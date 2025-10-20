@@ -2,10 +2,6 @@
 font-family = "JetBrains Mono"
 font-size = 14
 
-# --- Window size ---
-window-width = 150
-window-height = 150
-
 # --- Character spacing ---
 adjust-cell-width = 0
 adjust-cell-height = 0
@@ -24,3 +20,5 @@ background-opacity = 0.8
 window-padding-x = 2
 window-padding-y = 2
 window-padding-balance = true
+
+# --- Title bar ---

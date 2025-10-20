@@ -26,10 +26,3 @@ vim.scrolloff = 10
 -- change tabs to spaces
 vim.opt.expandtab = true
 vim.opt.smarttab = true
-
--- swap file (set to false by default)
-vim.opt.swapfile = false
-
--- use system clipboard
-vim.opt.clipboard = "unnamedplus"
-

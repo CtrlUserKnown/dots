@@ -3,18 +3,6 @@ vim.g.mapleader = " "
 vim.g.maplocalleader = "\\"
 vim.opt.timeoutlen = 2000 -- better timeout lenght
 
--- force Escape key to always work
-vim.keymap.set('i', '<Esc>', '<Esc>', { noremap = true, silent = true })
-vim.keymap.set('i', 'jk', '<Esc>', { noremap = true, silent = true }) -- Alternative: type 'jk' quickly
-
--- save and quit with leader keys
-vim.keymap.set('n', '<leader>w', ':w<CR>', { noremap = true, silent = true, desc = 'Save file' })
-vim.keymap.set('n', '<leader>q', ':wq<CR>', { noremap = true, silent = true, desc = 'Save and quit' })
-vim.keymap.set('n', '<leader>Q', ':q!<CR>', { noremap = true, silent = true, desc = 'Quit without saving' })
-
--- highlight current line number
-vim.api.nvim_set_hl(0, 'LineNr', { bold = true })
-
 -- load vim options for defaults
 require('options')
 

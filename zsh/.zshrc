@@ -1,56 +1,114 @@
-# Charlynder zshrc file
+# Char zshrc file
 #
-# date created: 07.18.2022
-#
-# v0.1.2: 09.08.2025
+# date created: 10.14.2025
 
-# Path to your oh-my-zsh installation.
-export ZSH="$HOME/.oh-my-zsh"
+# --- config:prompts ---
+# remove comment to pick a theme
+# default prompt theme CharModel
+source ~/.config/zsh/themes/charModel
+# source ~/.config/zsh/themes/charMulti
 
-ZSH_THEME="charlynderModel"
+# --- config:bat ---
+# Bat color themes
+export BAT_THEME="rose-pine"
 
-# auto-update oh-my-zsh
-# zstyle ':omz:update' mode auto      # update automatically without asking
+# --- config:eza ---
+eval $(dircolors ~/.config/dircolors)
 
-# Plugins
-plugins=(git zsh-autosuggestions)
+# --- config:yazi ---
+export EDITOR="nvim"
+export VISUAL="nvim"
 
-source $ZSH/oh-my-zsh.sh
+# --- config:fzf ---
+# default command for fzf (what it searches)
+export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
 
-# Load zsh-autosuggestions
-# source $(brew --prefix)/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+# Default options for fzf
+export FZF_DEFAULT_OPTS='
+  --height 40%
+  --layout=reverse
+  --border
+  --preview "bat --style=numbers --color=always {}"
+  --bind "alt-enter:execute(nvim {})"
+  --color=fg:#e0def4,bg:#191724,hl:#eb6f92
+  --color=fg+:#e0def4,bg+:#26233a,hl+:#eb6f92
+  --color=info:#9ccfd8,prompt:#f6c177,pointer:#c4a7e7
+  --color=marker:#ebbcba,spinner:#eb6f92,header:#31748f
+  --color=border:#524f67,preview-bg:#1f1d2e
+'
 
-# User configuration
+# CTRL-T options (file search)
+export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+export FZF_CTRL_T_OPTS='--preview "bat --color=always --line-range :500 {}"'
 
-# Run neofetch only once per day
-if [[ ! -f /tmp/neofetch_run_$(date +%Y%m%d) ]]; then
-    fastfetch
-    touch /tmp/neofetch_run_$(date +%Y%m%d)
-fi
+# ALT-C options (directory search)
+export FZF_ALT_C_COMMAND='fd --type d --hidden --follow --exclude .git'
+export FZF_ALT_C_OPTS='--preview "tree -C {} | head -200"'
 
-# Language environment
-export LANG=en_US.UTF-8
+# CTRL-R options (command history)
+export FZF_CTRL_R_OPTS='--preview "echo {}" --preview-window down:3:wrap'
 
-# Preferred editor for local and remote sessions
-if [[ -n $SSH_CONNECTION ]]; then
-  export EDITOR='vim'
-else
-  export EDITOR='mvim'
-fi
-
-# Set fzf key bindings and fuzzy completion (disabled)
-# source <(fzf --zsh)
-
-
+# --- conifg:aliases ---
 # import aliases
-if [ -f ~/.aliases ]; then
-	source ~/.aliases
+if [ -f ~/.config/zsh/aliases.zsh ]; then
+        source ~/.config/zsh/aliases.zsh
 fi
 
-# zoxide (keep this at the very end so hooks and completions are not overridden)
-# Ensure the completion system is initialized so compdef is available
-if ! typeset -f compdef >/dev/null; then
-  autoload -Uz compinit && compinit -i
+# --- conifg:fastfetch ---
+# Run neofetch only once per session
+if [[ ! -f /tmp/neofetch_run_$$ ]]; then
+    fastfetch
+    touch /tmp/neofetch_run_$$
 fi
-# Initialize zoxide (provides `z` and `zi`, plus completions)
+
+# --- conifg:zoxide ---
+# initialize zoxide (provides `z` and `zi`, plus completions)
 eval "$(zoxide init zsh)"
+
+# --- config:zim ---
+ZIM_HOME=${ZDOTDIR:-${HOME}}/.zim
+# download zimfw plugin manager if missing.
+if [[ ! -e ${ZIM_HOME}/zimfw.zsh ]]; then
+  if (( ${+commands[curl]} )); then
+    curl -fsSL --create-dirs -o ${ZIM_HOME}/zimfw.zsh \
+        https://github.com/zimfw/zimfw/releases/latest/download/zimfw.zsh
+  else
+    mkdir -p ${ZIM_HOME} && wget -nv -O ${ZIM_HOME}/zimfw.zsh \
+        https://github.com/zimfw/zimfw/releases/latest/download/zimfw.zsh
+  fi
+fi
+
+# install missing modules, and update ${ZIM_HOME}/init.zsh if missing or outdated.
+if [[ ! ${ZIM_HOME}/init.zsh -nt ${ZIM_CONFIG_FILE:-${ZDOTDIR:-${HOME}}/.zimrc} ]]; then
+  source ${ZIM_HOME}/zimfw.zsh init
+fi
+
+# initialize modules.
+source ${ZIM_HOME}/init.zsh
+
+# remove older command from the history if a duplicate is to be added.
+setopt HIST_IGNORE_ALL_DUPS
+
+# remove path separator from WORDCHARS.
+WORDCHARS=${WORDCHARS//[\/]}
+
+# --- config:zsh ---
+# zsh-autosuggestions
+ZSH_AUTOSUGGEST_MANUAL_REBIND=1
+
+# customize the highlighting style that the suggestions are shown with.
+ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=242'
+
+# zsh-history-substring-search
+zmodload -F zsh/terminfo +p:terminfo
+
+# zsh-syntax-highlighting
+ZSH_HIGHLIGHT_HIGHLIGHTERS=(main brackets)
+
+# customize the main highlighter styles.
+typeset -A ZSH_HIGHLIGHT_STYLES
+ZSH_HIGHLIGHT_STYLES[comment]='fg=242'
+
+# --- config:hidden ---
+# use degit instead of git as the default tool to install and update modules.
+# zstyle ':zim:zmodule' use 'degit'

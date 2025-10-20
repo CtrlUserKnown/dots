@@ -2,7 +2,49 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [0.1.3] - 2025-03-27
 
+### Added
+- Oh-my-zsh added for plugin support in zsh
+- "Winnie" oh-my-zsh theme added
+- Neovim config added with pckr.vim as the plugin manager
+- Fastfetch added to replace Neofetch
+- Added hyprland config
 
+### Changed
+- Restructured file structure for better management during development
+
+## [0.1.5] - 2025-06-14
+
+### Added
+- Tmux added
+- Tmux config added
+- Neovim plugin "autoclose.vim" added for better usability
+- New zsh themes added: "CharlynderModel" & "CharlynderLite"
+
+### Removed
+- Old "Winnie" zsh theme
+- Old Neovim config
+
+### Changed
+- Changed Tmux keybindings: prefix changed from `<Ctrl + b>` to `<Ctrl + Space>`
+- Replaced "Winnie" zsh theme with "CharlynderModel" theme as the default
+- Made better Neovim plugin & UI changes
+- Added "Tree-sitter.vim", "oil.vim", & "completions.vim" to Neovim for better usability
+
+## [0.1.7] - 2025-08-03
+
+### Added
+- Ghostty added
+- Ghostty config added
+- Rectangle WM added
+- Rectangle WM config added
+- Lazy.vim plugin manager added
+- Brewfile to track dependencies
+
+### Removed
+- Pckr.vim plugin manager due to have issues maintianing
+
+### Changed
+- Moved to Lazy.vim for better plugin support
+- Rewrote Ghostty config, added better theme

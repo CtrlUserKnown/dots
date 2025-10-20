@@ -1,5 +1,4 @@
 return {
-    -- Nvim Surround
     {
         "kylechui/nvim-surround",
         version = "*",
@@ -9,38 +8,7 @@ return {
         end
     },
 
-    {
-        "christoomey/vim-tmux-navigator",
-        lazy = false
-    },
-    
-    -- Harpoon2
-    {
-        'ThePrimeagen/harpoon',
-        branch = 'harpoon2',
-        dependencies = { 'nvim-lua/plenary.nvim' },
-        config = function()
-           require('harpoon-config')
-        end
-    },
-
-    -- Rosé Pine
-    {
-        'rose-pine/neovim',
-        name = 'rose-pine',
-        priority = 1000,
-        config = function()
-            require('rose-pine').setup({
-                variant = 'main', -- 'main', 'moon', or 'dawn'
-                disable_background = true,
-                disable_float_background = true,
-                disable_italics = false,
-            })
-            vim.cmd('colorscheme rose-pine')
-        end
-    },
-
-    -- Treesitter
+    -- Treesitter for better syntax highlighting and code understanding
     {
         'nvim-treesitter/nvim-treesitter',
         build = ':TSUpdate',
@@ -49,7 +17,6 @@ return {
         end,
     },
 
-    -- Refactoring
     {
         'ThePrimeagen/refactoring.nvim',
         dependencies = {
@@ -65,25 +32,25 @@ return {
             end
 
             -- Select refactor operation with vim.ui.select (or Telescope if configured)
-            vim.keymap.set({ "n", "x" }, "<leader>R", refactoring.select_refactor, { desc = "Select Refactor" })
+            vim.keymap.set({ "n", "x" }, "<leader>rr", refactoring.select_refactor, { desc = "Select Refactor" })
 
             -- Example specific refactor operations:
-            vim.keymap.set({ "x" }, "<leader>Rc", function()
+            vim.keymap.set({ "x" }, "<leader>re", function()
                 return refactoring.refactor('Extract Function')
             end, { expr = true, desc = "Extract Function" })
 
-            vim.keymap.set({ "x" }, "<leader>Rv", function()
+            vim.keymap.set({ "x" }, "<leader>rv", function()
                 return refactoring.refactor('Extract Variable')
             end, { expr = true, desc = "Extract Variable" })
 
-            vim.keymap.set({ "n", "x" }, "<leader>Ri", function()
+            vim.keymap.set({ "n", "x" }, "<leader>ri", function()
                 return refactoring.refactor('Inline Variable')
             end, { expr = true, desc = "Inline Variable" })
 
             -- debugger functionality
-            vim.keymap.set({ "n", "x" }, "<leader>Rp", refactor('Printf'), { desc = "Insert Printf" })
-            vim.keymap.set({ "n", "x" }, "<leader>RP", refactor('Print Var'), { desc = "Insert Print Var" })
-            vim.keymap.set({ "n" }, "<leader>Rc", refactor('Cleanup'), { desc = "Cleanup Debug" })
+            vim.keymap.set({ "n", "x" }, "<leader>rp", refactor('Printf'), { desc = "Insert Printf" })
+            vim.keymap.set({ "n", "x" }, "<leader>rP", refactor('Print Var'), { desc = "Insert Print Var" })
+            vim.keymap.set({ "n" }, "<leader>rc", refactor('Cleanup'), { desc = "Cleanup Debug" })
         end
     },
 
@@ -98,43 +65,18 @@ return {
             local telescope = require('telescope')
             telescope.setup({
                 defaults = {
-                    prompt_prefix = ' 🔎  ',
+                    prompt_prefix = '   ',
                     selection_caret = '❯',
                 },
                 extensions = {
                     file_browser = {
                         hidden = true,
-                        hijack_netrw = true, -- Telescope instead of netrw
+                        hijack_netrw = true, -- Telescope instead of
                     },
                 },
             })
             -- load file browser extension
             pcall(telescope.load_extension, 'file_browser')
-        end,
-    },
-
-    -- Which-key
-    {
-        "folke/which-key.nvim",
-        event = "VeryLazy",
-        opts = {
-            preset = "modern",
-        },
-        config = function()
-            local wk = require("which-key")
-            wk.setup({
-                preset = "modern",
-            })
-
-            -- Add key descriptions
-            wk.add({
-                { "<leader>r", group = "refactor" },
-                { "<leader>w", desc = "Save file" },
-                { "<leader>q", desc = "Save and quit" },
-                { "<leader>Q", desc = "Quit without saving" },
-                { "<leader>e", desc = "File explorer" },
-                { "<leader>v", desc = "File explorer" },
-            })
         end,
     },
 

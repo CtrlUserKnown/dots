@@ -1,0 +1,105 @@
+# CharMulti
+#
+# Date Created: 10.10.2025
+#
+# A custom Zsh prompt theme featuring a dynamic arrow indicator that changes
+# direction based on your typing (forward when typing, backward when deleting).
+# Includes full git integration with branch display and status indicators for
+# staged and unstaged changes. The prompt shows your exit code, command history,
+# username, current directory, and displays the current time and date above the
+# main prompt line.
+
+# create the symbol for the apple icon
+function cancer {
+  echo -n "\u264B\uFE0E"
+}
+
+# Function to display status word (Rosé Pine colors)
+function status_word {
+  local exit_code=$?
+  if [[ $exit_code -eq 0 ]]; then
+    echo -n "%F{#c4a7e7}${exit_code} success%f"
+  else
+    echo -n "%F{#eb6f92}${exit_code} failed%f"
+  fi
+}
+
+# Variable to track arrow direction
+ARROW_DIRECTION="»"
+
+# Initialize vcs_info for git branch display
+autoload -Uz vcs_info
+setopt prompt_subst
+
+# Configure vcs_info styles (Rosé Pine colors)
+zstyle ':vcs_info:*' check-for-changes true
+zstyle ':vcs_info:*' unstagedstr '%F{#eb6f92}*'   # display this when there are unstaged changes (love/red)
+zstyle ':vcs_info:*' stagedstr '%F{#f6c177}+'  # display this when there are staged changes (gold/yellow)
+zstyle ':vcs_info:*' actionformats '%F{5}%F{#c4a7e7}%b%F{#f6c177}|%F{#eb6f92}%a%c%u%F{5}%f '  # iris purple branch
+zstyle ':vcs_info:*' formats '%F{5}%F{#c4a7e7}%b%c%u%F{5}%f '  # iris purple branch name
+zstyle ':vcs_info:svn:*' branchformat '%b'
+zstyle ':vcs_info:svn:*' actionformats '%F{5}%F{#c4a7e7}%b%F{#eb6f92}:%F{#f6c177}%i%F{#f6c177}|%F{#eb6f92}%a%c%u%F{5}%f '
+zstyle ':vcs_info:svn:*' formats '%F{#c4a7e7}%b%F{#eb6f92}:%F{#f6c177}%i%c%u%F{5}%f '
+zstyle ':vcs_info:*' enable git cvs svn
+
+# Custom backspace widget
+function my-backward-delete-char() {
+  ARROW_DIRECTION="«"
+  zle backward-delete-char
+  zle reset-prompt
+}
+
+# Custom self-insert widget to catch normal typing
+function my-self-insert() {
+  ARROW_DIRECTION="»"
+  zle self-insert
+  zle reset-prompt
+}
+
+# Custom accept-line to reset arrow
+function my-accept-line() {
+  ARROW_DIRECTION="»"
+  zle accept-line
+}
+
+# Create the widgets
+zle -N my-backward-delete-char
+zle -N my-self-insert
+zle -N my-accept-line
+
+# Bind the widgets
+bindkey '^?' my-backward-delete-char  # Backspace
+bindkey '^H' my-backward-delete-char  # Ctrl+H
+bindkey '^M' my-accept-line  # Enter
+
+# Override the default self-insert to catch normal typing
+for key in {a..z} {A..Z} {0..9}; do
+  bindkey "$key" my-self-insert
+done
+
+# Common symbols
+bindkey ' ' my-self-insert
+bindkey '.' my-self-insert
+bindkey ',' my-self-insert
+bindkey '!' my-self-insert
+bindkey '?' my-self-insert
+bindkey ':' my-self-insert
+bindkey ';' my-self-insert
+
+# Function to update vcs_info and reset arrow after command
+theme_precmd() {
+  vcs_info
+  # Reset arrow to default after command execution
+  ARROW_DIRECTION="»"
+  # Print the time/date on the line above
+  # print -rP '%W %B%F{#c4a7e7}%t%f%b'
+}
+
+# Set up the prompt with dynamic vcs_info (Rosé Pine colors)
+PROMPT=' $(cancer) (%(?,%F{#c4a7e7}success%f %?,%F{#eb6f92}failed%f %?) | %h) %{$reset_color%}${vcs_info_msg_0_}%{$reset_color%}
+ [%F{#907aa9}%n%f: %~] ${ARROW_DIRECTION} '
+RPROMPT='%W %B%F{#c4a7e7}%t%f%b'
+
+# Add the precmd hook to update git info automatically
+autoload -U add-zsh-hook
+add-zsh-hook precmd theme_precmd

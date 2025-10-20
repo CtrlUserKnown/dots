@@ -1,10 +1,18 @@
-# Charlynder Model theme for zsh
-# A theme that changes based on different modes
+# CharModel zsh theme
+#
+# Date Created: 09.30.2025
+#
+# A dynamic zsh prompt theme with environment-aware styling and interactive arrow
+# indicators. Features different symbols for tmux (⚡) and standard shell (♋︎)
+# environments. Includes full git integration with branch display and real-time
+# status indicators for staged/unstaged changes. The arrow dynamically responds
+# to your actions: typing (»), deleting («), and navigating (↑↓). Styled with
+# Rosé Pine's purple color palette for a cohesive, elegant terminal experience.
 
-# Environment variables
+# --- Environment variables ---
 # Set the symbol for different environments
 function tmuxbolt {
-    echo -n "⚡️"
+    echo -n "\u26A1"
 }
 
 function cancer {
@@ -17,18 +25,19 @@ ARROW_DIRECTION="»"  # Default arrow direction
 autoload -Uz vcs_info
 setopt prompt_subst
 
-# Configure vcs_info styles
+# Configure vcs_info styles (Rosé Pine colors)
 zstyle ':vcs_info:*' check-for-changes true
-zstyle ':vcs_info:*' unstagedstr '%F{red}*'   # display this when there are unstaged changes
-zstyle ':vcs_info:*' stagedstr '%F{yellow}+'  # display this when there are staged changes
-zstyle ':vcs_info:*' actionformats '%F{5}[%F{2}%b%F{3}|%F{1}%a%c%u%F{5}]%f '
-zstyle ':vcs_info:*' formats '%F{5}[%F{2}%b%c%u%F{5}]%f '
+zstyle ':vcs_info:*' unstagedstr '%F{#eb6f92}*'   # display this when there are unstaged changes (love/red)
+zstyle ':vcs_info:*' stagedstr '%F{#f6c177}+'  # display this when there are staged changes (gold/yellow)
+zstyle ':vcs_info:*' actionformats '%F{5}%F{#c4a7e7}%b%F{#f6c177}|%F{#eb6f92}%a%c%u%F{5}%f '  # iris purple branch
+zstyle ':vcs_info:*' formats '%F{5}%F{#c4a7e7}%b%c%u%F{5}%f '  # iris purple branch name
 zstyle ':vcs_info:svn:*' branchformat '%b'
-zstyle ':vcs_info:svn:*' actionformats '%F{5}[%F{2}%b%F{1}:%F{3}%i%F{3}|%F{1}%a%c%u%F{5}]%f '
-zstyle ':vcs_info:svn:*' formats '%F{5}[%F{2}%b%F{1}:%F{3}%i%c%u%F{5}]%f '
+zstyle ':vcs_info:svn:*' actionformats '%F{5}%F{#c4a7e7}%b%F{#eb6f92}:%F{#f6c177}%i%F{#f6c177}|%F{#eb6f92}%a%c%u%F{5}%f '
+zstyle ':vcs_info:svn:*' formats '%F{5}%F{#c4a7e7}%b%F{#eb6f92}:%F{#f6c177}%i%c%u%F{5}%f '
 zstyle ':vcs_info:*' enable git cvs svn
 
-# Functions to detect if we're in tmux or python
+
+# Functions to detect if we're in Tmux or Neovim
 function in_tmux {
     [[ -n "$TMUX" ]]
 }
@@ -122,14 +131,14 @@ function get_arrow {
   echo -n "${ARROW_DIRECTION}"
 }
 
-# Function to build the appropriate prompt
+# Function to build the appropriate prompt (Rosé Pine colors)
 function build_prompt {
     local prompt_str=""
 
     if in_tmux; then
-        prompt_str="$(tmuxbolt) [%F{041}%n%f:%F{blue}%c%f] %{$reset_color%}${vcs_info_msg_0_}%{$reset_color%} ~ "
+        prompt_str="$(tmuxbolt) [%F{#907aa9}%n%f:%F{#9ccfd8}%c%f] %{$reset_color%}${vcs_info_msg_0_}%{$reset_color%} ~ "
     else
-        prompt_str="$(cancer) [%F{041}%n%f: %~] %{$reset_color%}${vcs_info_msg_0_}%{$reset_color%} ${ARROW_DIRECTION} "
+        prompt_str="$(cancer) [%F{#907aa9}%n%f: %~] %{$reset_color%}${vcs_info_msg_0_}%{$reset_color%} ${ARROW_DIRECTION} "
     fi
 
     echo -n "$prompt_str"
