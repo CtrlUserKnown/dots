@@ -3,31 +3,23 @@ vim.g.mapleader = " "
 vim.g.maplocalleader = "\\"
 vim.opt.timeoutlen = 2000 -- better timeout lenght
 
--- force Escape key to always work
-vim.keymap.set('i', '<Esc>', '<Esc>', { noremap = true, silent = true })
-vim.keymap.set('i', 'jk', '<Esc>', { noremap = true, silent = true }) -- Alternative: type 'jk' quickly
-
--- save and quit with leader keys
-vim.keymap.set('n', '<leader>w', ':w<CR>', { noremap = true, silent = true, desc = 'Save file' })
-vim.keymap.set('n', '<leader>q', ':wq<CR>', { noremap = true, silent = true, desc = 'Save and quit' })
-vim.keymap.set('n', '<leader>Q', ':q!<CR>', { noremap = true, silent = true, desc = 'Quit without saving' })
-
--- go to beginning and end of file
-vim.keymap.set('n', '<leader>gg', 'gg', { noremap = true, silent = true, desc = 'Go to beginning of file' })
-vim.keymap.set('n', '<leader>G', 'G', { noremap = true, silent = true, desc = 'Go to end of file' })
-
+-- --- config:load
 -- highlight current line number
 vim.api.nvim_set_hl(0, 'LineNr', { bold = true })
 
 -- load vim options for defaults
 require('options')
 
+-- load keymaps for editor
+require('keymaps')
+
+-- load lsp for editor
+require('lsp-config')
+
 -- load vim autoclose for closing quotes and paretheses
 require('autoclose').setup()
 
--- plugins
--- lazy.nvim setup
-
+-- --- config:plugins ---
 -- bootstrap lazy.nvim
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
 if not vim.loop.fs_stat(lazypath) then

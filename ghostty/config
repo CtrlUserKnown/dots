@@ -4,7 +4,7 @@ font-size = 14
 
 # --- Window size ---
 window-width = 150
-window-height = 150
+window-height = 40
 
 # --- Character spacing ---
 adjust-cell-width = 0

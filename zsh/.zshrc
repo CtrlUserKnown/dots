@@ -5,15 +5,12 @@
 # --- config:prompts ---
 # remove comment to pick a theme
 # default prompt theme CharModel
-source ~/.config/zsh/themes/charModel
-# source ~/.config/zsh/themes/charMulti
+# source ~/.config/zsh/themes/charModel
+source ~/.config/zsh/themes/charMulti
 
 # --- config:bat ---
 # Bat color themes
 export BAT_THEME="rose-pine"
-
-# --- config:eza ---
-eval $(dircolors ~/.config/dircolors)
 
 # --- config:yazi ---
 export EDITOR="nvim"
@@ -65,6 +62,7 @@ fi
 # initialize zoxide (provides `z` and `zi`, plus completions)
 eval "$(zoxide init zsh)"
 
+
 # --- config:zim ---
 ZIM_HOME=${ZDOTDIR:-${HOME}}/.zim
 # download zimfw plugin manager if missing.
@@ -78,13 +76,19 @@ if [[ ! -e ${ZIM_HOME}/zimfw.zsh ]]; then
   fi
 fi
 
+# Prevent double initialization of completion
+skip_global_compinit=1
+# initialize modules.
+source ${ZIM_HOME}/init.zsh
+
+
+
 # install missing modules, and update ${ZIM_HOME}/init.zsh if missing or outdated.
 if [[ ! ${ZIM_HOME}/init.zsh -nt ${ZIM_CONFIG_FILE:-${ZDOTDIR:-${HOME}}/.zimrc} ]]; then
   source ${ZIM_HOME}/zimfw.zsh init
 fi
 
-# initialize modules.
-source ${ZIM_HOME}/init.zsh
+
 
 # remove older command from the history if a duplicate is to be added.
 setopt HIST_IGNORE_ALL_DUPS

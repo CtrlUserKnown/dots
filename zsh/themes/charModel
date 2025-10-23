@@ -9,7 +9,12 @@
 # to your actions: typing (»), deleting («), and navigating (↑↓). Styled with
 # Rosé Pine's purple color palette for a cohesive, elegant terminal experience.
 
-# --- Environment variables ---
+# --- theme:vim-motions ---
+# set vim motions in the terminal if using this theme
+bindkey -v
+export KEYTIMEOUT=1
+
+# --- theme:env ---
 # Set the symbol for different environments
 function tmuxbolt {
     echo -n "\u26A1"
@@ -21,6 +26,7 @@ function cancer {
 
 ARROW_DIRECTION="»"  # Default arrow direction
 
+# --- theme:vis-updates ---
 # Initialize vcs_info for git branch display
 autoload -Uz vcs_info
 setopt prompt_subst
@@ -119,6 +125,7 @@ bindkey '?' my-self-insert
 bindkey ':' my-self-insert
 bindkey ';' my-self-insert
 
+# --- theme:precmd ---
 # Function to update vcs_info and reset arrow after command
 theme_precmd() {
   vcs_info
@@ -131,10 +138,12 @@ function get_arrow {
   echo -n "${ARROW_DIRECTION}"
 }
 
+# --- theme:prompt ---
 # Function to build the appropriate prompt (Rosé Pine colors)
 function build_prompt {
     local prompt_str=""
-
+    
+    # Checks if the user is in tmux
     if in_tmux; then
         prompt_str="$(tmuxbolt) [%F{#907aa9}%n%f:%F{#9ccfd8}%c%f] %{$reset_color%}${vcs_info_msg_0_}%{$reset_color%} ~ "
     else
