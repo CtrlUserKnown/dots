@@ -5,16 +5,30 @@
 # --- config:prompts ---
 # remove comment to pick a theme
 # default prompt theme CharModel
-# source ~/.config/zsh/themes/charModel
-source ~/.config/zsh/themes/charMulti
+source ~/.config/zsh/themes/charModel
+# source ~/.config/zsh/themes/charMulti
+# source ~/.config/zsh/themes/charMux
 
 # --- config:bat ---
 # Bat color themes
 export BAT_THEME="rose-pine"
 
-# --- config:yazi ---
+# --- config:editor ---
 export EDITOR="nvim"
 export VISUAL="nvim"
+
+# --- config:ls/eza ---
+# Rose Pine colors for eza
+export EZA_COLORS="\
+da=38;5;246:\
+di=38;2;196;167;231:\
+ln=38;5;211:\
+ex=38;2;86;148;159:\
+*.txt=38;5;224:\
+*.md=38;5;224:\
+*.json=38;5;180:\
+*.yml=38;5;180:\
+*.yaml=38;5;180"
 
 # --- config:fzf ---
 # default command for fzf (what it searches)
@@ -87,8 +101,6 @@ source ${ZIM_HOME}/init.zsh
 if [[ ! ${ZIM_HOME}/init.zsh -nt ${ZIM_CONFIG_FILE:-${ZDOTDIR:-${HOME}}/.zimrc} ]]; then
   source ${ZIM_HOME}/zimfw.zsh init
 fi
-
-
 
 # remove older command from the history if a duplicate is to be added.
 setopt HIST_IGNORE_ALL_DUPS

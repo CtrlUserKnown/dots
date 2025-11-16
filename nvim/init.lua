@@ -5,9 +5,12 @@ vim.opt.timeoutlen = 2000 -- better timeout lenght
 
 -- --- config:load
 -- highlight current line number
-vim.api.nvim_set_hl(0, 'LineNr', { bold = true })
+vim.api.nvim_set_hl(0, 'CursorLineNr', {
+  fg = '#f6c177',  -- Rosé Pine gold (yellow-orange)
+  bold = true
+})
 
--- load vim options for defaults
+-- load neovim options
 require('options')
 
 -- load keymaps for editor
@@ -15,6 +18,9 @@ require('keymaps')
 
 -- load lsp for editor
 require('lsp-config')
+
+-- load telescope find & replace configuration
+-- require('telescope-replace-config').setup()
 
 -- load vim autoclose for closing quotes and paretheses
 require('autoclose').setup()

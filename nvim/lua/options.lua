@@ -1,6 +1,10 @@
 -- show line numbers
 vim.wo.number = true
 
+-- enable line trails
+vim.opt.list = true
+vim.opt.listchars = { tab = '▸ ', trail = '·', extends = '»', precedes = '«', nbsp = '␣' }
+
 -- remove statusline
 vim.opt.laststatus = 0
 vim.opt.showcmd = true
@@ -26,6 +30,10 @@ vim.scrolloff = 10
 -- change tabs to spaces
 vim.opt.expandtab = true
 vim.opt.smarttab = true
+vim.opt.smartindent = true
+vim.opt.shiftwidth = 4
+vim.opt.tabstop = 4
+vim.opt.softtabstop = 4
 
 -- swap file (set to false by default)
 vim.opt.swapfile = false
@@ -33,3 +41,9 @@ vim.opt.swapfile = false
 -- use system clipboard
 vim.opt.clipboard = "unnamedplus"
 
+-- highlight the current line number
+vim.opt.cursorline = true
+vim.opt.cursorlineopt = 'number'
+
+-- cursor shape in different modes
+vim.opt.guicursor = "n-v-c:block,i-ci-ve:ver25,r-cr:hor20,o:hor50"

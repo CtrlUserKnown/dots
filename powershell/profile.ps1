@@ -3,8 +3,7 @@
 # > Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
 
 # initialize starship prompt
-# Invoke-Expression (&starship init powershell)
-Invoke-Expression (& '/opt/homebrew/bin/starship' init powershell --print-full-init | Out-String)
+Invoke-Expression (&starship init powershell)
 
 # show options menu
 Set-PSReadlineKeyHandler -Key Tab -Function MenuComplete

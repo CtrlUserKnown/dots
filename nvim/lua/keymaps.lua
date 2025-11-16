@@ -11,6 +11,12 @@ vim.keymap.set('n', '<leader>Q', ':q!<CR>', { noremap = true, silent = true, des
 vim.keymap.set('n', '<leader>gg', 'gg', { noremap = true, silent = true, desc = 'Go to beginning of file' })
 vim.keymap.set('n', '<leader>G', 'G', { noremap = true, silent = true, desc = 'Go to end of file' })
 
+-- go to beginning and end of line
+vim.keymap.set('n', 'gh', '0', { noremap = true, silent = true, desc = 'Go to beginning of line' })
+vim.keymap.set('n', 'gl', '$', { noremap = true, silent = true, desc = 'Go to end of line' })
+vim.keymap.set('v', 'gh', '0', { noremap = true, silent = true, desc = 'Go to beginning of line' })
+vim.keymap.set('v', 'gl', '$', { noremap = true, silent = true, desc = 'Go to end of line' })
+
 -- paragraph navigation with Option + ( and )
 vim.keymap.set('n', '<M-[>', '{', { noremap = true, silent = true, desc = 'Previous paragraph' })
 vim.keymap.set('n', '<M-]>', '}', { noremap = true, silent = true, desc = 'Next paragraph' })

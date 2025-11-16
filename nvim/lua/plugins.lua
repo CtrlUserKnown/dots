@@ -43,8 +43,12 @@ return {
                 disable_background = true,
                 disable_float_background = true,
                 disable_italics = false,
+                highlight_groups = {
+                        CursorLineNr = { fg = 'gold', bold = true }
+                }
             })
             vim.cmd('colorscheme rose-pine')
+
         end
     },
 
@@ -56,6 +60,38 @@ return {
             require('treesitter-config')
         end,
     },
+
+    -- Mason (LSP/DAP/Linter installer)
+    {
+        'williamboman/mason.nvim',
+        config = function()
+            require('mason').setup({
+                ui = {
+                    icons = {
+                        package_installed = "✓",
+                        package_pending = "➜",
+                        package_uninstalled = "✗"
+                    }
+                }
+            })
+        end,
+    },
+
+    {
+        'williamboman/mason-lspconfig.nvim',
+        dependencies = { 'williamboman/mason.nvim' },
+        config = function()
+            require('mason-lspconfig').setup({
+                ensure_installed = {
+                    'lua_ls',
+                    'pyright',
+                    'ts_ls',
+                },
+                automatic_installation = true,
+            })
+        end,
+    },
+
 
     -- Refactoring
     {
@@ -136,7 +172,7 @@ return {
 
             -- Add key descriptions
             wk.add({
-                { "<leader>r", group = "refactor" },
+                { "<leader>R", group = "Refactor" },
                 { "<leader>w", desc = "Save file" },
                 { "<leader>q", desc = "Save and quit" },
                 { "<leader>Q", desc = "Quit without saving" },
@@ -204,6 +240,14 @@ return {
         dependencies = { "zbirenbaum/copilot.lua" },
         config = function()
             require("copilot_cmp").setup()
+        end
+    },
+
+    -- alpha-nvim dashboard
+    {
+        "goolord/alpha-nvim",
+        config = function ()
+            require('alpha-config')
         end
     },
 

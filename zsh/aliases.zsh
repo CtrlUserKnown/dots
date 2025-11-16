@@ -5,10 +5,11 @@
 
 # --- alias:functionality ---
 alias -g cls="command clear"
-alias -g ls="command eza --color=always"
-alias -g tree="command eza -T --color=always"
+alias -g ls="command eza --icons --color=always"
+# alias  lt="command eza --tree"
+alias -g la="command eza -al --icons --color=always"
+alias -g ll="command eza -l --icons color=always"
 alias -g htop="command btop"
-alias -g la="eza -al --color=always"
 
 # --- alias:application ---
 alias -g tm="command tmux"
