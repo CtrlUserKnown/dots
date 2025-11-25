@@ -50,8 +50,17 @@ function download() {
   fi
 }
 
+function termcon() {
+    # open the terminal configuration file in the default editor (neovim)
+    ${EDITOR:-nvim} ~/development/dotfiles/src/.zshrc
+}
+
+function muxcon() {
+    # open the tmux configuration file in the default editor (neovim)
+    ${EDITOR:-nvim} ~/development/dotfiles/src/tmux/tmux.conf
+}
+
 # --- alias:application ---
 alias -g mux="command tmux"
 alias -g b="command btop"
-alias -g neovim="nvim"
 alias -g f="fzf"

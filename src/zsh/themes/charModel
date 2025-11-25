@@ -1,193 +1,147 @@
-# CharModel zsh theme
-#
-# Date Created: 09.30.2025
-#
-# A dynamic zsh prompt theme with environment-aware styling and interactive arrow
-# indicators. Features different symbols for tmux (⚡) and standard shell (♋︎)
-# environments. Includes full git integration with branch display and real-time
-# status indicators for staged/unstaged changes. The arrow dynamically responds
-# to your actions: typing (»), deleting («), and navigating (↑↓). Styled with
-# Rosé Pine's purple color palette for a cohesive, elegant terminal experience.
+# User ~/.zshrc (complete; forces emacs line-editing for interactive shells)
+# Date: 2025-11-25
+# Purpose: Ensure zsh uses emacs-style editing (so typing inserts characters immediately),
+#          only apply zle/widget/bindkey work in interactive shells, and keep existing prompt/theme.
 
-# --- theme:vim-motions ---
-# set vim motions in the terminal if using this theme
-# bindkey -v
-# export KEYTIMEOUT=1
+# ---- Basic environment ----
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
 
-# --- theme:env ---
-# Set the symbol for different environments
-function muxFraktur {
-    echo -n "\U0001D57E"
-}
+# If you use a framework (oh-my-zsh, prezto, zim, etc.), source it here.
+# Example (uncomment only if you use oh-my-zsh):
+# source $ZSH/oh-my-zsh.sh
 
-function cancer {
-    echo -n "\u264B\uFE0E"
-}
-
-ARROW_DIRECTION="»"  # Default arrow direction
-
-# --- theme:vis-updates ---
-# Initialize vcs_info for git branch display
+# ---- Theme/prompt & git info (kept from your theme) ----
 autoload -Uz vcs_info
 setopt prompt_subst
 
-# Configure vcs_info styles (Rosé Pine colors)
+# VCS styles (example from your theme)
 zstyle ':vcs_info:*' check-for-changes true
-zstyle ':vcs_info:*' unstagedstr '%F{#eb6f92}*'   # display this when there are unstaged changes (love/red)
-zstyle ':vcs_info:*' stagedstr '%F{#f6c177}+'  # display this when there are staged changes (gold/yellow)
-zstyle ':vcs_info:*' actionformats '%F{5}%F{#c4a7e7}%b%F{#f6c177}|%F{#eb6f92}%a%c%u%F{5}%f '  # iris purple branch
-zstyle ':vcs_info:*' formats '%F{5}%F{#c4a7e7}%b%c%u%F{5}%f '  # iris purple branch name
-zstyle ':vcs_info:svn:*' branchformat '%b'
-zstyle ':vcs_info:svn:*' actionformats '%F{5}%F{#c4a7e7}%b%F{#eb6f92}:%F{#f6c177}%i%F{#f6c177}|%F{#eb6f92}%a%c%u%F{5}%f '
-zstyle ':vcs_info:svn:*' formats '%F{5}%F{#c4a7e7}%b%F{#eb6f92}:%F{#f6c177}%i%c%u%F{5}%f '
+zstyle ':vcs_info:*' unstagedstr '%F{#eb6f92}*'
+zstyle ':vcs_info:*' stagedstr '%F{#f6c177}+'
+zstyle ':vcs_info:*' actionformats '%F{5}%F{#c4a7e7}%b%F{#f6c177}|%F{#eb6f92}%a%c%u%F{5}%f '
+zstyle ':vcs_info:*' formats '%F{5}%F{#c4a7e7}%b%c%u%F{5}%f '
 zstyle ':vcs_info:*' enable git cvs svn
 
+# Example env functions used by your prompt
+function muxFraktur { echo -n "\U0001D57E"; }
+function cancer { echo -n "\u264B\uFE0E"; }
 
-# Functions to detect if we're in Tmux or Neovim
-function in_tmux {
-    [[ -n "$TMUX" ]]
-}
+ARROW_DIRECTION="»"  # Default arrow direction
 
-# Custom self-insert widget to catch normal typing
-function my-self-insert() {
-  ARROW_DIRECTION="»"  # Right arrow when typing (matches charlynderLite)
-  zle self-insert
-  zle reset-prompt
-}
+# ---- Interactive-only: zle widgets and bindkeys ----
+if [[ -o interactive ]]; then
 
-# Custom backspace widget
-function my-backward-delete-char() {
-  ARROW_DIRECTION="«"  # Left arrow when backspacing (matches charlynderLite)
-  zle backward-delete-char
-  zle reset-prompt
-}
+  # Force emacs editing mode (disable zsh vi-mode).
+  # If some other file or plugin re-enables vi-mode later, place `bindkey -e` at the end of this file.
+  bindkey -e
 
-# Navigation key widgets
-function my-backward-char() {
-  ARROW_DIRECTION="«"  # Left arrow when moving left
-  zle backward-char
-  zle reset-prompt
-}
+  # Custom widgets (kept from your theme)
+  function my-self-insert() {
+    ARROW_DIRECTION="»"
+    zle self-insert
+    zle reset-prompt
+  }
+  function my-backward-delete-char() {
+    ARROW_DIRECTION="«"
+    zle backward-delete-char
+    zle reset-prompt
+  }
+  function my-backward-char() {
+    ARROW_DIRECTION="«"
+    zle backward-char
+    zle reset-prompt
+  }
+  function my-forward-char() {
+    ARROW_DIRECTION="»"
+    zle forward-char
+    zle reset-prompt
+  }
+  function my-up-line-or-history() {
+    ARROW_DIRECTION="↑"
+    zle up-line-or-history
+    zle reset-prompt
+  }
+  function my-down-line-or-history() {
+    ARROW_DIRECTION="↓"
+    zle down-line-or-history
+    zle reset-prompt
+  }
 
-function my-forward-char() {
-  ARROW_DIRECTION="»"  # Right arrow when moving right
-  zle forward-char
-  zle reset-prompt
-}
+  # Register widgets
+  zle -N my-backward-delete-char
+  zle -N my-self-insert
+  zle -N my-backward-char
+  zle -N my-forward-char
+  zle -N my-up-line-or-history
+  zle -N my-down-line-or-history
 
-function my-up-line-or-history() {
-  ARROW_DIRECTION="↑"  # Up arrow when moving up
-  zle up-line-or-history
-  zle reset-prompt
-}
+  # Bindings (emacs keymap)
+  bindkey '^?' my-backward-delete-char  # Backspace
+  bindkey '^H' my-backward-delete-char  # Ctrl+H
 
-function my-down-line-or-history() {
-  ARROW_DIRECTION="↓"  # Down arrow when moving down
-  zle down-line-or-history
-  zle reset-prompt
-}
+  # Arrow keys (common sequences)
+  bindkey -M emacs '^[[D' my-backward-char
+  bindkey -M emacs '^[[C' my-forward-char
+  bindkey -M emacs '^[[A' my-up-line-or-history
+  bindkey -M emacs '^[[B' my-down-line-or-history
 
-# Create the widgets
-zle -N my-backward-delete-char
-zle -N my-self-insert
-zle -N my-backward-char
-zle -N my-forward-char
-zle -N my-up-line-or-history
-zle -N my-down-line-or-history
+  # Alternative sequences (some terminals)
+  bindkey -M emacs '^[OD' my-backward-char
+  bindkey -M emacs '^[OC' my-forward-char
+  bindkey -M emacs '^[OA' my-up-line-or-history
+  bindkey -M emacs '^[OB' my-down-line-or-history
 
-# Bind the widgets
-bindkey '^?' my-backward-delete-char  # Backspace
-bindkey '^H' my-backward-delete-char  # Ctrl+H
+  # Bind alphanumerics to custom self-insert widget in emacs map
+  for key in {a..z} {A..Z} {0..9}; do
+    bindkey -M emacs "$key" my-self-insert
+  done
 
-# Only bind arrow keys when NOT in completion menu
-# Bind navigation keys (primary sequences)
-bindkey -M emacs '^[[D' my-backward-char       # Left arrow
-bindkey -M emacs '^[[C' my-forward-char        # Right arrow
-bindkey -M emacs '^[[A' my-up-line-or-history  # Up arrow
-bindkey -M emacs '^[[B' my-down-line-or-history # Down arrow
+  # Common punctuation
+  bindkey -M emacs ' ' my-self-insert
+  bindkey -M emacs '.' my-self-insert
+  bindkey -M emacs ',' my-self-insert
+  bindkey -M emacs '!' my-self-insert
+  bindkey -M emacs '?' my-self-insert
+  bindkey -M emacs ':' my-self-insert
+  bindkey -M emacs ';' my-self-insert
 
-# Alternative sequences for different terminals
-bindkey -M emacs '^[OD' my-backward-char       # Left arrow (alternative)
-bindkey -M emacs '^[OC' my-forward-char        # Right arrow (alternative)
-bindkey -M emacs '^[OA' my-up-line-or-history  # Up arrow (alternative)
-bindkey -M emacs '^[OB' my-down-line-or-history # Down arrow (alternative)
+fi  # interactive guard
 
-# Override the default self-insert to catch normal typing
-for key in {a..z} {A..Z} {0..9}; do
-  bindkey "$key" my-self-insert
-done
-
-# Common symbols
-bindkey ' ' my-self-insert
-bindkey '.' my-self-insert
-bindkey ',' my-self-insert
-bindkey '!' my-self-insert
-bindkey '?' my-self-insert
-bindkey ':' my-self-insert
-bindkey ';' my-self-insert
-
-# --- theme:precmd ---
-# Function to update vcs_info and reset arrow after command
+# ---- Prompt building (kept/compatible) ----
 theme_precmd() {
   vcs_info
-  # Reset arrow to default after command execution (matches charlynderLite)
   ARROW_DIRECTION="»"
 }
 
-# Function to get current arrow (ensures variable expansion)
-function get_arrow {
-  echo -n "${ARROW_DIRECTION}"
-}
+function get_arrow { echo -n "${ARROW_DIRECTION}"; }
 
-# --- theme:prompt ---
-# Function to build the appropriate prompt (Rosé Pine colors)
 function build_prompt {
-    local prompt_str=""
-    local env_indicators=""
+  local prompt_str=""
+  local env_indicators=""
 
-    # Add environment indicators with Rosé Pine colors
-    if [[ -n "$VIRTUAL_ENV" ]]; then
-        env_indicators+="%F{#9ccfd8}(py:$(basename $VIRTUAL_ENV))%f "  # foam (cyan)
-    fi
+  if [[ -n "$VIRTUAL_ENV" ]]; then env_indicators+="%F{#9ccfd8}(py:$(basename $VIRTUAL_ENV))%f "; fi
+  if [[ -n "$CONDA_DEFAULT_ENV" ]]; then env_indicators+="%F{#f6c177}(conda:${CONDA_DEFAULT_ENV})%f "; fi
+  if [[ -n "$AWS_PROFILE" ]]; then env_indicators+="%F{#eb6f92}[aws:${AWS_PROFILE}]%f "; fi
+  if [[ -f /.dockerenv ]]; then env_indicators+="%F{#c4a7e7}[docker]%f "; fi
+  if [[ -n "$KUBECTL_CONTEXT" ]]; then env_indicators+="%F{#31748f}[k8s:${KUBECTL_CONTEXT}]%f "; fi
+  if [[ -n "$SSH_CONNECTION" ]]; then env_indicators+="%F{#ebbcba}[ssh:%m]%f "; fi
+  if [[ -n "$JAVA_HOME" ]]; then env_indicators+="%F{#f6c177}(java:$(basename $JAVA_HOME))%f "; fi
 
-    if [[ -n "$CONDA_DEFAULT_ENV" ]]; then
-        env_indicators+="%F{#f6c177}(conda:${CONDA_DEFAULT_ENV})%f "  # gold
-    fi
+  if [[ -n "$TMUX" ]]; then
+    prompt_str=" $(muxFraktur) [%F{#9ccfd8}%~%f] %{$reset_color%}${vcs_info_msg_0_}%{$reset_color%}$(get_arrow) "
+  else
+    prompt_str=" $(cancer) [%F{#907aa9}%n%f: %~] %{$reset_color%}${vcs_info_msg_0_}%{$reset_color%} ${ARROW_DIRECTION} "
+  fi
 
-    if [[ -n "$AWS_PROFILE" ]]; then
-        env_indicators+="%F{#eb6f92}[aws:${AWS_PROFILE}]%f "  # love (rose/red)
-    fi
-
-    if [[ -f /.dockerenv ]]; then
-        env_indicators+="%F{#c4a7e7}[docker]%f "  # iris (purple)
-    fi
-
-    if [[ -n "$KUBECTL_CONTEXT" ]]; then
-        env_indicators+="%F{#31748f}[k8s:${KUBECTL_CONTEXT}]%f "  # pine (teal)
-    fi
-
-    if [[ -n "$SSH_CONNECTION" ]]; then
-        env_indicators+="%F{#ebbcba}[ssh:%m]%f "  # rose (lighter rose)
-    fi
-
-    # java environment
-    if [[ -n "$JAVA_HOME" ]]; then
-        env_indicators+="%F{#f6c177}(java:$(basename $JAVA_HOME))%f "  # gold
-    fi
-
-    # Checks if the user is in tmux
-    if in_tmux; then
-        prompt_str=" $(muxFraktur) [%F{#9ccfd8}%~%f] %{$reset_color%}${vcs_info_msg_0_}%{$reset_color%}$(get_arrow) "
-    else
-        prompt_str=" $(cancer) [%F{#907aa9}%n%f: %~] %{$reset_color%}${vcs_info_msg_0_}%{$reset_color%} ${ARROW_DIRECTION} "
-    fi
-
-    echo -n "$prompt_str"
+  echo -n "$prompt_str"
 }
 
-# Set up the prompt with dynamic detection
 PROMPT='$(build_prompt)'
-
-# Add the precmd hook to update git info automatically
-# Note: add-zsh-hook is already loaded by Zim, no need to autoload it again
 add-zsh-hook precmd theme_precmd
+
+# ---- Safety: ensure emacs mode at the very end ----
+# Some frameworks re-enable vi-mode later; this final bindkey -e ensures emacs wins.
+if [[ -o interactive ]]; then
+  bindkey -e
+fi

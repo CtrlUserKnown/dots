@@ -1,194 +1,203 @@
-# CharModel zsh theme
+# Char zshrc file
 #
-# Date Created: 09.30.2025
-#
-# A dynamic zsh prompt theme with environment-aware styling and interactive arrow
-# indicators. Features different symbols for tmux (⚡) and standard shell (♋︎)
-# environments. Includes full git integration with branch display and real-time
-# status indicators for staged/unstaged changes. The arrow dynamically responds
-# to your actions: typing (»), deleting («), and navigating (↑↓). Styled with
-# Rosé Pine's purple color palette for a cohesive, elegant terminal experience.
+# date created: 10.14.2025
+# Modified to work without Zim Framework
 
-# --- theme:vim-motions ---
-# set vim motions in the terminal if using this theme
-# bindkey -v
-# export KEYTIMEOUT=1
+# --- config:homebrew ---
+# Initialize Homebrew
+if [[ -f "/opt/homebrew/bin/brew" ]];
+then
+  eval "$(/opt/homebrew/bin/brew shellenv)"
+elif [[ -f "/usr/local/bin/brew" ]]; then
+  eval "$(/usr/local/bin/brew shellenv)"
+fi
 
-# --- theme:env ---
-# Set the symbol for different environments
-function muxFraktur {
-    echo -n "\U0001D57E"
-}
+# --- config:bat ---
+# Bat color themes
+export BAT_THEME="rose-pine"
 
-function cancer {
-    echo -n "\u264B\uFE0E"
-}
+# --- config:editor ---
+export EDITOR="nvim"
+export VISUAL="nvim"
 
-ARROW_DIRECTION="»"  # Default arrow direction
+# --- config:ls/eza ---
+# Rose Pine colors for eza
+export EZA_COLORS="\
+da=38;5;246:\
+di=38;2;196;167;231:\
+ln=38;5;211:\
+ex=38;2;86;148;159:\
+*.txt=38;5;224:\
+*.md=38;5;224:\
+*.json=38;5;180:\
+*.yml=38;5;180:\
+*.yaml=38;5;180"
 
-# --- theme:vis-updates ---
-# Initialize vcs_info for git branch display
-autoload -Uz vcs_info
-setopt prompt_subst
+# --- config:fzf ---
+# default command for fzf (what it searches)
+export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
 
-# Configure vcs_info styles (Rosé Pine colors)
-zstyle ':vcs_info:*' check-for-changes true
-zstyle ':vcs_info:*' unstagedstr '%F{#eb6f92}*'   # display this when there are unstaged changes (love/red)
-zstyle ':vcs_info:*' stagedstr '%F{#f6c177}+'  # display this when there are staged changes (gold/yellow)
-zstyle ':vcs_info:*' actionformats '%F{5}%F{#c4a7e7}%b%F{#f6c177}|%F{#eb6f92}%a%c%u%F{5}%f '  # iris purple branch
-zstyle ':vcs_info:*' formats '%F{5}%F{#c4a7e7}%b%c%u%F{5}%f '  # iris purple branch name
-zstyle ':vcs_info:svn:*' branchformat '%b'
-zstyle ':vcs_info:svn:*' actionformats '%F{5}%F{#c4a7e7}%b%F{#eb6f92}:%F{#f6c177}%i%F{#f6c177}|%F{#eb6f92}%a%c%u%F{5}%f '
-zstyle ':vcs_info:svn:*' formats '%F{5}%F{#c4a7e7}%b%F{#eb6f92}:%F{#f6c177}%i%c%u%F{5}%f '
-zstyle ':vcs_info:*' enable git cvs svn
+# Default options for fzf
+export FZF_DEFAULT_OPTS='
+  --height 40%
+  --layout=reverse
+  --border
+  --preview "bat --style=numbers --color=always {}"
+  --bind "alt-enter:execute(nvim {})"
+  --color=fg:#e0def4,bg:#191724,hl:#eb6f92
+  --color=fg+:#e0def4,bg+:#26233a,hl+:#eb6f92
+  --color=info:#9ccfd8,prompt:#f6c177,pointer:#c4a7e7
+  --color=marker:#ebbcba,spinner:#eb6f92,header:#31748f
+  --color=border:#524f67,preview-bg:#1f1d2e
+'
 
+# CTRL-T options (file search)
+export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+export FZF_CTRL_T_OPTS='--preview "bat --color=always --line-range :500 {}"'
 
-# Functions to detect if we're in Tmux or Neovim
-function in_tmux {
-    [[ -n "$TMUX" ]]
-}
+# ALT-C options (directory search)
+export FZF_ALT_C_COMMAND='fd 
+--type d --hidden --follow --exclude .git'
+export FZF_ALT_C_OPTS='--preview "tree -C {} |
+head -200"'
 
-# Custom self-insert widget to catch normal typing
-function my-self-insert() {
-  ARROW_DIRECTION="»"  # Right arrow when typing (matches charlynderLite)
-  zle self-insert
-  zle reset-prompt
-}
+# CTRL-R options (command history)
+export FZF_CTRL_R_OPTS='--preview "echo {}" --preview-window down:3:wrap'
 
-# Custom backspace widget
-function my-backward-delete-char() {
-  ARROW_DIRECTION="«"  # Left arrow when backspacing (matches charlynderLite)
-  zle backward-delete-char
-  zle reset-prompt
-}
+# --- config:history ---
+HISTFILE=${ZDOTDIR:-$HOME}/.zsh_history
+HISTSIZE=10000
+SAVEHIST=10000
+setopt HIST_IGNORE_ALL_DUPS
+setopt SHARE_HISTORY
+setopt APPEND_HISTORY
+setopt INC_APPEND_HISTORY
 
-# Navigation key widgets
-function my-backward-char() {
-  ARROW_DIRECTION="«"  # Left arrow when moving left
-  zle backward-char
-  zle reset-prompt
-}
+# --- config:options ---
+# Remove path separator from WORDCHARS
+WORDCHARS=${WORDCHARS//[\/]}
 
-function my-forward-char() {
-  ARROW_DIRECTION="»"  # Right arrow when moving right
-  zle forward-char
-  zle reset-prompt
-}
+# Enable extended globbing
+setopt EXTENDED_GLOB
 
-function my-up-line-or-history() {
-  ARROW_DIRECTION="↑"  # Up arrow when moving up
-  zle up-line-or-history
-  zle reset-prompt
-}
+# Auto CD when typing directory name
+setopt AUTO_CD
 
-function my-down-line-or-history() {
-  ARROW_DIRECTION="↓"  # Down arrow when moving down
-  zle down-line-or-history
-  zle reset-prompt
-}
+# --- config:completions ---
+# Set up fpath for completions (add zsh-completions if installed via Homebrew)
+if [[ -d "/opt/homebrew/share/zsh-completions" ]]; then
+  fpath=(/opt/homebrew/share/zsh-completions $fpath)
+elif [[ -d "/usr/local/share/zsh-completions" ]]; then
+  fpath=(/usr/local/share/zsh-completions $fpath)
+fi
 
-# Create the widgets
-zle -N my-backward-delete-char
-zle -N my-self-insert
-zle -N my-backward-char
-zle -N my-forward-char
-zle -N my-up-line-or-history
-zle -N my-down-line-or-history
+# Initialize completion system
+autoload -Uz compinit
+if [[ -n ${ZDOTDIR}/.zcompdump(#qN.mh+24) ]]; then
+  compinit
+else
+  compinit -C
+fi
 
-# Bind the widgets
-bindkey '^?' my-backward-delete-char  # Backspace
-bindkey '^H' my-backward-delete-char  # Ctrl+H
+# Completion styling
+zstyle ':completion:*' menu select
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}' 'r:|[._-]=* r:|=*' 'l:|=* r:|=*'
+zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
+zstyle ':completion:*' completer _complete _match _approximate
+zstyle ':completion:*:match:*' original only
+zstyle ':completion:*:approximate:*' max-errors 1 numeric
+zstyle ':completion:*' group-name ''
+zstyle ':completion:*:descriptions' format '%F{yellow}-- %d --%f'
+zstyle ':completion:*:messages' format '%F{purple}-- %d --%f'
+zstyle ':completion:*:warnings' format '%F{red}-- no matches found --%f'
 
-# Only bind arrow keys when NOT in completion menu
-# Bind navigation keys (primary sequences)
-bindkey -M emacs '^[[D' my-backward-char       # Left arrow
-bindkey -M emacs '^[[C' my-forward-char        # Right arrow
-bindkey -M emacs '^[[A' my-up-line-or-history  # Up arrow
-bindkey -M emacs '^[[B' my-down-line-or-history # Down arrow
+# --- config:zsh-syntax-highlighting ---
+# Load zsh-syntax-highlighting (install via: brew install zsh-syntax-highlighting)
+if [[ -f "/opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]];
+then
+  source /opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+elif [[ -f "/usr/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]; then
+  source /usr/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+fi
 
-# Alternative sequences for different terminals
-bindkey -M emacs '^[OD' my-backward-char       # Left arrow (alternative)
-bindkey -M emacs '^[OC' my-forward-char        # Right arrow (alternative)
-bindkey -M emacs '^[OA' my-up-line-or-history  # Up arrow (alternative)
-bindkey -M emacs '^[OB' my-down-line-or-history # Down arrow (alternative)
+# Syntax highlighting customization
+ZSH_HIGHLIGHT_HIGHLIGHTERS=(main brackets)
+typeset -A ZSH_HIGHLIGHT_STYLES
+ZSH_HIGHLIGHT_STYLES[comment]='fg=242'
 
-# Override the default self-insert to catch normal typing
-# Only bind in emacs mode, not in menuselect
-for key in {a..z} {A..Z} {0..9}; do
-  bindkey -M emacs "$key" my-self-insert
-done
+# --- config:zsh-autosuggestions ---
+# Load zsh-autosuggestions (install via: brew install zsh-autosuggestions)
+if [[ -f "/opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh" ]];
+then
+  source /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+elif [[ -f "/usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh" ]]; then
+  source /usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+fi
 
-# Common symbols - only in emacs mode
-bindkey -M emacs ' ' my-self-insert
-bindkey -M emacs '.' my-self-insert
-bindkey -M emacs ',' my-self-insert
-bindkey -M emacs '!' my-self-insert
-bindkey -M emacs '?' my-self-insert
-bindkey -M emacs ':' my-self-insert
-bindkey -M emacs ';' my-self-insert
+ZSH_AUTOSUGGEST_MANUAL_REBIND=1
+ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=242'
 
-# --- theme:precmd ---
-# Function to update vcs_info and reset arrow after command
-theme_precmd() {
-  vcs_info
-  # Reset arrow to default after command execution (matches charlynderLite)
-  ARROW_DIRECTION="»"
-}
+# --- config:zsh-history-substring-search ---
+# Load zsh-history-substring-search (install via: brew install zsh-history-substring-search)
+if [[ -f "/opt/homebrew/share/zsh-history-substring-search/zsh-history-substring-search.zsh" ]];
+then
+  source /opt/homebrew/share/zsh-history-substring-search/zsh-history-substring-search.zsh
+elif [[ -f "/usr/local/share/zsh-history-substring-search/zsh-history-substring-search.zsh" ]]; then
+  source /usr/local/share/zsh-history-substring-search/zsh-history-substring-search.zsh
+fi
 
-# Function to get current arrow (ensures variable expansion)
-function get_arrow {
-  echo -n "${ARROW_DIRECTION}"
-}
+# Bind keys for history substring search
+if (( ${+functions[_zsh_highlight_bind_widgets]} ));
+then
+  bindkey '^[[A' history-substring-search-up
+  bindkey '^[[B' history-substring-search-down
+fi
 
-# --- theme:prompt ---
-# Function to build the appropriate prompt (Rosé Pine colors)
-function build_prompt {
-    local prompt_str=""
-    local env_indicators=""
+# --- config:aliases ---
+# import aliases
+if [ -f ~/.config/zsh/aliases.zsh ];
+then
+  source ~/.config/zsh/aliases.zsh
+fi
 
-    # Add environment indicators with Rosé Pine colors
-    if [[ -n "$VIRTUAL_ENV" ]]; then
-        env_indicators+="%F{#9ccfd8}(py:$(basename $VIRTUAL_ENV))%f "  # foam (cyan)
-    fi
+# --- config:hooks ---
+# Load add-zsh-hook utility (needed by themes)
+autoload -Uz add-zsh-hook
 
-    if [[ -n "$CONDA_DEFAULT_ENV" ]]; then
-        env_indicators+="%F{#f6c177}(conda:${CONDA_DEFAULT_ENV})%f "  # gold
-    fi
+# --- config:theme ---
+# Load theme
+source ~/.config/zsh/themes/charModel
 
-    if [[ -n "$AWS_PROFILE" ]]; then
-        env_indicators+="%F{#eb6f92}[aws:${AWS_PROFILE}]%f "  # love (rose/red)
-    fi
+# Completion menu keybindings
+bindkey -N menuselect
+bindkey -M menuselect '^[[A' up-line-or-history          # Up arrow: navigate up
+bindkey -M menuselect '^[[B' down-line-or-history        # Down arrow: navigate down
+bindkey -M menuselect '^[[D' backward-char               # Left arrow: go back
+bindkey -M menuselect '^[[C' accept-line                 # Right arrow: accept selection
+bindkey -M menuselect '^[OA' up-line-or-history          # Up arrow (alt terminal)
+bindkey -M menuselect '^[OB' down-line-or-history        # Down arrow (alt terminal)
+bindkey -M menuselect '^[OD' backward-char               # Left arrow (alt terminal)
+bindkey -M menuselect '^[OC' accept-line                 # Right arrow: accept selection
+bindkey -M menuselect '^M' accept-line                   # Enter: accept selection
+bindkey -M menuselect '^I' menu-complete                 # Tab: cycle forward
+bindkey -M menuselect '^[[Z' reverse-menu-complete       # Shift-Tab: cycle backward
+bindkey -M menuselect '^[' send-break                    # Esc: cancel completion
 
-    if [[ -f /.dockerenv ]]; then
-        env_indicators+="%F{#c4a7e7}[docker]%f "  # iris (purple)
-    fi
+# --- config:fastfetch ---
+# Run fastfetch only once per session
+if [[ !
+-f /tmp/neofetch_run_$$ ]]; then
+  fastfetch
+  touch /tmp/neofetch_run_$$
+fi
 
-    if [[ -n "$KUBECTL_CONTEXT" ]]; then
-        env_indicators+="%F{#31748f}[k8s:${KUBECTL_CONTEXT}]%f "  # pine (teal)
-    fi
+# --- config:zoxide ---
+# initialize zoxide (provides `z` and `zi`, plus completions)
+eval "$(zoxide init zsh)"
 
-    if [[ -n "$SSH_CONNECTION" ]]; then
-        env_indicators+="%F{#ebbcba}[ssh:%m]%f "  # rose (lighter rose)
-    fi
-
-    # java environment
-    if [[ -n "$JAVA_HOME" ]]; then
-        env_indicators+="%F{#f6c177}(java:$(basename $JAVA_HOME))%f "  # gold
-    fi
-
-    # Checks if the user is in tmux
-    if in_tmux; then
-        prompt_str=" $(muxFraktur) [%F{#9ccfd8}%~%f] %{$reset_color%}${vcs_info_msg_0_}%{$reset_color%}$(get_arrow) "
-    else
-        prompt_str=" $(cancer) [%F{#907aa9}%n%f: %~] %{$reset_color%}${vcs_info_msg_0_}%{$reset_color%} ${ARROW_DIRECTION} "
-    fi
-
-    echo -n "$prompt_str"
-}
-
-# Set up the prompt with dynamic detection
-PROMPT='$(build_prompt)'
-
-# Add the precmd hook to update git info automatically
-# Note: add-zsh-hook is already loaded by Zim, no need to autoload it again
-add-zsh-hook precmd theme_precmd
+# --- config:keybindings (Final Fix for Autosuggestion) ---
+# FIX: Force Right Arrow to accept autosuggestion by binding it after all plugins load.
+# This ensures it overrides any conflict from zsh-history-substring-search.
+# The key code for your terminal is confirmed to be '^[[C'
+bindkey '^[[C' autosuggest-accept
+bindkey '^[OC' autosuggest-accept

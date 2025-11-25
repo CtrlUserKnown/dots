@@ -98,6 +98,18 @@ local handlers = {
         }
     end,
 
+    -- Custom handler for tinymist (Typst)
+    ['tinymist'] = function()
+        lspconfig.tinymist.setup {
+            on_attach = on_attach,
+            capabilities = capabilities,
+            settings = {
+                exportPdf = "onSave",
+                outputPath = "$root/$dir/$name",
+            },
+        }
+    end,
+
     -- Custom handler for jdtls (Java)
     ['jdtls'] = function()
         lspconfig.jdtls.setup(vim.tbl_deep_extend('force', {
