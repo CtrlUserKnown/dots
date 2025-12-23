@@ -9,6 +9,9 @@ vim.api.nvim_set_hl(0, 'CursorLineNr', {
   bold = true
 })
 
+-- load statusline configuration
+require('statusline')
+
 -- load neovim options
 require('options')
 

@@ -50,22 +50,22 @@ function download() {
   fi
 }
 
-function termcon() {
+function configterminal() {
     # open the terminal configuration file in the default editor (neovim)
     ${EDITOR:-nvim} ~/development/dotfiles/src/.zshrc
 }
 
-function muxcon() {
+function configmux() {
     # open the tmux configuration file in the default editor (neovim)
     ${EDITOR:-nvim} ~/development/dotfiles/src/tmux/tmux.conf
 }
 
-function ghostcon() {
+function configghostty() {
     # open the ghost configuration file in the default editor (neovim)
     ${EDITOR:-nvim} ~/development/dotfiles/src/ghostty/config
 }
 
-function aliascon() {
+function configalias() {
     # open the aliases configuration file in the default editor (neovim)
     ${EDITOR:-nvim} ~/development/dotfiles/src/zsh/aliases.zsh
 }

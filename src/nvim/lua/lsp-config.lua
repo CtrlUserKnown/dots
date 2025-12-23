@@ -1,3 +1,27 @@
+-- Function to add words to dictionary for different LSP servers
+local function add_word_to_dictionary(word, client_name)
+    -- For ltex LSP
+    if client_name == "ltex" then
+        local params = {
+            command = "ltex.addToDictionary",
+            arguments = {
+                {
+                    words = {
+                        ["en-US"] = { word }  -- Change language code if needed
+                    }
+                }
+            }
+        }
+        vim.lsp.buf.execute_command(params)
+    end
+    
+    -- For typos LSP
+    if client_name == "typos_lsp" then
+        local config_path = vim.fn.expand("~/.config/typos.toml")
+        vim.notify("Add custom typos config at " .. config_path, vim.log.levels.INFO)
+    end
+end
+
 local on_attach = function(client, bufnr)
     local opts = { noremap = true, silent = true, buffer = bufnr }
     
@@ -23,7 +47,74 @@ local on_attach = function(client, bufnr)
     vim.keymap.set('n', '<leader>ih', function()
         vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled({ bufnr = bufnr }), { bufnr = bufnr })
     end, { buffer = bufnr, desc = 'Toggle inlay hints' })
+    
+    -- Add keybinding to ignore word under cursor (add to dictionary)
+    vim.keymap.set('n', '<leader>ig', function()
+        local word = vim.fn.expand('<cword>')
+        add_word_to_dictionary(word, client.name)
+        vim.notify("Added '" .. word .. "' to dictionary", vim.log.levels.INFO)
+    end, vim.tbl_extend('force', opts, { desc = 'Ignore word (add to dictionary)' }))
+    
+    -- Add keybinding to inspect diagnostics (useful for debugging)
+    vim.keymap.set('n', '<leader>di', function()
+        local diag = vim.diagnostic.get(0, { lnum = vim.fn.line('.') - 1 })
+        print(vim.inspect(diag))
+    end, vim.tbl_extend('force', opts, { desc = 'Inspect diagnostics at cursor' }))
 end
+
+-- Filter diagnostics to remove comment-related checks and spelling errors
+local function filter_diagnostics(diagnostics)
+    return vim.tbl_filter(function(diagnostic)
+        -- Filter out sentence/paragraph length warnings
+        if diagnostic.message:match("sentence is %d+ words long") then
+            return false
+        end
+        if diagnostic.message:match("paragraph is %d+ words long") then
+            return false
+        end
+        -- Filter out other common comment linting messages
+        if diagnostic.message:match("This sentence") then
+            return false
+        end
+        
+        -- Filter out spelling errors (uncomment if you want to hide all spelling errors)
+        -- if diagnostic.message:match("Unknown word") then
+        --     return false
+        -- end
+        -- if diagnostic.message:match("Spelling") then
+        --     return false
+        -- end
+        -- if diagnostic.source == "ltex" or diagnostic.source == "typos" or diagnostic.source == "cspell" then
+        --     return false
+        -- end
+        
+        return true
+    end, diagnostics)
+end
+
+-- Override diagnostic handler to filter unwanted diagnostics
+local original_set = vim.diagnostic.set
+vim.diagnostic.set = function(namespace, bufnr, diagnostics, opts)
+    diagnostics = filter_diagnostics(diagnostics)
+    original_set(namespace, bufnr, diagnostics, opts)
+end
+
+-- Configure diagnostics display
+vim.diagnostic.config({
+    virtual_text = {
+        source = "if_many",
+    },
+    signs = true,
+    underline = true,
+    update_in_insert = false,
+    severity_sort = true,
+    float = {
+        border = "rounded",
+        source = "if_many",
+        header = "",
+        prefix = "",
+    },
+})
 
 -- Only proceed if lspconfig is available
 local lspconfig_ok, lspconfig = pcall(require, 'lspconfig')
@@ -112,6 +203,13 @@ local handlers = {
 
     -- Custom handler for jdtls (Java)
     ['jdtls'] = function()
+        -- Function to generate a unique workspace name based on the project root
+        local function get_jdtls_workspace(root_dir)
+            local project_name = vim.fn.fnamemodify(root_dir, ':p:h:t')
+            local workspace_dir = vim.fn.stdpath('cache') .. '/jdtls/' .. project_name
+            return workspace_dir
+        end
+
         lspconfig.jdtls.setup(vim.tbl_deep_extend('force', {
             on_attach = on_attach,
             capabilities = capabilities,
@@ -127,6 +225,24 @@ local handlers = {
                 'settings.gradle.kts',
                 '.git'
             ),
+            -- Override cmd to use unique workspace per project
+            cmd_env = {
+                JDTLS_WORKSPACE = function()
+                    local root = vim.fs.root(0, {
+                        'build.xml',
+                        'pom.xml',
+                        'build.gradle',
+                        'build.gradle.kts',
+                        'settings.gradle',
+                        'settings.gradle.kts',
+                        '.git'
+                    })
+                    if root then
+                        return get_jdtls_workspace(root)
+                    end
+                    return vim.fn.stdpath('cache') .. '/jdtls/default'
+                end
+            },
             on_attach = function(client, bufnr)
                 on_attach(client, bufnr)
                 -- Force enable inlay hints for Java
@@ -140,14 +256,6 @@ local handlers = {
                     },
                     configuration = {
                         updateBuildConfiguration = "interactive",
-                        -- Support for different Java versions
-                        runtimes = {
-                            -- Add your Java installations here if needed
-                            -- {
-                            --     name = "JavaSE-17",
-                            --     path = "/path/to/jdk-17",
-                            -- },
-                        },
                     },
                     maven = {
                         downloadSources = true,
@@ -156,14 +264,10 @@ local handlers = {
                     -- Referenced libraries for all build systems
                     project = {
                         referencedLibraries = {
-                            -- Ant libraries
                             "lib/**/*.jar",
                             "**/lib/*.jar",
-                            -- Maven local repository
                             vim.fn.expand("~/.m2/repository/**/*.jar"),
-                            -- Gradle cache
                             vim.fn.expand("~/.gradle/caches/**/*.jar"),
-                            -- Common library patterns
                             "target/**/*.jar",
                             "build/libs/**/*.jar",
                             "dist/**/*.jar",
@@ -274,9 +378,6 @@ vim.api.nvim_create_autocmd("FileType", {
                 vim.b.java_build_system = build_system
                 vim.b.java_build_file = build_file
                 vim.b.java_project_root = root
-                
-                -- Optional: Print build system detection
-                -- vim.notify("Detected " .. build_system .. " project at " .. root, vim.log.levels.INFO)
             end
         end
     end
@@ -360,6 +461,27 @@ vim.api.nvim_create_autocmd("FileType", {
                 vim.cmd('split | terminal ' .. cmd)
             end
         end, vim.tbl_extend('force', opts, { desc = 'Clean Java project' }))
+        
+        -- Clean JDTLS workspace cache for current project
+        vim.keymap.set('n', '<leader>jw', function()
+            local root = vim.b.java_project_root
+            if not root then
+                vim.notify("No Java project detected", vim.log.levels.WARN)
+                return
+            end
+            
+            local project_name = vim.fn.fnamemodify(root, ':p:h:t')
+            local workspace_dir = vim.fn.stdpath('cache') .. '/jdtls/' .. project_name
+            
+            -- Stop LSP first
+            vim.cmd('LspStop jdtls')
+            
+            -- Delete workspace cache
+            vim.fn.system('rm -rf ' .. workspace_dir)
+            
+            vim.notify("Cleaned JDTLS workspace for " .. project_name, vim.log.levels.INFO)
+            vim.notify("Restart Neovim or run :LspStart to reinitialize", vim.log.levels.INFO)
+        end, vim.tbl_extend('force', opts, { desc = 'Clean JDTLS workspace cache' }))
     end
 })
 

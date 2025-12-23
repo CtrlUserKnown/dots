@@ -12,10 +12,10 @@ vim.keymap.set('n', '[[', 'gg', { noremap = true, silent = true, desc = 'Go to b
 vim.keymap.set('n', ']]', 'G', { noremap = true, silent = true, desc = 'Go to end of file' })
 
 -- go to beginning and end of line
-vim.keymap.set('n', 'el', '0', { noremap = true, silent = true, desc = 'Go to beginning of line' })
-vim.keymap.set('n', 'ea', '$', { noremap = true, silent = true, desc = 'Go to end of line' })
-vim.keymap.set('v', 'el', '0', { noremap = true, silent = true, desc = 'Go to beginning of line' })
-vim.keymap.set('v', 'ea', '$', { noremap = true, silent = true, desc = 'Go to end of line' })
+vim.keymap.set('n', 'H', '0', { noremap = true, silent = true, desc = 'Go to beginning of line' })
+vim.keymap.set('n', 'L', '$', { noremap = true, silent = true, desc = 'Go to end of line' })
+vim.keymap.set('v', 'H', '0', { noremap = true, silent = true, desc = 'Go to beginning of line' })
+vim.keymap.set('v', 'L', '$', { noremap = true, silent = true, desc = 'Go to end of line' })
 
 -- paragraph navigation with Option + ( and )
 vim.keymap.set('n', '<M-[>', '{', { noremap = true, silent = true, desc = 'Previous paragraph' })

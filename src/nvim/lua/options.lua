@@ -1,12 +1,15 @@
 -- show line numbers
 vim.wo.number = true
 
+-- leader keys timeout lenght
+vim.opt.timeoutlen = 300
+
 -- enable line trails
 vim.opt.list = true
 vim.opt.listchars = { tab = '▸ ', trail = '·', extends = '»', precedes = '«', nbsp = '␣' }
 
 -- remove statusline
-vim.opt.laststatus = 0
+-- vim.opt.laststatus = 0
 vim.opt.showcmd = true
 
 -- change the key for the file explorer (use Telescope file browser)
@@ -47,3 +50,7 @@ vim.opt.cursorlineopt = 'number'
 
 -- cursor shape in different modes
 vim.opt.guicursor = "n-v-c:block,i-ci-ve:ver25,r-cr:hor20,o:hor50"
+
+-- hide commandline
+vim.opt.cmdheight = 0
+vim.opt.showcmd = false

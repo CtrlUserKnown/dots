@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# tmux session creator for project
+
 # this script will start a tmux session with for every i come back to this project
 SESSIONNAME="Dotfiles"
 PROJECTPATH="."
