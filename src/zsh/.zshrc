@@ -1,9 +1,14 @@
 # Char zshrc file
-#
 # date created: 10.14.2025
-# Modified to work without Zim Framework
+#
+# to find alias look at: ~/development/dotfiles/src/zsh/zsh/.aliases
+# to find functions look at: ./zsh/.functions
 
-# --- config:homebrew ---
+# --- config:locale ---
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+
+# --- config:Homebrew ---
 # Initialize Homebrew
 if [[ -f "/opt/homebrew/bin/brew" ]];
 then
@@ -56,10 +61,8 @@ export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
 export FZF_CTRL_T_OPTS='--preview "bat --color=always --line-range :500 {}"'
 
 # ALT-C options (directory search)
-export FZF_ALT_C_COMMAND='fd 
---type d --hidden --follow --exclude .git'
-export FZF_ALT_C_OPTS='--preview "tree -C {} |
-head -200"'
+export FZF_ALT_C_COMMAND='fd --type d --hidden --follow --exclude .git'
+export FZF_ALT_C_OPTS='--preview "tree -C {} | head -200"'
 
 # CTRL-R options (command history)
 export FZF_CTRL_R_OPTS='--preview "echo {}" --preview-window down:3:wrap'
@@ -93,11 +96,14 @@ fi
 
 # Initialize completion system
 autoload -Uz compinit
-if [[ -n ${ZDOTDIR}/.zcompdump(#qN.mh+24) ]]; then
+if [[ -n ${ZDOTDIR:-$HOME}/.zcompdump(#qN.mh+24) ]]; then
   compinit
 else
   compinit -C
 fi
+
+# Load menuselect module for menu navigation
+zmodload zsh/complist
 
 # Completion styling
 zstyle ':completion:*' menu select
@@ -110,6 +116,7 @@ zstyle ':completion:*' group-name ''
 zstyle ':completion:*:descriptions' format '%F{yellow}-- %d --%f'
 zstyle ':completion:*:messages' format '%F{purple}-- %d --%f'
 zstyle ':completion:*:warnings' format '%F{red}-- no matches found --%f'
+
 
 # --- config:zsh-syntax-highlighting ---
 # Load zsh-syntax-highlighting (install via: brew install zsh-syntax-highlighting)
@@ -155,9 +162,15 @@ fi
 
 # --- config:aliases ---
 # import aliases
-if [ -f ~/.config/zsh/aliases.zsh ];
+if [ -f ~/.config/zsh/.aliases ];
 then
-  source ~/.config/zsh/aliases.zsh
+  source ~/.config/zsh/.aliases
+fi
+
+# import functions
+if [ -f ~/.config/zsh/.functions ];
+then
+  source ~/.config/zsh/.functions
 fi
 
 # --- config:hooks ---
@@ -168,25 +181,9 @@ autoload -Uz add-zsh-hook
 # Load theme
 source ~/.config/zsh/themes/charModel
 
-# Completion menu keybindings
-bindkey -N menuselect
-bindkey -M menuselect '^[[A' up-line-or-history          # Up arrow: navigate up
-bindkey -M menuselect '^[[B' down-line-or-history        # Down arrow: navigate down
-bindkey -M menuselect '^[[D' backward-char               # Left arrow: go back
-bindkey -M menuselect '^[[C' accept-line                 # Right arrow: accept selection
-bindkey -M menuselect '^[OA' up-line-or-history          # Up arrow (alt terminal)
-bindkey -M menuselect '^[OB' down-line-or-history        # Down arrow (alt terminal)
-bindkey -M menuselect '^[OD' backward-char               # Left arrow (alt terminal)
-bindkey -M menuselect '^[OC' accept-line                 # Right arrow: accept selection
-bindkey -M menuselect '^M' accept-line                   # Enter: accept selection
-bindkey -M menuselect '^I' menu-complete                 # Tab: cycle forward
-bindkey -M menuselect '^[[Z' reverse-menu-complete       # Shift-Tab: cycle backward
-bindkey -M menuselect '^[' send-break                    # Esc: cancel completion
-
 # --- config:fastfetch ---
 # Run fastfetch only once per session
-if [[ !
--f /tmp/neofetch_run_$$ ]]; then
+if [[ ! -f /tmp/neofetch_run_$$ ]]; then
   fastfetch
   touch /tmp/neofetch_run_$$
 fi
@@ -195,9 +192,14 @@ fi
 # initialize zoxide (provides `z` and `zi`, plus completions)
 eval "$(zoxide init zsh)"
 
-# --- config:keybindings (Final Fix for Autosuggestion) ---
-# FIX: Force Right Arrow to accept autosuggestion by binding it after all plugins load.
-# This ensures it overrides any conflict from zsh-history-substring-search.
-# The key code for your terminal is confirmed to be '^[[C'
-bindkey '^[[C' autosuggest-accept
-bindkey '^[OC' autosuggest-accept
+# --- config:keybindings (Final Fix) ---
+# IMPORTANT: Theme bindings must come LAST to ensure arrow keys work correctly
+# The theme handles arrow key bindings with custom widgets that update the prompt arrow
+
+# edit command line
+autoload -Uz edit-command-line
+zle -N edit-command-line
+bindkey '^E' edit-command-line
+
+# undo
+bindkey '^_' undo

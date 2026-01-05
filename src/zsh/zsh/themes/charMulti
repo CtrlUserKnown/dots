@@ -1,0 +1,96 @@
+# CharModel zsh theme with Swift arrow tracker
+# Date: 2025-12-27
+
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+
+autoload -Uz vcs_info
+setopt prompt_subst
+
+# Git integration colors (Rosé Pine)
+zstyle ':vcs_info:*' check-for-changes true
+zstyle ':vcs_info:*' unstagedstr '%F{#eb6f92}*'
+zstyle ':vcs_info:*' stagedstr '%F{#f6c177}+'
+zstyle ':vcs_info:*' actionformats '%F{5}%F{#c4a7e7}%b%F{#f6c177}|%F{#eb6f92}%a%c%u%F{5}%f '
+zstyle ':vcs_info:*' formats '%F{5}%F{#c4a7e7}%b%c%u%F{5}%f '
+zstyle ':vcs_info:*' enable git cvs svn
+
+# Special characters for prompt
+function muxFraktur { echo -n "\U0001D57E"; }
+function cancer { echo -n "\u264B\uFE0E"; }
+
+# Path to arrow tracker
+ARROW_TRACKER="$HOME/.config/zsh/arrow-tracker"
+
+# Get current arrow from Swift program
+function get_arrow {
+  if [[ -x "$ARROW_TRACKER" ]]; then
+    "$ARROW_TRACKER" read
+  else
+    echo -n "»"
+  fi
+}
+
+# Update git info and reset arrow after each command
+theme_precmd() {
+  vcs_info
+  [[ -x "$ARROW_TRACKER" ]] && "$ARROW_TRACKER" forward
+}
+
+# Build the prompt
+function build_prompt {
+  if [[ -n "$TMUX" ]]; then
+    echo -n " $(muxFraktur) [%F{#9ccfd8}%~%f] %{$reset_color%}${vcs_info_msg_0_}%{$reset_color%}$(get_arrow) "
+  else
+    echo -n " $(cancer) [%F{#907aa9}%n%f: %~] %{$reset_color%}${vcs_info_msg_0_}%{$reset_color%} $(get_arrow) "
+  fi
+}
+
+PROMPT='$(build_prompt)'
+add-zsh-hook precmd theme_precmd
+
+# Set up keybindings
+bindkey -e
+
+# Custom widgets that call Swift program
+function arrow-backward-delete() {
+  [[ -x "$ARROW_TRACKER" ]] && "$ARROW_TRACKER" backward
+  zle backward-delete-char
+}
+zle -N arrow-backward-delete
+
+function arrow-up() {
+  [[ -x "$ARROW_TRACKER" ]] && "$ARROW_TRACKER" up
+  zle up-line-or-history
+}
+zle -N arrow-up
+
+function arrow-down() {
+  [[ -x "$ARROW_TRACKER" ]] && "$ARROW_TRACKER" down
+  zle down-line-or-history
+}
+zle -N arrow-down
+
+function arrow-backward-char() {
+  [[ -x "$ARROW_TRACKER" ]] && "$ARROW_TRACKER" backward
+  zle backward-char
+}
+zle -N arrow-backward-char
+
+function arrow-forward-char() {
+  [[ -x "$ARROW_TRACKER" ]] && "$ARROW_TRACKER" forward
+  zle forward-char
+}
+zle -N arrow-forward-char
+
+# Bind keys
+bindkey '^?' arrow-backward-delete
+bindkey '^H' arrow-backward-delete
+bindkey '^[[A' arrow-up
+bindkey '^[[B' arrow-down
+bindkey '^[[D' arrow-backward-char
+bindkey '^[[C' arrow-forward-char
+bindkey '^[OA' arrow-up
+bindkey '^[OB' arrow-down
+bindkey '^[OD' arrow-backward-char
+bindkey '^[OC' arrow-forward-char

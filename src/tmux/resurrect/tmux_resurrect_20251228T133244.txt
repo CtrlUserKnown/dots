@@ -1,0 +1,10 @@
+pane	Benkyo	1	1	:*	1	MacBookAir.lan	:/Users/christian	1	zsh	:
+pane	Benkyo	2	0	:-	1	MacBookAir.lan	:/Users/christian/development/benkyo	1	zsh	:
+pane	Benkyo	3	0	:	1	MacBookAir.lan	:/Users/christian/development/benkyo	1	zsh	:
+pane	Rustlings	1	1	:*	1	MacBookAir.lan	:/Users/christian/development/testing/rustlings	1	rustlings	:rustlings
+pane	Rustlings	1	1	:*	2	MacBookAir.lan	:/Users/christian/development/testing/rustlings	0	nvim	:nvim
+window	Benkyo	1	:Editor	1	:*	c57d,163x46,0,0,0	off
+window	Benkyo	2	:Markdown-view	0	:-	c17e,163x45,0,0,1	off
+window	Benkyo	3	:Git	0	:	c17f,163x45,0,0,2	off
+window	Rustlings	1	:[tmux]	1	:*	6896,163x46,0,0{80x46,0,0,3,82x46,81,0,4}	:
+state	Benkyo	Rustlings

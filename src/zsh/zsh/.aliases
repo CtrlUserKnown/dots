@@ -1,0 +1,41 @@
+# zsh costum aliases
+#
+# author: Charlynder
+# date created: 08.28.2025
+#
+# to find zsh configuration look in ~/development/dotfiles/src/zsh/.zshrc
+# to find functions look in ~/development/dotfiles/src/zsh/zsh/.functions
+
+# --- alias:functionality ---
+alias cls="command clear"
+alias ls="command eza --color=always"
+alias la="command eza -al --icons --color=always"
+alias ll="command eza -l --icons color=always"
+alias reload="source ~/.zshrc"
+alias open="open ."
+
+# --- alias:programming ---
+alias y="yazi"
+alias py="python3"
+alias ipy="ipython3"
+alias swiftinit="swift package init"
+alias sps="swift package show-dependencies"
+alias spt="swift package test"
+alias jv="java"
+alias jc="javac"
+alias rn="rustc"
+alias cr="cargo run"
+
+# --- alias:application ---
+alias mux="command tmux"
+alias b="command btop"
+alias f="fzf"
+
+# --- alias:suffix ---
+alias -s md="$EDITOR"
+alias -s rs="$EDITOR"
+alias -s swift="$EDITOR" 
+alias -s py="$EDITOR"
+alias -s c="$EDITOR"
+alias -s crystal="$EDITOR"
+

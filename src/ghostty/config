@@ -18,10 +18,11 @@ shell-integration-features = no-cursor,sudo,title
 theme = "Cursor Dark"
 background-blur = true
 background-blur-radius = 18
-background-opacity = 0.9
+background-opacity = 0.95
 
 # --- Rose Pine Color Scheme ---
-background = 191724
+# black variant
+background = 191724 
 foreground = e0def4
 
 # cursor-color = #524f67

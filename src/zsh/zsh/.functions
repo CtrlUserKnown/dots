@@ -1,0 +1,73 @@
+#!/usr/bin/env zsh
+# zsh functions
+# Auther: CrtlUserUnknown
+#
+# to find the zsh config file look at ~/development/dotfiles/src/zsh/.zshrc
+# to find the aliases look at ~/development/dotfiles/src/zsh/zsh/.aliases
+
+function download() {
+  # Check if curl is available using Zsh's 'whence'
+  if whence -q curl; then
+    echo "Using curl to download: $1"
+    # -L: Follow redirects, -O: Write output to a local file
+    curl -L -O "$1"
+  
+  # Check if wget is available
+  elif whence -q wget; then
+    echo "Using wget to download: $1"
+    # -c: Continue download, --show-progress: Display progress
+    wget -c --show-progress "$1"
+    
+  # Neither is found
+  else
+    echo "Error: Neither curl nor wget is installed." >&2
+    return 1
+  fi
+}
+
+function config() {
+    if [[ -z "$1" ]]; then
+        echo "Select configuration to edit:"
+        select option in "Terminal/ZSH" "Tmux" "Ghostty" "Aliases" "Cancel"; do
+            case "$option" in
+                "Terminal/ZSH") ${EDITOR:-nvim} ~/development/dotfiles/src/zsh/; break;;
+                "Tmux") ${EDITOR:-nvim} ~/development/dotfiles/src/tmux/tmux.conf; break;;
+                "Ghostty") ${EDITOR:-nvim} ~/development/dotfiles/src/ghostty/config; break;;
+                "Aliases") ${EDITOR:-nvim} ~/development/dotfiles/src/zsh/zsh/.aliases; break;;
+                "Cancel") return 0;;
+            esac
+        done
+    else
+        case "$1" in
+            terminal|zsh) ${EDITOR:-nvim} ~/development/dotfiles/src/zsh/;;
+            tmux|mux) ${EDITOR:-nvim} ~/development/dotfiles/src/tmux/tmux.conf;;
+            ghostty|ghost) ${EDITOR:-nvim} ~/development/dotfiles/src/ghostty/config;;
+            alias|aliases) ${EDITOR:-nvim} ~/development/dotfiles/src/zsh/zsh/.aliases;;
+            *) echo "Unknown config type: $1"; return 1;;
+        esac
+    fi
+}
+
+function attach() {
+    # Attach to an existing tmux session
+    if tmux list-sessions &> /dev/null; then
+        local session=$(tmux list-sessions | cut -d: -f1 | fzf)
+        if [ -n "$session" ]; then
+            tmux attach-session -t "$session"
+        fi
+    else
+        echo "No tmux sessions found"
+    fi
+}
+
+auto-cd-with-zoxide() {
+  if [[ -n "$BUFFER" ]] && [[ "$BUFFER" != *" "* ]]; then
+    # Check if buffer looks like a path (contains / or ~)
+    if [[ "$BUFFER" == */* ]] || [[ "$BUFFER" == ~* ]]; then
+      local dir="$BUFFER"
+      BUFFER=""
+      print -z "z $dir"
+    fi
+  fi
+  zle accept-line
+}
