@@ -2,9 +2,9 @@
 
 ### Themes
 
-Char Model: [Char Model zsh prompt theme](./src/zsh/zsh/themes/charlynderModel)
+Char Model: [Char Model zsh prompt theme](/src/zsh/zsh/themes/charlynderModel)
 
-Char Multi : [Char Multi zsh prompt theme](./src/zsh/zsh/themes/charMulti)
+Char Multi : [Char Multi zsh prompt theme](/src/zsh/zsh/themes/charMulti)
 
 ### Configs
 
@@ -12,11 +12,11 @@ Dotfiles comes with configurations for zsh, PowerShell, TMUX, Ghostty, and more!
 
 ZSH configuration for `Mac` & `Linux`: [ZSH](/zsh/.zshrc)
 
-Use Starship with PowerShell on `Windows`: [PowerShell](./assets/otherOS/powershell/Microsoft.PowerShell_profile.ps1)
+Use Starship with PowerShell on `Windows`: [PowerShell](/assets/otherOS/powershell/Microsoft.PowerShell_profile.ps1)
 
-Tmux configuration: [TMUX](./src/tmux/tmux.conf)
+Tmux configuration: [TMUX](/src/tmux/tmux.conf)
 
-Ghostty configuration: [Ghostty](./src/ghostty/config)
+Ghostty configuration: [Ghostty](/src/ghostty/config)
 
 Neovim config (moved to New repo): [Charvim](https://github.com/CrtlUserKnown/Charvim)
 
