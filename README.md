@@ -2,7 +2,7 @@
 
 ### Themes
 
-Char Model: [Char Model zsh prompt theme](/src/zsh/zsh/themes/charlynderModel)
+Char Model: [Char Model zsh prompt theme](/src/zsh/zsh/themes/charModel)
 
 Char Multi : [Char Multi zsh prompt theme](/src/zsh/zsh/themes/charMulti)
 
@@ -19,4 +19,3 @@ Tmux configuration: [TMUX](/src/tmux/tmux.conf)
 Ghostty configuration: [Ghostty](/src/ghostty/config)
 
 Neovim config (moved to New repo): [Charvim](https://github.com/CrtlUserKnown/Charvim)
-
