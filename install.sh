@@ -1,17 +1,9 @@
 #!/usr/bin/env bash
 
-# --- Charfiles:macOS install script ---
-#
+# --- dotfiles:macOS install script ---
 # date created: 08.29.2025
 
 # --- charfile:start ---
-# psudocode:
-# 1. prompt user if they want to setup git
-# 2. install homebrew if missing
-# 3. install brewfile packages
-# 4. show preview of the prompt and prompt for which prompt theme to use
-# 5. create symlinks for config files
-# 6. make sure all of the files are working correctly
 
 # --- script prompting:gum ---
 # ensure gum is installed (silent)
@@ -36,12 +28,16 @@ install_gum
       --foreground 141 \
       --align center \
       --padding "1 2" << 'EOF'
-      ________ ___ _   _  _   __  ___ ___  _  ____  _  __  _   _  _   _
-     / _/_   _| _ \ | | || |/' _/| __| _ \| |/ /  \| |/__\| | | ||  \| |
-    | \__ | | | v / | | \/ |\`._\`.| _|| v /|  <|  | ' | \/ | 'V' ||   ' |
-     \__/ |_| |_|_\___\\__/ |___/|___|_|_\|_|\_\_|\__|\__/!_/ \_!|_|\__|
-     dotfiles
-    EOF
+          ______     __                __  __    __  __    __ 
+         /      \   |  \              |  \|  \  |  \|  \  /  \
+        |  $$$$$$\ _| $$_     ______  | $$| $$  | $$| $$ /  $$
+        | $$   \$$|   $$ \   /      \ | $$| $$  | $$| $$/  $$ 
+        | $$       \$$$$$$  |  $$$$$$\| $$| $$  | $$| $$  $$  
+        | $$   __   | $$ __ | $$   \$$| $$| $$  | $$| $$$$$\  
+        | $$__/  \  | $$|  \| $$      | $$| $$__/ $$| $$ \$$\ 
+         \$$    $$   \$$  $$| $$      | $$ \$$    $$| $$  \$$\
+          \$$$$$$     \$$$$  \$$       \$$  \$$$$$$  \$$   \$$
+EOF
 
     # --- package manager:homebrew ---
     # install Homebrew on to the system
