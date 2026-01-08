@@ -9,25 +9,81 @@
 # ensure gum is installed (silent)
 install_gum() {
     if ! command -v gum &> /dev/null; then
+        echo "Installing gum..."
+
+        # Use Homebrew to install gum if available, otherwise manual install
+        if command -v brew &> /dev/null; then
+            brew install gum >/dev/null 2>&1
+            return $?
+        fi
+
+        # Manual installation for CI/CD environments
+        ARCH=$(uname -m)
+        OS="Darwin"
+
+        # Map architecture names
+        case "$ARCH" in
+            x86_64) ARCH="x86_64" ;;
+            arm64) ARCH="arm64" ;;
+            *) echo "Unsupported architecture: $ARCH"; return 1 ;;
+        esac
+
         tmpdir=$(mktemp -d)
-        curl -sSL "https://github.com/charmbracelet/gum/releases/latest/download/gum_$(uname -s)_$(uname -m).tar.gz" \
-        | tar -xz -C "$tmpdir"
-        sudo mv "$tmpdir/gum" /usr/local/bin/gum >/dev/null 2>&1
-        rm -rf "$tmpdir"
+
+        # Download and extract gum
+        if curl -sSL "https://github.com/charmbracelet/gum/releases/latest/download/gum_${OS}_${ARCH}.tar.gz" \
+            | tar -xz -C "$tmpdir" 2>/dev/null; then
+            sudo mv "$tmpdir/gum" /usr/local/bin/gum 2>/dev/null || {
+                # Fallback if sudo fails (CI environment)
+                mkdir -p "$HOME/.local/bin"
+                mv "$tmpdir/gum" "$HOME/.local/bin/gum"
+                export PATH="$HOME/.local/bin:$PATH"
+            }
+            rm -rf "$tmpdir"
+            echo "✅ Gum installed successfully"
+            return 0
+        else
+            echo "⚠️ Failed to install gum, continuing without fancy output..."
+            rm -rf "$tmpdir"
+            return 1
+        fi
     fi
 }
 
-# install gum if missing
+# Helper function to show messages (works with or without gum)
+show_message() {
+    if command -v gum &> /dev/null; then
+        gum style --foreground 141 "$1"
+    else
+        echo "$1"
+    fi
+}
+
+# Helper function for spinners (works with or without gum)
+run_with_spinner() {
+    local title="$1"
+    shift
+    
+    if command -v gum &> /dev/null; then
+        gum spin --spinner dot --title "$title" -- "$@"
+    else
+        echo "$title"
+        "$@"
+    fi
+}
+
+# install gum if missing (but continue if it fails)
 install_gum
 
 (
     # --- script:Banner ---
-    gum style \
-      --border thick \
-      --border-foreground 105 \
-      --foreground 141 \
-      --align center \
-      --padding "1 2" << 'EOF'
+    if command -v gum &> /dev/null; then
+        gum style \
+          --border thick \
+          --border-foreground 105 \
+          --foreground 141 \
+          --align center \
+          --padding "1 2" << 'EOF'
           ______     __                __  __    __  __    __ 
          /      \   |  \              |  \|  \  |  \|  \  /  \
         |  $$$$$$\ _| $$_     ______  | $$| $$  | $$| $$ /  $$
@@ -38,6 +94,12 @@ install_gum
          \$$    $$   \$$  $$| $$      | $$ \$$    $$| $$  \$$\
           \$$$$$$     \$$$$  \$$       \$$  \$$$$$$  \$$   \$$
 EOF
+    else
+        echo "================================"
+        echo "    Ctrlk Dotfiles Installer    "
+        echo "================================"
+        echo ""
+    fi
 
     # --- package manager:homebrew ---
     # install Homebrew on to the system
@@ -46,26 +108,28 @@ EOF
     else
         echo "🚀 Homebrew not found. Installing..."
 
-        # download the installer script first
-        gum spin --spinner dot --title "Downloading Homebrew installer..." -- \
-            curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh -o /tmp/homebrew_install.sh
-
-        # run the installer (needs to be interactive)
-        /bin/bash /tmp/homebrew_install.sh
-
-        # Clean up
-        rm -f /tmp/homebrew_install.sh
+        # Non-interactive installation for CI
+        if [ -n "$CI" ]; then
+            NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        else
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        fi
 
         # Add Homebrew to PATH if necessary
         if [[ -d "/opt/homebrew/bin" ]]; then
             echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
             eval "$(/opt/homebrew/bin/brew shellenv)"
-        elif [[ -d "/usr/local/bin" ]]; then
+        elif [[ -d "/usr/local/bin/brew" ]]; then
             echo 'eval "$(/usr/local/bin/brew shellenv)"' >> ~/.zprofile
             eval "$(/usr/local/bin/brew shellenv)"
         fi
 
         echo "✅ Homebrew installation complete."
+
+        # Try to install gum via Homebrew after Homebrew is installed
+        if ! command -v gum &> /dev/null; then
+            brew install gum >/dev/null 2>&1 || echo "⚠️ Could not install gum via Homebrew"
+        fi
     fi
 
     # --- configuration:.config ---
@@ -74,7 +138,7 @@ EOF
 
     # make .config directory
     if [ ! -d ~/.config ]; then
-        gum spin --spinner dot --title "Creating Config folder..." -- mkdir ~/.config
+        run_with_spinner "Creating Config folder..." mkdir ~/.config
         sleep 1
     else
         echo "✅ Config directory already exists!"
@@ -83,7 +147,7 @@ EOF
     # --- configuration:Dotfiles ---
     # make dotfiles directory
     if [ ! -d ~/.dots ]; then
-        gum spin --spinner dot --title "Making Dotfiles directory (~/.dots)..." -- \
+        run_with_spinner "Making Dotfiles directory (~/.dots)..." \
                 bash -c "mkdir -p ~/.dots && git clone https://github.com/CtrlUserKnown/dotfiles.git ~/.dots"
         sleep 1
     else
@@ -95,7 +159,7 @@ EOF
     # compare the installed files with the Brewfile and brew list
     # if the package is missing, install it
     if [ -f "./Brewfile" ]; then
-        gum spin --spinner dot --title "Installing packages from Brewfile..." -- brew bundle --file=./Brewfile
+        run_with_spinner "Installing packages from Brewfile..." brew bundle --file=./Brewfile
         echo "✅ Brewfile packages installation complete."
     else
         echo "⚠️ No Brewfile found in the current directory. Skipping package installation."
@@ -107,7 +171,7 @@ EOF
 
     # --- configuration:Links ---
     # create links for configurations, final form (lol)
-    gum spin --spinner dot --title "Creating links for configuration files..." -- bash -c "
+    run_with_spinner "Creating links for configuration files..." bash -c "
         # Create symlinks for .config directories
         ln -sf $HOME/.dots/src/bat $HOME/.config/bat
         ln -sf $HOME/.dots/src/fastfetch $HOME/.config/fastfetch
@@ -122,25 +186,25 @@ EOF
 
     # --- verification:Check ---
     # verify that the files are working correctly
-    gum spin --spinner dot --title "Verifying installation..." -- bash -c "
+    run_with_spinner "Verifying installation..." bash -c "
         all_good=true
 
         # Check .config symlinks
         for dir in bat fastfetch ghostty tmux zsh; do
-            if [ ! -L $HOME/.config/\$dir ]; then
-                echo \"⚠️ Missing symlink: $HOME/.config/\$dir\"
+            if [ ! -L \$HOME/.config/\$dir ]; then
+                echo \"⚠️ Missing symlink: \$HOME/.config/\$dir\"
                 all_good=false
             fi
         done
 
         # Check home directory symlinks
-        if [ ! -L $HOME/.zshrc ]; then
-            echo \"⚠️ Missing symlink: $HOME/.zshrc\"
+        if [ ! -L \$HOME/.zshrc ]; then
+            echo \"⚠️ Missing symlink: \$HOME/.zshrc\"
             all_good=false
         fi
 
         # Check if dotfiles repo exists
-        if [ ! -d $HOME/.dots/.git ]; then
+        if [ ! -d \$HOME/.dots/.git ]; then
             echo \"⚠️ Dotfiles repository not properly cloned\"
             all_good=false
         fi
@@ -157,7 +221,8 @@ EOF
 )
 
 # --- Charfiles:finish ---
-gum style --foreground 200 --border normal --padding "0.5" --margin "0.5" <<EOF
+if command -v gum &> /dev/null; then
+    gum style --foreground 200 --border normal --padding "0.5" --margin "0.5" <<EOF
 🎉 Installation Complete! 🎉
 
 Your macOS environment has been set up with Homebrew, Git, and your configuration files.
@@ -165,3 +230,15 @@ You can now start customizing your setup further!
 
 Thank you for using my dotfiles!
 EOF
+else
+    echo ""
+    echo "================================"
+    echo "🎉 Installation Complete! 🎉"
+    echo "================================"
+    echo ""
+    echo "Your macOS environment has been set up with Homebrew, Git, and your configuration files."
+    echo "You can now start customizing your setup further!"
+    echo ""
+    echo "Thank you for using my dotfiles!"
+    echo ""
+fi
