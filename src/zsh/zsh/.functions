@@ -6,6 +6,44 @@
 # to find the aliases look at ~/.config/zsh/.aliases
 
 # --- functions:devUx ---
+function commands() {
+    if [[ "$1" == "costum" ]]; then
+        echo "--- Aliases ---"
+        echo "cls        clear the terminal"
+        echo "ls         eza with color"
+        echo "lla        eza all files with icons"
+        echo "ll         eza list with icons"
+        echo "reload     source ~/.zshrc"
+        echo "open       open current directory"
+        echo "y          yazi"
+        echo "py         python3"
+        echo "ipy        ipython3"
+        echo "swiftinit  swift package init"
+        echo "sps        swift package show-dependencies"
+        echo "spt        swift package test"
+        echo "jv         java"
+        echo "jc         javac"
+        echo "rn         rustc"
+        echo "cr         cargo run"
+        echo "mux        tmux"
+        echo "b          btop"
+        echo "f          fzf"
+        echo ""
+        echo "--- Functions ---"
+        echo "commands     list commands or custom aliases/functions"
+        echo "config     edit zsh, tmux, ghostty, or alias configs"
+        echo "create     scaffold a new project (Swift, Java, Rust, Crystal, Git)"
+        echo "attach     attach to a tmux session via fzf"
+        echo "duplicate  duplicate a file or folder"
+        echo "download   download a file using curl or wget"
+    else
+        echo $PATH | tr ':' '\n' | while read dir; do
+            ls "$dir" 2>/dev/null
+        done | sort -u | grep -v '/' | grep -v '@' | column -c $(tput cols)
+        echo "\nTip: run 'commands custom' to see your custom aliases/functions"
+    fi
+}
+
 function config() {
     if [[ -z "$1" ]]; then
         echo "Select configuration to edit:"

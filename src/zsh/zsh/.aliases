@@ -3,8 +3,8 @@
 # author: Charlynder
 # date created: 08.28.2025
 #
-# to find zsh configuration look in ~/.config/zsh/.zshrc
-# to find functions look in ~/.config/zsh/zsh/.functions
+# to find zsh configuration look in ~/.zshrc
+# to find functions look in ~/.config/zsh/.functions
 
 # --- alias:functionality ---
 alias cls="command clear"

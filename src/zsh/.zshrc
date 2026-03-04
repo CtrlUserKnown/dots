@@ -199,6 +199,8 @@ source ~/.config/zsh/themes/charModel
 if [[ ! -f /tmp/neofetch_run_$$ ]]; then
   fastfetch
   touch /tmp/neofetch_run_$$
+
+  echo -e "For the list of command, run: commands or commands costum \n"
 fi
 
 # --- config:zoxide ---
@@ -214,3 +216,10 @@ bindkey '^E' edit-command-line
 
 # undo
 bindkey '^_' undo
+
+# Homebrew Ruby @3.4 configuration
+export PATH="/opt/homebrew/opt/ruby@3.4/bin:$PATH"
+export LDFLAGS="-L/opt/homebrew/opt/ruby@3.4/lib"
+export CPPFLAGS="-I/opt/homebrew/opt/ruby@3.4/include"
+
+export JAVA_HOME=$(/usr/libexec/java_home)
