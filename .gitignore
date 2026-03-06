@@ -5,3 +5,4 @@
 
 # Ignore tmux plugin repos
 ./src/tmux/plugins/
+src/tmux/plugins/
