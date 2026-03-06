@@ -1,3 +1,4 @@
+# shellcheck shell=zsh
 # CtrlUserKnown zshrc configuration file
 # date created: 10.14.2025
 #
@@ -87,7 +88,6 @@ setopt EXTENDED_GLOB
 setopt AUTO_CD
 
 # --- config:completions ---
-# shellcheck shell=zsh
 
 # Set up fpath for completions (add zsh-completions if installed via Homebrew)
 if [[ -d "/opt/homebrew/share/zsh-completions" ]]; then
