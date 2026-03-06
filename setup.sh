@@ -77,7 +77,7 @@ install_gum
 
 # Check macOS version
 check_os_version() {
-    if [[ "$OSTYPE" == "darwin"* ]]; then
+    if [[ "$(uname -s)" == "Darwin" ]]; then
         OS_VERSION=$(sw_vers -productVersion)
         MAJOR_VERSION=$(echo "$OS_VERSION" | cut -d. -f1)
         

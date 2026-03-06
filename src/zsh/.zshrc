@@ -98,7 +98,8 @@ fi
 
 # Initialize completion system
 autoload -Uz compinit
-if [[ -n ${ZDOTDIR:-$HOME}/.zcompdump(#qN.mh+24) ]]; then
+# Re-initialize compinit if .zcompdump is older than 24 hours
+if [[ -n $(find "${ZDOTDIR:-$HOME}/.zcompdump" -prune -mtime +1 2>/dev/null) ]]; then
   compinit
 else
   compinit -C
