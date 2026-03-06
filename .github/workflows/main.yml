@@ -110,16 +110,15 @@ jobs:
 
       - name: Mock macOS 10.15 environment
         run: |
-          # Create a mock sw_vers for the test
+          # Create a mock sw_vers and uname for the test
           mkdir -p bin
           echo -e '#!/bin/bash\necho "10.15.7"' > bin/sw_vers
-          chmod +x bin/sw_vers
+          echo -e '#!/bin/bash\nif [ "$1" == "-s" ]; then echo "Darwin"; else /usr/bin/uname "$@"; fi' > bin/uname
+          chmod +x bin/sw_vers bin/uname
           echo "$(pwd)/bin" >> $GITHUB_PATH
 
       - name: Run setup script (dry run)
         run: |
-          # Mock the OSTYPE since we're on Linux for this specific test
-          export OSTYPE="darwin21.0"
           export CI=true
           # The script should warn but continue because CI is set
           ./setup.sh | grep -q "Warning: You are running macOS 10.15.7"
