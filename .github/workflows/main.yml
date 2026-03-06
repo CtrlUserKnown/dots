@@ -14,11 +14,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Run ShellCheck
+      - name: Run ShellCheck (Bash scripts only)
         uses: ludeeus/action-shellcheck@master
         with:
           scandir: '.'
-          ignore_paths: 'src/tmux/plugins' # Ignore third-party scripts
+          ignore_paths: 'src/tmux/plugins src/zsh' # Ignore non-bash files
+
+      - name: Zsh Syntax Check
+        run: |
+          # Install zsh if not present (usually is on ubuntu)
+          sudo apt-get update && sudo apt-get install -y zsh
+          
+          echo "Checking Zsh syntax..."
+          # Find all zsh files and run syntax check (zsh -n)
+          find src/zsh -type f \( -name "*.zsh" -o -name ".zshrc" -o -name ".*" \) -not -path "*/.*" -exec zsh -n {} +
+          echo "✅ Zsh syntax check passed"
 
   test-setup:
     needs: lint
