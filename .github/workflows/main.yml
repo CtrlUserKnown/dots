@@ -100,3 +100,27 @@ jobs:
           else
             echo "⚠️ No Brewfile found to verify"
           fi
+
+  test-unsupported-macos:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Mock macOS 10.15 environment
+        run: |
+          # Create a mock sw_vers for the test
+          mkdir -p bin
+          echo -e '#!/bin/bash\necho "10.15.7"' > bin/sw_vers
+          chmod +x bin/sw_vers
+          echo "$(pwd)/bin" >> $GITHUB_PATH
+
+      - name: Run setup script (dry run)
+        run: |
+          # Mock the OSTYPE since we're on Linux for this specific test
+          export OSTYPE="darwin21.0"
+          export CI=true
+          # The script should warn but continue because CI is set
+          ./setup.sh | grep -q "Warning: You are running macOS 10.15.7"
+          echo "✅ Successfully detected and warned about old macOS version"
