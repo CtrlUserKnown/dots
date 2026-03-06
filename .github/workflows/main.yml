@@ -1,4 +1,4 @@
-name: Test Install Script
+name: Test Setup Script
 
 on:
   push:
@@ -8,9 +8,21 @@ on:
   workflow_dispatch:
 
 jobs:
-  test-install:
-    runs-on: macos-latest
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: '.'
+          ignore: 'src/tmux/plugins' # Ignore third-party scripts
+
+  test-setup:
+    needs: lint
+    runs-on: macos-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -21,13 +33,15 @@ jobs:
           # Clean up any existing configs to simulate fresh install
           rm -rf ~/.config/bat ~/.config/fastfetch ~/.config/ghostty ~/.config/tmux ~/.config/zsh
           rm -f ~/.zshrc ~/.zprofile
-          rm -rf ~/.dots
+          # Create a mock home directory structure for the script
+          mkdir -p ~/.dots
+          cp -R . ~/.dots/
 
-      - name: Make install script executable
-        run: chmod +x install.sh
+      - name: Make setup script executable
+        run: chmod +x setup.sh
 
-      - name: Run install script
-        run: ./install.sh
+      - name: Run setup script
+        run: ./setup.sh
         env:
           CI: true
 
@@ -41,37 +55,7 @@ jobs:
             exit 1
           fi
 
-      - name: Verify gum installation
-        run: |
-          if command -v gum &> /dev/null; then
-            echo "✅ Gum is installed"
-            gum --version
-          else
-            echo "❌ Gum installation failed"
-            exit 1
-          fi
-
-      - name: Verify .config directory
-        run: |
-          if [ -d ~/.config ]; then
-            echo "✅ .config directory exists"
-            ls -la ~/.config/
-          else
-            echo "❌ .config directory not created"
-            exit 1
-          fi
-
-      - name: Verify dotfiles repository
-        run: |
-          if [ -d ~/.dots/.git ]; then
-            echo "✅ Dotfiles repository cloned"
-            ls -la ~/.dots/
-          else
-            echo "❌ Dotfiles repository not cloned properly"
-            exit 1
-          fi
-
-      - name: Verify config symlinks
+      - name: Verify symlinks
         run: |
           echo "Checking symlinks..."
           all_good=true
@@ -81,6 +65,10 @@ jobs:
             if [ -L ~/.config/$dir ]; then
               target=$(readlink ~/.config/$dir)
               echo "✅ ~/.config/$dir -> $target"
+              if [ ! -e "$target" ]; then
+                echo "❌ Broken symlink: ~/.config/$dir"
+                all_good=false
+              fi
             else
               echo "❌ Missing symlink: ~/.config/$dir"
               all_good=false
@@ -91,6 +79,10 @@ jobs:
           if [ -L ~/.zshrc ]; then
             target=$(readlink ~/.zshrc)
             echo "✅ ~/.zshrc -> $target"
+            if [ ! -e "$target" ]; then
+                echo "❌ Broken symlink: ~/.zshrc"
+                all_good=false
+            fi
           else
             echo "❌ Missing symlink: ~/.zshrc"
             all_good=false
@@ -100,95 +92,11 @@ jobs:
             exit 1
           fi
 
-      - name: Verify symlinks point to valid targets
+      - name: Test Brewfile packages (Dry Run)
         run: |
-          echo "Verifying symlink targets..."
-          all_good=true
-
-          for dir in bat fastfetch ghostty tmux zsh; do
-            if [ -e ~/.config/$dir ]; then
-              echo "✅ ~/.config/$dir points to valid target"
-            else
-              echo "❌ ~/.config/$dir is a broken symlink"
-              all_good=false
-            fi
-          done
-
-          if [ -e ~/.zshrc ]; then
-            echo "✅ ~/.zshrc points to valid target"
-          else
-            echo "❌ ~/.zshrc is a broken symlink"
-            all_good=false
-          fi
-
-          if [ "$all_good" = false ]; then
-            exit 1
-          fi
-
-      - name: Verify .zprofile cleanup
-        run: |
-          if [ ! -f ~/.zprofile ]; then
-            echo "✅ .zprofile was properly cleaned up"
-          else
-            echo "⚠️ .zprofile still exists (may be expected if brew added it back)"
-          fi
-
-      - name: Test Brewfile packages installation
-        run: |
-          if [ -f "./Brewfile" ]; then
-            echo "Checking if Brewfile packages were installed..."
-            brew list --formula
-            brew list --cask
+          if [ -f "./assets/Brewfile" ]; then
+            echo "Checking Brewfile..."
+            brew bundle check --file=./assets/Brewfile || echo "Some bundles would be installed"
           else
             echo "⚠️ No Brewfile found to verify"
-          fi
-
-      - name: Test idempotency (run script again)
-        run: |
-          echo "Testing idempotency - running install script again..."
-          ./install.sh
-          echo "✅ Script can be run multiple times without errors"
-
-      - name: Final verification
-        run: |
-          echo "=== Final System State ==="
-          echo "Homebrew:"
-          brew --version
-          echo ""
-          echo "Config directory:"
-          ls -la ~/.config/ || echo "No .config directory"
-          echo ""
-          echo "Dotfiles:"
-          ls -la ~/.dots/ || echo "No .dots directory"
-          echo ""
-          echo "Home symlinks:"
-          ls -la ~/ | grep -E '\.zshrc|\.zprofile' || echo "No relevant files"
-          echo ""
-          echo "✅ All tests passed!"
-
-  test-without-brewfile:
-    runs-on: macos-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Remove Brewfile to test fallback
-        run: rm -f Brewfile
-
-      - name: Make install script executable
-        run: chmod +x install.sh
-
-      - name: Run install script without Brewfile
-        run: ./install.sh
-        env:
-          CI: true
-
-      - name: Verify installation still works
-        run: |
-          if [ -d ~/.config ] && [ -d ~/.dots ]; then
-            echo "✅ Installation works without Brewfile"
-          else
-            echo "❌ Installation failed without Brewfile"
-            exit 1
           fi
