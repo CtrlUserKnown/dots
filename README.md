@@ -2,7 +2,8 @@
 
 A professional, performance-oriented macOS development environment. This repository automates the setup of a modern terminal workflow using Homebrew, Zsh, Tmux, and Ghostty.
 
-[![Test Setup Script](https://github.com/CtrlUserKnown/dotfiles/actions/workflows/main.yml/badge.svg)](https://github.com/CtrlUserKnown/dotfiles/actions/workflows/main.yml)
+> [!TIP]
+> [Test Setup Script](https://github.com/CtrlUserKnown/dotfiles/actions/workflows/main.yml/badge.svg)
 
 ## Features
 
@@ -26,7 +27,7 @@ A professional, performance-oriented macOS development environment. This reposit
 You can install these dotfiles with a single command:
 
 ```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/CtrlUserKnown/dotfiles/main/setup.sh)"
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/CrtlUserKnown/dotfiles/refs/heads/main/setup.sh)"
 ```
 
 Or clone the repository manually:
