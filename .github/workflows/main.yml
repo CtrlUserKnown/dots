@@ -19,6 +19,7 @@ jobs:
         with:
           scandir: '.'
           ignore_paths: 'src/tmux/plugins src/zsh' # Ignore non-bash files
+          additional_files: 'tests/test_setup.sh'
 
       - name: Zsh Syntax Check
         run: |
@@ -37,79 +38,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up test environment
+      - name: Make scripts executable
         run: |
-          echo "Setting up test environment..."
-          # Clean up any existing configs to simulate fresh install
-          rm -rf ~/.config/bat ~/.config/fastfetch ~/.config/ghostty ~/.config/tmux ~/.config/zsh
-          rm -f ~/.zshrc ~/.zprofile
-          # Create a mock home directory structure for the script
-          mkdir -p ~/.dots
-          cp -R . ~/.dots/
+          chmod +x setup.sh
+          chmod +x tests/test_setup.sh
 
-      - name: Make setup script executable
-        run: chmod +x setup.sh
-
-      - name: Run setup script
-        run: ./setup.sh
+      - name: Run automated test suite
+        run: |
+          cd tests
+          ./test_setup.sh
         env:
           CI: true
 
-      - name: Verify Homebrew installation
+      - name: Verify installation with setup.sh
         run: |
-          if command -v brew &> /dev/null; then
-            echo "✅ Homebrew is installed"
-            brew --version
-          else
-            echo "❌ Homebrew installation failed"
-            exit 1
-          fi
-
-      - name: Verify symlinks
-        run: |
-          echo "Checking symlinks..."
-          all_good=true
-
-          # Check .config symlinks
-          for dir in bat fastfetch ghostty tmux zsh; do
-            if [ -L ~/.config/$dir ]; then
-              target=$(readlink ~/.config/$dir)
-              echo "✅ ~/.config/$dir -> $target"
-              if [ ! -e "$target" ]; then
-                echo "❌ Broken symlink: ~/.config/$dir"
-                all_good=false
-              fi
-            else
-              echo "❌ Missing symlink: ~/.config/$dir"
-              all_good=false
-            fi
-          done
-
-          # Check home directory symlinks
-          if [ -L ~/.zshrc ]; then
-            target=$(readlink ~/.zshrc)
-            echo "✅ ~/.zshrc -> $target"
-            if [ ! -e "$target" ]; then
-                echo "❌ Broken symlink: ~/.zshrc"
-                all_good=false
-            fi
-          else
-            echo "❌ Missing symlink: ~/.zshrc"
-            all_good=false
-          fi
-
-          if [ "$all_good" = false ]; then
-            exit 1
-          fi
-
-      - name: Test Brewfile packages (Dry Run)
-        run: |
-          if [ -f "./assets/Brewfile" ]; then
-            echo "Checking Brewfile..."
-            brew bundle check --file=./assets/Brewfile || echo "Some bundles would be installed"
-          else
-            echo "⚠️ No Brewfile found to verify"
-          fi
+          # Use the script's own verification logic to ensure it's still working
+          # in a real environment after the test suite.
+          export CI=true
+          ./setup.sh
 
   test-unsupported-macos:
     needs: lint
