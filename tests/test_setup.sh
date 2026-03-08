@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 
-# --- Test Suite for setup.sh ---
-# This script runs setup.sh in a isolated environment to verify its behavior.
+# --- CharVim:test suite ---
+# this script test setup.sh in a isolated environment to verify its behavior.
+# all hail microslop!
 
-# 1. SETUP: Create a temporary mock home directory
+# --- CharVim:setup ---
+# create a temporary mock home directory
 TEST_DIR=$(mktemp -d)
 MOCK_HOME="$TEST_DIR/home"
 MOCK_DOTS="$TEST_DIR/dots_repo"
@@ -11,12 +13,13 @@ PROJECT_ROOT=$(pwd)/..
 mkdir -p "$MOCK_HOME"
 mkdir -p "$MOCK_DOTS"
 
-# Copy the current project to the mock dots repo location
+# copy the current project to the mock dots repo location
 cp -r "$PROJECT_ROOT/." "$MOCK_DOTS"
 
 echo "🧪 Starting tests in isolated environment: $TEST_DIR"
 
-# 2. HELPER: Assertion function
+# --- CharVim:helper ---
+# assertion function
 assert_exists() {
     if [ -e "$1" ]; then
         echo "✅ PASS: $1 exists"
@@ -35,16 +38,17 @@ assert_link() {
     fi
 }
 
-# 3. EXECUTION: Run the setup script with mocked environment
-# We'll use 'HOME' to redirect where it tries to install things.
-# We'll also mock 'brew' and 'timeout' to avoid actually installing stuff.
+# --- CharVim:execution ---
+# run the setup script with mocked environment
+# use 'HOME' to redirect where it tries to install things.
+# also mock 'brew' and 'timeout' to avoid actually installing stuff.
 
 export HOME="$MOCK_HOME"
-cd "$MOCK_DOTS"
+cd "$MOCK_DOTS" || exit 1
 
 echo "🏃 Running setup.sh (mocked)..."
 
-# Mocking git, brew, and gum to speed up tests and avoid side effects
+# mocking git, brew, and gum to speed up tests and avoid side effects
 mock_bin="$TEST_DIR/bin"
 mkdir -p "$mock_bin"
 
@@ -93,35 +97,33 @@ EOF
 chmod +x "$mock_bin/git" "$mock_bin/timeout" "$mock_bin/brew" "$mock_bin/gum" "$mock_bin/curl"
 export PATH="$mock_bin:$PATH"
 
-# Run the script! 
-(
-    export HOME="$MOCK_HOME"
-    export PATH="$mock_bin:$PATH"
-    export CI=1
-    cd "$MOCK_DOTS"
-    # Run with output to a file so we can debug if it fails
-    bash ./setup.sh > "$TEST_DIR/setup_output.log" 2>&1
-)
+# run the script
+export CI=1
+# run with output to a file to debug if fails
+# we are already in MOCK_DOTS
+bash ./setup.sh > "$TEST_DIR/setup_output.log" 2>&1
 
-# 4. VERIFICATION: Check the results
-if [ ! -d "$HOME/.config" ]; then
-    echo "❌ FAIL: $HOME/.config is missing"
+# --- CharVim:verification ---
+echo "🧐 Verifying results..."
+
+if [ ! -d "$MOCK_HOME/.config" ]; then
+    echo "❌ FAIL: $MOCK_HOME/.config is missing"
     echo "--- Setup Output ---"
     cat "$TEST_DIR/setup_output.log"
     exit 1
 fi
 
-# Check if .dots directory was "created" (or exists)
-# Note: In our test, we're not actually cloning, but checking if the logic handles it.
-assert_exists "$HOME/.dots"
+# check if .dots directory was "created" (or exists)
+# note: in thw test, its not actually cloning, but checking if the logic handles it
+assert_exists "$MOCK_HOME/.dots"
 
-# Check symlinks (based on setup.sh L220+)
-assert_link "$HOME/.config/bat"
-assert_link "$HOME/.config/tmux"
-assert_link "$HOME/.zshrc"
+# check symlinks (based on setup.sh L220+)
+assert_link "$MOCK_HOME/.config/bat"
+assert_link "$MOCK_HOME/.config/tmux"
+assert_link "$MOCK_HOME/.zshrc"
 
 echo ""
 echo "🎉 ALL TESTS PASSED!"
 
-# 5. CLEANUP
+# --- CharVim:cleanup ---
 rm -rf "$TEST_DIR"
