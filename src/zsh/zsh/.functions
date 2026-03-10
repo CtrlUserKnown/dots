@@ -30,10 +30,11 @@ function commands() {
         echo "f          fzf"
         echo ""
         echo "--- Functions ---"
-        echo "commands     list commands or custom aliases/functions"
+        echo "commands   list commands or custom aliases/functions"
         echo "config     edit zsh, tmux, ghostty, or alias configs"
         echo "create     scaffold a new project (Swift, Java, Rust, Crystal, Git)"
         echo "attach     attach to a tmux session via fzf"
+        echo "mux-session  create or attach to a named tmux session"
         echo "duplicate  duplicate a file or folder"
         echo "download   download a file using curl or wget"
     else
@@ -67,103 +68,113 @@ function config() {
     fi
 }
 
-function create() {
-    if [[ -z "$1" ]]; then
-        echo "Create projects for Github and different programming languages:"
-        select option in "Swift" "Java/Maven" "Rust/Cargo" "Crystal" "Git" "Cancel"; do
-            case "$option" in
-                "Swift") 
-                    read "project_name?Enter project name: "
-                    mkdir -p "$project_name" && cd "$project_name"
-                    swift package init
-                    git init
-                    break;;
-                "Java/Maven") 
-                    read "project_name?Enter project name: "
-                    mvn archetype:generate -DgroupId=com.example -DartifactId="$project_name" -DarchetypeArtifactId=maven-archetype-quickstart -DinteractiveMode=false
-                    cd "$project_name"
-                    git init
-                    break;;
-                "Rust/Cargo") 
-                    read "project_name?Enter project name: "
-                    cargo new "$project_name"
-                    cd "$project_name"
-                    git init
-                    break;;
-                "Crystal") 
-                    read "project_name?Enter project name: "
-                    crystal init app "$project_name"
-                    cd "$project_name"
-                    git init
-                    break;;
-                "Git")
-                    read "project_name?Enter project name: "
-                    mkdir -p "$project_name" && cd "$project_name"
-                    git init
-                    touch README.md
-                    break;;
-                "Cancel") return 0;;
-            esac
-        done
-    else
-        project_name="$2"
-        if [[ -z "$project_name" ]]; then
-            echo "Error: Please provide a project name"
-            echo "Usage: create <language> <project_name>"
-            return 1
-        fi
+# --- functions:tmux-session ---
+# Creates a named tmux session with standard windows, or attaches if it already exists.
+# Usage: mux-session [session-name]  (defaults to current directory name)
+function mux-session() {
+    if ! command -v tmux &>/dev/null; then
+        echo "Error: tmux is not installed"
+        return 1
+    fi
 
-        case "$1" in
-            Swift|swift)
-                mkdir -p "$project_name" && cd "$project_name"
-                swift package init
-                git init
-                ;;
-            Java|java|Maven|maven)
-                mvn archetype:generate -DgroupId=com.example -DartifactId="$project_name" -DarchetypeArtifactId=maven-archetype-quickstart -DinteractiveMode=false
-                cd "$project_name"
-                git init
-                ;;
-            Rust|rust|Cargo|cargo)
-                cargo new "$project_name"
-                cd "$project_name"
-                git init
-                ;;
-            Crystal|crystal)
-                crystal init app "$project_name"
-                cd "$project_name"
-                git init
-                ;;
-            Git|git)
-                mkdir -p "$project_name" && cd "$project_name"
-                git init
-                touch README.md
-                ;;
-            *) 
-                echo "Unknown language: $1"
-                echo "Supported languages: Swift, Java/Maven, Rust/Cargo, Crystal, Git"
-                return 1
-                ;;
-        esac
+    local session_name="${1:-$(basename "$PWD")}"
+    local project_path="$PWD"
+
+    if ! tmux has-session -t "$session_name" 2>/dev/null; then
+        # Create session and windows
+        tmux new-session -d -s "$session_name" -c "$project_path"
+        tmux rename-window -t "$session_name:1" 'main'
+
+        tmux new-window -t "$session_name:2" -n 'view' -c "$project_path"
+        tmux send-keys -t "$session_name:2" 'lazygit' C-m
+        tmux split-window -t "$session_name:2" -h -c "$project_path"
+        tmux send-keys -t "$session_name:2" 'glow .' C-m
+
+        tmux select-window -t "$session_name:1"
+    fi
+
+    # Attach or switch
+    if [[ -n "$TMUX" ]]; then
+        tmux switch-client -t "$session_name"
+    else
+        tmux attach-session -t "$session_name"
     fi
 }
 
+function create() {
+    local lang="$1"
+    local project_name="$2"
+
+    # Interactive mode
+    if [[ -z "$lang" ]]; then
+        echo "Create projects for Github and different programming languages:"
+        select lang in "Swift" "Java/Maven" "Rust/Cargo" "Crystal" "Git" "Cancel"; do
+            [[ "$lang" == "Cancel" ]] && return 0
+            [[ -n "$lang" ]] && break
+        done
+        read "project_name?Enter project name: "
+    fi
+
+    if [[ -z "$project_name" ]]; then
+        echo "Error: Please provide a project name"
+        echo "Usage: create <language> <project_name>"
+        return 1
+    fi
+
+    case "$lang" in
+        Swift|swift)
+            mkdir -p "$project_name" && cd "$project_name"
+            swift package init && git init ;;
+        Java/Maven|Java|java|Maven|maven)
+            mvn archetype:generate -DgroupId=com.example -DartifactId="$project_name" \
+                -DarchetypeArtifactId=maven-archetype-quickstart -DinteractiveMode=false
+            cd "$project_name" && git init ;;
+        Rust/Cargo|Rust|rust|Cargo|cargo)
+            cargo new "$project_name" && cd "$project_name" && git init ;;
+        Crystal|crystal)
+            crystal init app "$project_name" && cd "$project_name" && git init ;;
+        Git|git)
+            mkdir -p "$project_name" && cd "$project_name"
+            git init && touch README.md ;;
+        *)
+            echo "Unknown language: $lang"
+            echo "Supported: Swift, Java/Maven, Rust/Cargo, Crystal, Git"
+            return 1 ;;
+    esac
+
+    mux-session "$project_name"
+}
+
 function attach() {
-    # Attach to an existing tmux session
-    if tmux list-sessions &> /dev/null; then
-        local session=$(tmux list-sessions | cut -d: -f1 | fzf)
-        if [ -n "$session" ]; then
-            tmux attach-session -t "$session"
+    if tmux list-sessions &>/dev/null; then
+        local session
+        session=$(tmux list-sessions | cut -d: -f1 | fzf)
+        if [[ -n "$session" ]]; then
+            if [[ -n "$TMUX" ]]; then
+                tmux switch-client -t "$session"
+            else
+                tmux attach-session -t "$session"
+            fi
         fi
     else
         echo "No tmux sessions found"
     fi
 }
 
+# --- functions:hooks ---
+chpwd() {
+    local current_dir="$PWD"
+    local config_dir="${HOME}/.config"
+    local dev_dir="${HOME}/development"
+
+    if [[ "$current_dir" == "$config_dir" ]] || [[ "$current_dir" == "$dev_dir" ]]; then
+        ls
+    fi
+}
+
 # --- functions:UX ---
 auto-cd-with-zoxide() {
   if [[ -n "$BUFFER" ]] && [[ "$BUFFER" != *" "* ]]; then
-    # Check if buffer looks like a path (contains / or ~)
     if [[ "$BUFFER" == */* ]] || [[ "$BUFFER" == ~* ]]; then
       local dir="$BUFFER"
       BUFFER=""
@@ -188,13 +199,11 @@ function duplicate() {
     return 1
   fi
 
-  # If no destination provided, create one with " copy" suffix
   if [ -z "$destination" ]; then
     local basename="${source%/}"
     local extension="${basename##*.}"
     local name="${basename%.*}"
 
-    # Check if file has an extension
     if [ "$basename" = "$extension" ]; then
       destination="${basename} copy"
     else
@@ -202,7 +211,6 @@ function duplicate() {
     fi
   fi
 
-  # Use cp with -R flag for recursive copying (works for both files and folders)
   cp -R "$source" "$destination"
 
   if [ $? -eq 0 ]; then
@@ -213,23 +221,25 @@ function duplicate() {
   fi
 }
 
- function download() { 
-  # Check if curl is available using Zsh's 'whence'
+function download() { 
   if whence -q curl; then
     echo "Using curl to download: $1"
-    # -L: Follow redirects, -O: Write output to a local file
     curl -L -O "$1"
-
-  # Check if wget is available
   elif whence -q wget; then
     echo "Using wget to download: $1"
-    # -c: Continue download, --show-progress: Display progress
     wget -c --show-progress "$1"
-
-  # Neither is found
   else
     echo "Error: Neither curl nor wget is installed." >&2
     return 1
   fi
 }
 
+# --- functions:tmux-init ---
+if [[ -n "$TMUX" ]] && [[ $(tmux display-message -p '#I') == "1" ]]; then
+    local dir_name="$(basename "$PWD")"
+    local current_session="$(tmux display-message -p '#S')"
+    if [[ "$current_session" != "$dir_name" ]] && ! tmux has-session -t "$dir_name" 2>/dev/null; then
+        tmux rename-session -t "$current_session" "$dir_name"
+        tmux rename-window -t "$dir_name:1" 'main'
+    fi
+fi
