@@ -1,46 +1,33 @@
 # CharModel zsh theme
-# Date: 2026-01-02
+# Date: 2026-03-19
 
-# ANSI color codes (Rosé Pine)
-local COLOR_RESET=$'%{\033[0m%}'
-local COLOR_CYAN=$'%{\033[38;2;156;207;216m%}'      # #9ccfd8
-local COLOR_PURPLE=$'%{\033[38;2;144;122;169m%}'    # #907aa9
-local COLOR_IRIS=$'%{\033[38;2;196;167;231m%}'      # #c4a7e7
-local COLOR_LOVE=$'%{\033[38;2;235;111;146m%}'      # #eb6f92
+# Cached git info — updated once per command via precmd, not on every keypress
+_GIT_INFO=""
 
-# Special characters
-local MUX_FRAKTUR=$'\U0001D57E'    # 𝕾
-local CANCER=$'\u264B\uFE0E'       # ♋︎
-
-# Git info function
-function prompt_git_info() {
+function _update_git_info() {
     local branch
     branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
-    
     if [[ -n $branch ]]; then
-        local dirty=""
-        if ! git diff --quiet 2>/dev/null; then
-            dirty="${COLOR_LOVE}*${COLOR_RESET}"
+        if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+            _GIT_INFO=" ($branch*)"
+        else
+            _GIT_INFO=" ($branch)"
         fi
-        echo "${COLOR_IRIS}${branch}${dirty}${COLOR_RESET} "
-    fi
-}
-
-# Build prompt function
-function build_prompt() {
-    local path_display="%~"
-    local git_info=$(prompt_git_info)
-    
-    if [[ -n $TMUX ]]; then
-        echo " ${MUX_FRAKTUR} [${COLOR_CYAN}${path_display}${COLOR_RESET}] ${git_info}» "
     else
-        echo " ${CANCER} [${COLOR_PURPLE}%n${COLOR_RESET}: ${path_display}] ${git_info}» "
+        _GIT_INFO=""
     fi
 }
 
-# Use prompt_subst to evaluate the function
+autoload -Uz add-zsh-hook
+add-zsh-hook precmd _update_git_info
+
 setopt prompt_subst
-PROMPT='$(build_prompt)'
+
+if [[ -n $TMUX ]]; then
+    PROMPT='[%F{#9ccfd8}%~%f]${_GIT_INFO} » '
+else
+    PROMPT='[%F{#907aa9}%n%f: %~]${_GIT_INFO} » '
+fi
 
 bindkey -e
 bindkey -M menuselect '^[' undo

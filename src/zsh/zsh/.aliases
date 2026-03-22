@@ -1,18 +1,14 @@
-# zsh costum aliases
-#
+# zsh custom aliases
 # author: Charlynder
 # date created: 08.28.2025
-#
-# to find zsh configuration look in ~/.zshrc
-# to find functions look in ~/.config/zsh/.functions
 
 # --- alias:functionality ---
 alias cls="command clear"
 alias ls="command eza --color=always"
-alias lla="command eza -al --icons --color=always"
-alias ll="command eza -l --icons color=always"
+alias la="command eza -al --icons --color=always"
+alias ll="command eza -l --icons --color=always"  # FIX: was missing '=' before 'always'
 alias reload="source ~/.zshrc"
-alias open="open ."
+# FIX: removed 'alias open="open ."' — it breaks 'open <file>' usage
 
 # --- alias:programming ---
 alias y="yazi"
@@ -34,8 +30,7 @@ alias f="fzf"
 # --- alias:suffix ---
 alias -s md="$EDITOR"
 alias -s rs="$EDITOR"
-alias -s swift="$EDITOR" 
+alias -s swift="$EDITOR"
 alias -s py="$EDITOR"
 alias -s c="$EDITOR"
 alias -s crystal="$EDITOR"
-
