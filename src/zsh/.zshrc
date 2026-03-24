@@ -14,7 +14,7 @@ fi
 
 # --- config:editor ---
 export EDITOR="nvim"
-export VISUAL="nvim"
+export VISUAL="code"
 
 # --- config:eza ---
 export EZA_COLORS="\
@@ -89,6 +89,33 @@ zstyle ':completion:*' completer _complete _approximate
 zstyle ':completion:*' group-name ''
 zstyle ':completion:*:descriptions' format '%F{yellow}-- %d --%f'
 zstyle ':completion:*:warnings' format '%F{red}-- no matches found --%f'
+
+# --- config:fzf-tab ---
+# clone with: git clone https://github.com/Aloxaf/fzf-tab ~/.config/zsh/plugins/fzf-tab
+if [[ -f ~/.config/zsh/plugins/fzf-tab/fzf-tab.plugin.zsh ]]; then
+    source ~/.config/zsh/plugins/fzf-tab/fzf-tab.plugin.zsh
+
+    # disable sort for files/dirs so they appear in natural order
+    zstyle ':completion:*' sort false
+
+    # use fd for path completion
+    zstyle ':fzf-tab:complete:cd:*' fzf-preview 'eza --color=always --icons $realpath'
+    zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'eza --color=always --icons $realpath'
+
+    # show file preview for most completions
+    zstyle ':fzf-tab:complete:*:*' fzf-preview 'bat --color=always --style=numbers $realpath 2>/dev/null || eza --color=always --icons $realpath'
+
+    # Rose Pine colors for fzf-tab popup
+    zstyle ':fzf-tab:*' fzf-flags \
+        --color=fg:#e0def4,bg:#191724,hl:#eb6f92 \
+        --color=fg+:#e0def4,bg+:#26233a,hl+:#eb6f92 \
+        --color=info:#9ccfd8,prompt:#f6c177,pointer:#c4a7e7 \
+        --color=marker:#ebbcba,spinner:#eb6f92,header:#31748f \
+        --color=border:#524f67
+
+    # switch between tab/shift-tab to cycle through results
+    zstyle ':fzf-tab:*' switch-group '<' '>'
+fi
 
 # --- config:aliases ---
 if [[ -f ~/.config/zsh/.aliases ]]; then
