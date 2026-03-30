@@ -6,6 +6,7 @@
 alias cls="command clear"
 alias ls="command eza --color=auto"
 alias la="command eza -al --icons --color=auto"
+alias lla="command eza -al --icons --color=auto"
 alias ll="command eza -l --icons --color=auto"
 alias reload="source ~/.zshrc"
 
