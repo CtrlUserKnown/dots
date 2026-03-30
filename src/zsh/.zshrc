@@ -14,7 +14,7 @@ fi
 
 # --- config:editor ---
 export EDITOR="nvim"
-export VISUAL="code"
+export VISUAL="nvim"
 
 # --- config:eza ---
 export EZA_COLORS="\

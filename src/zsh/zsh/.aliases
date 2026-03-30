@@ -4,9 +4,9 @@
 
 # --- alias:functionality ---
 alias cls="command clear"
-alias ls="command eza --color=always"
-alias la="command eza -al --icons --color=always"
-alias ll="command eza -l --icons --color=always"
+alias ls="command eza --color=auto"
+alias la="command eza -al --icons --color=auto"
+alias ll="command eza -l --icons --color=auto"
 alias reload="source ~/.zshrc"
 
 # --- alias:programming ---
