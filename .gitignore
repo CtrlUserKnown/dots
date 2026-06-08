@@ -6,3 +6,7 @@
 # Ignore tmux plugin repos
 ./src/tmux/plugins/
 src/tmux/plugins/
+
+# node modules
+*/node_modules
+**/node_modules

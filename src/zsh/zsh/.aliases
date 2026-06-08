@@ -24,6 +24,7 @@ alias cr="cargo run"
 
 # --- alias:alias ---
 alias lz="lazygit"
+alias opc="opencode"
 
 # --- alias:application ---
 alias mux="command tmux"
