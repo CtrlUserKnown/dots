@@ -227,22 +227,6 @@ install_fzf_tab() {
     fi
 }
 
-# Install Tmux Plugin Manager from GitHub if not present
-install_tpm() {
-    local target="$HOME/.config/tmux/plugins/tpm"
-    if [ -d "$target" ]; then
-        echo "✅ TPM already installed"
-    else
-        echo "🔧 Installing Tmux Plugin Manager..."
-        mkdir -p "$(dirname "$target")"
-        if timeout 30s git clone --depth 1 https://github.com/tmux-plugins/tpm.git "$target"; then
-            echo "✅ TPM installed (run 'prefix + I' inside tmux to install plugins)"
-        else
-            echo "⚠️ TPM failed to install"
-        fi
-    fi
-}
-
 # Install npm dependencies for opencode if needed
 install_opencode_deps() {
     local dir="$HOME/.dots/src/opencode"
@@ -268,13 +252,12 @@ relink_and_verify() {
     ln -sf "$dots_dir/src/bat" "$HOME/.config/bat"
     ln -sf "$dots_dir/src/fastfetch" "$HOME/.config/fastfetch"
     ln -sf "$dots_dir/src/ghostty" "$HOME/.config/ghostty"
-    ln -sf "$dots_dir/src/tmux" "$HOME/.config/tmux"
     ln -sf "$dots_dir/src/zsh/zsh" "$HOME/.config/zsh"
     ln -sf "$dots_dir/src/zsh/.zshrc" "$HOME/.zshrc"
 
     # verify
     local all_good=true
-    for dir in bat fastfetch ghostty tmux zsh; do
+    for dir in bat fastfetch ghostty zsh; do
         if [ ! -L "$HOME/.config/$dir" ]; then
             echo "⚠️ Missing symlink: $HOME/.config/$dir"
             all_good=false
@@ -392,7 +375,6 @@ EOF
 
     # --- packages:GitHub ---
     install_fzf_tab
-    install_tpm
 
     # --- packages:npm ---
     install_opencode_deps

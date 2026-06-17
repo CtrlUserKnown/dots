@@ -117,9 +117,8 @@ fi
 # note: in thw test, its not actually cloning, but checking if the logic handles it
 assert_exists "$MOCK_HOME/.dots"
 
-# check symlinks (based on setup.sh L220+)
+# check symlinks
 assert_link "$MOCK_HOME/.config/bat"
-assert_link "$MOCK_HOME/.config/tmux"
 assert_link "$MOCK_HOME/.zshrc"
 
 echo ""

@@ -18,7 +18,7 @@ jobs:
         uses: ludeeus/action-shellcheck@master
         with:
           scandir: '.'
-          ignore_paths: 'src/tmux/plugins src/zsh' # Ignore non-bash files
+          ignore_paths: 'src/zsh' # Ignore non-bash files
           additional_files: 'tests/test_setup.sh'
 
       - name: Zsh Syntax Check
