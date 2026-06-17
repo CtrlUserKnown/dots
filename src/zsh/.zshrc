@@ -61,6 +61,26 @@ setopt HIST_IGNORE_ALL_DUPS SHARE_HISTORY APPEND_HISTORY INC_APPEND_HISTORY
 WORDCHARS=${WORDCHARS//[\/]}
 setopt EXTENDED_GLOB AUTO_CD
 
+# --- config:developer mode ---
+# Author is auto-enrolled in developer mode (no update prompts).
+# Other users get auto-updates by default.
+# Override by setting DEVELOPER_MODE=0 or DEVELOPER_MODE=1 before this line.
+if [[ -z "${DEVELOPER_MODE:-}" ]]; then
+    [[ "$USER" == "christian" ]] && typeset -g DEVELOPER_MODE=1
+fi
+
+# --- config:developer hooks ---
+# brew sync — auto-updates Brewfile on install/uninstall (developer mode only)
+if [[ -f ~/.config/zsh/brew-sync.zsh ]]; then
+    source ~/.config/zsh/brew-sync.zsh
+fi
+
+# --- config:update check ---
+# checks daily for dotfiles updates (skipped in developer mode)
+if [[ -f ~/.config/zsh/update-check.zsh ]]; then
+    source ~/.config/zsh/update-check.zsh
+fi
+
 # --- config:fastfetch ---
 if [[ ! -f /tmp/zsh_fastfetch_$$ ]] && [[ $- == *i* ]]; then
     fastfetch
@@ -83,6 +103,11 @@ compinit
 # --- config:zoxide ---
 eval "$(zoxide init zsh)"
 
+# --- config:carapace ---
+if command -v carapace >/dev/null 2>&1; then
+    source <(carapace _carapace)
+fi
+
 zstyle ':completion:*' menu select
 zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
 zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
@@ -102,6 +127,10 @@ if [[ -f ~/.config/zsh/plugins/fzf-tab/fzf-tab.plugin.zsh ]]; then
     # use fd for path completion
     zstyle ':fzf-tab:complete:cd:*' fzf-preview 'eza --color=always --icons $realpath'
     zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'eza --color=always --icons $realpath'
+    zstyle ':fzf-tab:complete:-command-:*' fzf-preview 'whence -v $word 2>/dev/null'
+
+    # show what a command name resolves to (alias, function, or binary)
+    zstyle ':fzf-tab:complete:*:command-word' fzf-preview 'whence -v $word'
 
     # show file preview for most completions
     zstyle ':fzf-tab:complete:*:*' fzf-preview 'bat --color=always --style=numbers $realpath 2>/dev/null || eza --color=always --icons $realpath'
