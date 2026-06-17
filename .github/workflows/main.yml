@@ -27,8 +27,12 @@ jobs:
           sudo apt-get update && sudo apt-get install -y zsh
           
           echo "Checking Zsh syntax..."
-          # Find all zsh files and run syntax check (zsh -n)
-          find src/zsh -type f \( -name "*.zsh" -o -name ".zshrc" -o -name ".*" \) -not -path "*/.*" -exec zsh -n {} +
+          # Check all .zsh files in src/zsh
+          find src/zsh -type f -name "*.zsh" -exec zsh -n {} +
+          # Check hidden files (.zshrc, .aliases, .functions) directly
+          for f in src/zsh/.zshrc src/zsh/zsh/.aliases src/zsh/zsh/.functions src/zsh/zsh/themes/charModel; do
+            [ -f "$f" ] && zsh -n "$f" && echo "  $f: OK"
+          done
           echo "✅ Zsh syntax check passed"
 
   test-setup:
