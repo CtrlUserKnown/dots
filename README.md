@@ -1,6 +1,6 @@
 # CtrlUserKnown Dots
 
-A professional, performance-oriented macOS development environment. This repository automates the setup of a modern terminal workflow using Homebrew, Zsh, Tmux, and Ghostty.
+A professional, performance-oriented macOS development environment. This repository automates the setup of a modern terminal workflow using Homebrew, Zsh, and Ghostty.
 
 > [!TIP]
 > [Test Setup Script](https://github.com/CtrlUserKnown/dotfiles/actions/workflows/main.yml/badge.svg)
@@ -10,10 +10,11 @@ A professional, performance-oriented macOS development environment. This reposit
 - **Automated Setup:** A robust `setup.sh` script that handles Homebrew, dependencies, and symlinking.
 - **Resilient Installation:** Built-in timeout logic and shallow clone fallbacks to prevent hanging on slow connections.
 - **Modern Stack:** Optimized configurations for:
-  - **Terminal:** [Ghostty](https://ghostty.org/) (macOS 12.0+)
-  - **Shell:** Zsh with custom themes (`charModel`, `charMulti`)
-  - **Multiplexer:** Tmux with TPM (Tmux Plugin Manager)
+  - **Terminal:** [Ghostty](https://ghostty.org/) (macOS 12.0+) with multiple themes
+  - **Shell:** Zsh with custom `charModel` prompt theme
   - **Utilities:** `bat`, `fastfetch`, `fzf`, `git`
+- **Brew Sync:** Automatically tracks Homebrew package changes back to the `Brewfile`.
+- **Auto-Update:** Built-in update checker to stay current with the latest dotfiles.
 - **Quality Assured:** Includes a dedicated automated test suite and GitHub Actions CI.
 
 ## System Requirements
@@ -34,18 +35,19 @@ Or clone the repository manually:
 
 The script will:
 1. Check your macOS version.
-2. Install [Homebrew](https://brew.sh/) and [Gum](https://github.com/charmbracelet/gum) if missing.
+2. Install [Homebrew](https://brew.sh/) and [Gum](https://github.com/charmbracelet/gum) if missing (includes timeout/fallback logic).
 3. Install all dependencies from the `Brewfile`.
 4. Create symlinks for all configurations in `~/.config`.
 
 ## Project Structure
 
-- [`src/zsh/`](src/zsh/) - Zsh configuration and custom themes.
-- [`src/tmux/`](src/tmux/) - Tmux configuration and plugin management.
-- [`src/ghostty/`](src/ghostty/) - Configuration for the Ghostty terminal.
+- [`src/zsh/`](src/zsh/) - Zsh configuration, custom `charModel` theme, aliases, functions, and utilities (`brew-sync.zsh`, `update-check.zsh`).
+- [`src/ghostty/`](src/ghostty/) - Configuration and themes for the Ghostty terminal.
 - [`src/bat/`](src/bat/) - Themes and config for the `bat` utility.
 - [`src/fastfetch/`](src/fastfetch/) - System information display config.
-- [`assets/Brewfile`](assets/Brewfile) - Managed list of Homebrew packages.
+- [`src/opencode/`](src/opencode/) - Configuration for [opencode](https://opencode.ai) AI coding assistant.
+- [`src/git/`](src/git/) - Git configuration.
+- [`assets/Brewfile`](assets/Brewfile) - Managed list of Homebrew packages (auto-synced via `brew-sync.zsh`).
 
 ## Testing
 
@@ -59,8 +61,8 @@ cd tests
 ## Themes
 
 - **Char Model:** A clean, minimal Zsh prompt. [View Config](src/zsh/zsh/themes/charModel)
-- **Char Multi:** A feature-rich, multi-line Zsh prompt. [View Config](src/zsh/zsh/themes/charMulti)
-- **Rose Pine:** Consistent color schemes across all tools.
+- **Ghostty Themes:** [noir-cat](src/ghostty/themes/noir-cat) and [knew-pines](src/ghostty/themes/knew-pines).
+- **Rosé Pine:** Rosé Pine, Rosé Pine Moon, and Rosé Pine Dawn color schemes for `bat`. See [`src/bat/themes/`](src/bat/themes/).
 
 ---
 *Neovim configuration has been migrated to its own repository: [Charvim](https://github.com/CtrlUserKnown/Charvim)*
