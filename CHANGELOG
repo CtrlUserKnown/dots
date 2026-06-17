@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-06-17
+
+### Added
+- Automatic daily dotfiles update check on shell start — prompts to pull new changes
+- Developer mode: auto-enables for repo author, skips update prompts; users can toggle via `DEVELOPER_MODE` flag
+- `brew-sync.zsh`: auto-regenerates `assets/Brewfile` on `brew install`/`uninstall`/`tap`/`untap` (developer mode only)
+- Individual per-package timeout for Brewfile installations (120s each) so one hanging dep won't block others
+- GitHub dependency installers: `fzf-tab`, Tmux Plugin Manager (`tpm`), and opencode npm deps
+
+### Changed
+- Migrated update check logic from inline in `.zshrc` to standalone `update-check.zsh`
+- Fixed CI zsh syntax check to actually cover `.zshrc`, `.aliases`, `.functions`, and theme files
+
+### Removed
+- Unused zsh themes: `charMulti` and `charMux`; only `charModel` remains
+
 ## [1.1.0] - 2026-03-29
 
 ### Added
