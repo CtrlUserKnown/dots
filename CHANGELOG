@@ -18,6 +18,10 @@ All notable changes to this project will be documented in this file.
 ### Removed
 - Unused zsh themes: `charMulti` and `charMux`; only `charModel` remains
 
+### Fixed
+- Removed orphaned gitlink at `src/tmux/tpm/plugins/tpm` that caused CI to fail with `fatal: No url found for submodule path` — the gitlink survived a 2025 restructure cleanup and was never deleted from the index
+- Stripped all remaining tmux/tpm references from `setup.sh`, `tests/test_setup.sh`, and `.github/workflows/main.yml`
+
 ## [1.1.0] - 2026-03-29
 
 ### Added
