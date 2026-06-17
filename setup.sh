@@ -63,7 +63,7 @@ show_message() {
 run_with_spinner() {
     local title="$1"
     shift
-    
+
     if command -v gum &> /dev/null; then
         gum spin --spinner dot --title "$title" -- "$@"
     else
@@ -80,12 +80,12 @@ check_os_version() {
     if [[ "$(uname -s)" == "Darwin" ]]; then
         OS_VERSION=$(sw_vers -productVersion)
         MAJOR_VERSION=$(echo "$OS_VERSION" | cut -d. -f1)
-        
+
         if [ "$MAJOR_VERSION" -lt 12 ]; then
             echo "⚠️ Warning: You are running macOS $OS_VERSION."
             echo "This setup is optimized for macOS 12.0 (Monterey) and newer."
             echo "Some tools, like Ghostty, may not be compatible with your system."
-            
+
             if [ -z "$CI" ]; then
                 if command -v gum &> /dev/null; then
                     gum confirm "Do you want to continue anyway?" || exit 0
@@ -101,7 +101,207 @@ check_os_version() {
 
 check_os_version
 
-(
+# --- dependency installer ---
+DEPENDENCY_TIMEOUT=120
+
+# Check if a brew formula is already installed
+brew_installed() {
+    brew list "$1" &>/dev/null
+}
+
+# Check if a brew cask is already installed
+cask_installed() {
+    brew list --cask "$1" &>/dev/null
+}
+
+# Check if a go package is already installed (checks GOBIN or GOPATH/bin)
+go_installed() {
+    local pkg="$1"
+    local bin_name
+    bin_name=$(basename "$pkg")
+    command -v "$bin_name" &>/dev/null
+}
+
+# Check if a cargo package is already installed
+cargo_installed() {
+    local pkg="$1"
+    local bin_name
+    bin_name=$(basename "$pkg")
+    command -v "$bin_name" &>/dev/null
+}
+
+# Install a single brew entry safely
+install_brew_entry() {
+    local line="$1"
+
+    # Tap
+    if [[ "$line" =~ ^tap\ \"(.*)\"$ ]]; then
+        local tap="${BASH_REMATCH[1]}"
+        if brew tap | grep -q "^${tap}$"; then
+            echo "✅ Tap $tap already added"
+        else
+            run_with_spinner "Tapping $tap..." brew tap "$tap"
+        fi
+
+    # Brew formula
+    elif [[ "$line" =~ ^brew\ \"(.*)\"$ ]]; then
+        local pkg="${BASH_REMATCH[1]}"
+        if brew_installed "$pkg"; then
+            echo "✅ $pkg already installed"
+        else
+            run_with_spinner "Installing $pkg..." \
+                timeout "$DEPENDENCY_TIMEOUT" brew install "$pkg" || \
+                echo "⚠️ $pkg failed to install (timeout or error)"
+        fi
+
+    # Cask
+    elif [[ "$line" =~ ^cask\ \"(.*)\"$ ]]; then
+        local pkg="${BASH_REMATCH[1]}"
+        if cask_installed "$pkg"; then
+            echo "✅ $pkg (cask) already installed"
+        else
+            run_with_spinner "Installing $pkg (cask)..." \
+                timeout "$DEPENDENCY_TIMEOUT" brew install --cask "$pkg" || \
+                echo "⚠️ $pkg (cask) failed to install (timeout or error)"
+        fi
+
+    # Go package
+    elif [[ "$line" =~ ^go\ \"(.*)\"$ ]]; then
+        local pkg="${BASH_REMATCH[1]}"
+        if go_installed "$pkg"; then
+            echo "✅ $(basename "$pkg") (go) already installed"
+        else
+            run_with_spinner "Installing $pkg (go)..." \
+                go install "$pkg@latest" || \
+                echo "⚠️ $pkg (go) failed to install"
+        fi
+
+    # Cargo package
+    elif [[ "$line" =~ ^cargo\ \"(.*)\"$ ]]; then
+        local pkg="${BASH_REMATCH[1]}"
+        local bin_name
+        bin_name=$(basename "$pkg")
+        if cargo_installed "$pkg"; then
+            echo "✅ $bin_name (cargo) already installed"
+        else
+            run_with_spinner "Installing $bin_name (cargo)..." \
+                timeout "$DEPENDENCY_TIMEOUT" cargo install "$bin_name" || \
+                echo "⚠️ $bin_name (cargo) failed to install"
+        fi
+    fi
+}
+
+# Install all brewfile entries safely, each with its own timeout
+install_brewfile() {
+    local brewfile="$1"
+
+    if [ ! -f "$brewfile" ]; then
+        echo "⚠️ Brewfile not found at $brewfile. Skipping."
+        return 1
+    fi
+
+    echo "🔧 Installing packages from Brewfile..."
+
+    while IFS= read -r line || [ -n "$line" ]; do
+        # Skip empty lines and comments
+        [[ -z "$line" || "$line" == \#* ]] && continue
+        install_brew_entry "$line"
+    done < "$brewfile"
+
+    echo "✅ Brewfile package installation complete."
+}
+
+# Install fzf-tab from GitHub if not present
+install_fzf_tab() {
+    local target="$HOME/.config/zsh/plugins/fzf-tab"
+    if [ -d "$target" ]; then
+        echo "✅ fzf-tab already installed"
+    else
+        echo "🔧 Installing fzf-tab from GitHub..."
+        mkdir -p "$(dirname "$target")"
+        if timeout 30s git clone --depth 1 https://github.com/Aloxaf/fzf-tab.git "$target"; then
+            echo "✅ fzf-tab installed"
+        else
+            echo "⚠️ fzf-tab failed to install"
+        fi
+    fi
+}
+
+# Install Tmux Plugin Manager from GitHub if not present
+install_tpm() {
+    local target="$HOME/.config/tmux/plugins/tpm"
+    if [ -d "$target" ]; then
+        echo "✅ TPM already installed"
+    else
+        echo "🔧 Installing Tmux Plugin Manager..."
+        mkdir -p "$(dirname "$target")"
+        if timeout 30s git clone --depth 1 https://github.com/tmux-plugins/tpm.git "$target"; then
+            echo "✅ TPM installed (run 'prefix + I' inside tmux to install plugins)"
+        else
+            echo "⚠️ TPM failed to install"
+        fi
+    fi
+}
+
+# Install npm dependencies for opencode if needed
+install_opencode_deps() {
+    local dir="$HOME/.dots/src/opencode"
+    if [ -f "$dir/package.json" ] && [ ! -d "$dir/node_modules" ]; then
+        echo "🔧 Installing opencode dependencies..."
+        if command -v npm &>/dev/null; then
+            run_with_spinner "Installing opencode npm packages..." \
+                timeout 60s npm install --prefix "$dir" || \
+                echo "⚠️ opencode npm install failed"
+        else
+            echo "⚠️ npm not found, skipping opencode dependencies"
+        fi
+    elif [ -d "$dir/node_modules" ]; then
+        echo "✅ opencode dependencies already installed"
+    fi
+}
+
+# Re-link configs and verify
+relink_and_verify() {
+    local dots_dir="$1"
+
+    echo "🔧 Creating links for configuration files..."
+    ln -sf "$dots_dir/src/bat" "$HOME/.config/bat"
+    ln -sf "$dots_dir/src/fastfetch" "$HOME/.config/fastfetch"
+    ln -sf "$dots_dir/src/ghostty" "$HOME/.config/ghostty"
+    ln -sf "$dots_dir/src/tmux" "$HOME/.config/tmux"
+    ln -sf "$dots_dir/src/zsh/zsh" "$HOME/.config/zsh"
+    ln -sf "$dots_dir/src/zsh/.zshrc" "$HOME/.zshrc"
+
+    # verify
+    local all_good=true
+    for dir in bat fastfetch ghostty tmux zsh; do
+        if [ ! -L "$HOME/.config/$dir" ]; then
+            echo "⚠️ Missing symlink: $HOME/.config/$dir"
+            all_good=false
+        fi
+    done
+
+    if [ ! -L "$HOME/.zshrc" ]; then
+        echo "⚠️ Missing symlink: $HOME/.zshrc"
+        all_good=false
+    fi
+
+    if [ ! -d "$dots_dir/.git" ]; then
+        echo "⚠️ Dotfiles repository not properly cloned"
+        all_good=false
+    fi
+
+    if [ "$all_good" = true ]; then
+        echo "✅ All configuration files verified successfully"
+    else
+        echo "⚠️ Some files are missing or not properly linked"
+        exit 1
+    fi
+}
+
+# --- install ---
+# main installation sequence
+do_install() {
     # --- script:Banner ---
     if command -v gum &> /dev/null; then
         gum style \
@@ -110,13 +310,13 @@ check_os_version
           --foreground 141 \
           --align center \
           --padding "1 2" << 'EOF'
-          ______     __                __  __    __  __    __ 
+          ______     __                __  __    __  __    __
          /      \   |  \              |  \|  \  |  \|  \  /  \
         |  $$$$$$\ _| $$_     ______  | $$| $$  | $$| $$ /  $$
-        | $$   \$$|   $$ \   /      \ | $$| $$  | $$| $$/  $$ 
-        | $$       \$$$$$$  |  $$$$$$\| $$| $$  | $$| $$  $$  
-        | $$   __   | $$ __ | $$   \$$| $$| $$  | $$| $$$$$\  
-        | $$__/  \  | $$|  \| $$      | $$| $$__/ $$| $$ \$$\ 
+        | $$   \$$|   $$ \   /      \ | $$| $$  | $$| $$/  $$
+        | $$       \$$$$$$  |  $$$$$$\| $$| $$  | $$| $$  $$
+        | $$   __   | $$ __ | $$   \$$| $$| $$  | $$| $$$$$\
+        | $$__/  \  | $$|  \| $$      | $$| $$__/ $$| $$ \$$\
          \$$    $$   \$$  $$| $$      | $$ \$$    $$| $$  \$$\
           \$$$$$$     \$$$$  \$$       \$$  \$$$$$$  \$$   \$$
 EOF
@@ -128,20 +328,17 @@ EOF
     fi
 
     # --- package manager:homebrew ---
-    # install Homebrew on to the system
     if command -v brew &> /dev/null; then
         echo "☕️ Homebrew is already installed."
     else
         echo "🚀 Homebrew not found. Installing..."
 
-        # Non-interactive installation for CI
         if [ -n "$CI" ]; then
             NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
         else
             /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
         fi
 
-        # Add Homebrew to PATH if necessary
         if [[ -d "/opt/homebrew/bin" ]]; then
             # shellcheck disable=SC2016
             echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
@@ -154,17 +351,14 @@ EOF
 
         echo "✅ Homebrew installation complete."
 
-        # Try to install gum via Homebrew after Homebrew is installed
         if ! command -v gum &> /dev/null; then
             brew install gum >/dev/null 2>&1 || echo "⚠️ Could not install gum via Homebrew"
         fi
     fi
 
     # --- configuration:.config ---
-    # make syslinks for config
     echo "🔧 Checking for configuration files..."
 
-    # make .config directory
     if [ ! -d ~/.config ]; then
         run_with_spinner "Creating Config folder..." mkdir ~/.config
         sleep 1
@@ -173,16 +367,13 @@ EOF
     fi
 
     # --- configuration:Dotfiles ---
-    # make dotfiles directory
     if [ ! -d ~/.dots ]; then
         echo "🔧 Setting up Dotfiles (~/.dots)..."
-        
-        # Try full clone first with a 30s timeout
+
         if ! timeout 30s git clone https://github.com/CtrlUserKnown/dotfiles.git ~/.dots; then
             echo "⚠️  Standard clone timed out or failed. Trying a shallow clone..."
-            rm -rf ~/.dots # Clean up partial clone
-            
-            # Fallback: try shallow clone with a 20s timeout
+            rm -rf ~/.dots
+
             if ! timeout 20s git clone --depth 1 https://github.com/CtrlUserKnown/dotfiles.git ~/.dots; then
                 echo "❌  Both attempts failed. Skipping dotfiles for now."
             else
@@ -197,74 +388,23 @@ EOF
     fi
 
     # --- packages:Brewfile ---
-    # install Homebrew files if the packages do not exist on the system
-    # compare the installed files with the Brewfile and brew list
-    # if the package is missing, install it
-    if [ -f "./assets/Brewfile" ]; then
-        echo "🔧 Installing packages from Brewfile..."
-        if ! timeout 40s brew bundle --file=./assets/Brewfile; then
-            echo "⚠️  Brew installation timed out or failed. You might want to run 'brew bundle --file=./assets/Brewfile' manually later."
-        else
-            echo "✅ Brewfile packages installation complete."
-        fi
-    else
-        echo "⚠️ No Brewfile found in the current directory. Skipping package installation."
-    fi
+    install_brewfile "./assets/Brewfile"
+
+    # --- packages:GitHub ---
+    install_fzf_tab
+    install_tpm
+
+    # --- packages:npm ---
+    install_opencode_deps
 
     # --- configuration:Edits ---
-    # zprofile will not be need since homebrew will be called in .zshrc file (only to be use during install)
     rm -f ~/.zprofile
 
-    # --- configuration:Links ---
-    # create links for configurations, final form (lol)
-    run_with_spinner "Creating links for configuration files..." bash -c "
-        # Create symlinks for .config directories
-        ln -sf $HOME/.dots/src/bat $HOME/.config/bat
-        ln -sf $HOME/.dots/src/fastfetch $HOME/.config/fastfetch
-        ln -sf $HOME/.dots/src/ghostty $HOME/.config/ghostty
-        ln -sf $HOME/.dots/src/tmux $HOME/.config/tmux
+    # --- configuration:Links & Verify ---
+    relink_and_verify "$HOME/.dots"
+}
 
-        # Create symlinks for home directory
-        ln -sf $HOME/.dots/src/zsh/zsh $HOME/.config/zsh
-        ln -sf $HOME/.dots/src/zsh/.zshrc $HOME/.zshrc
-    "
-    sleep 1
-
-    # --- verification:Check ---
-    # verify that the files are working correctly
-    run_with_spinner "Verifying installation..." bash -c "
-        all_good=true
-
-        # Check .config symlinks
-        for dir in bat fastfetch ghostty tmux zsh; do
-            if [ ! -L \$HOME/.config/\$dir ]; then
-                echo \"⚠️ Missing symlink: \$HOME/.config/\$dir\"
-                all_good=false
-            fi
-        done
-
-        # Check home directory symlinks
-        if [ ! -L \$HOME/.zshrc ]; then
-            echo \"⚠️ Missing symlink: \$HOME/.zshrc\"
-            all_good=false
-        fi
-
-        # Check if dotfiles repo exists
-        if [ ! -d \$HOME/.dots/.git ]; then
-            echo \"⚠️ Dotfiles repository not properly cloned\"
-            all_good=false
-        fi
-
-        if [ \"\$all_good\" = true ]; then
-            echo \"✅ All configuration files verified successfully\"
-        else
-            echo \"⚠️ Some files are missing or not properly linked\"
-            exit 1
-        fi
-    "
-    sleep 1
-
-)
+do_install
 
 # --- Charfiles:finish ---
 if command -v gum &> /dev/null; then
