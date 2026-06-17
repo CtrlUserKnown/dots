@@ -39,11 +39,11 @@ export FZF_DEFAULT_OPTS='
   --border
   --preview "bat --style=numbers --color=always {}"
   --bind "alt-enter:execute(nvim {})"
-  --color=fg:#e0def4,bg:#191724,hl:#eb6f92
-  --color=fg+:#e0def4,bg+:#26233a,hl+:#eb6f92
-  --color=info:#9ccfd8,prompt:#f6c177,pointer:#c4a7e7
-  --color=marker:#ebbcba,spinner:#eb6f92,header:#31748f
-  --color=border:#524f67,preview-bg:#1f1d2e
+  --color=fg:-1,bg:-1,hl:13
+  --color=fg+:-1,bg+:8,hl+:14
+  --color=info:12,prompt:10,pointer:13
+  --color=marker:11,spinner:13,header:6
+  --color=border:8,preview-bg:-1
 '
 export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
 export FZF_CTRL_T_OPTS='--preview "bat --color=always --line-range :500 {}"'
@@ -106,13 +106,13 @@ if [[ -f ~/.config/zsh/plugins/fzf-tab/fzf-tab.plugin.zsh ]]; then
     # show file preview for most completions
     zstyle ':fzf-tab:complete:*:*' fzf-preview 'bat --color=always --style=numbers $realpath 2>/dev/null || eza --color=always --icons $realpath'
 
-    # Rose Pine colors for fzf-tab popup
+    # use terminal-native colors so fzf matches the current ghostty theme
     zstyle ':fzf-tab:*' fzf-flags \
-        --color=fg:#e0def4,bg:#191724,hl:#eb6f92 \
-        --color=fg+:#e0def4,bg+:#26233a,hl+:#eb6f92 \
-        --color=info:#9ccfd8,prompt:#f6c177,pointer:#c4a7e7 \
-        --color=marker:#ebbcba,spinner:#eb6f92,header:#31748f \
-        --color=border:#524f67
+        --color=fg:-1,bg:-1,hl:13 \
+        --color=fg+:-1,bg+:8,hl+:14 \
+        --color=info:12,prompt:10,pointer:13 \
+        --color=marker:11,spinner:13,header:6 \
+        --color=border:8
 
     # switch between tab/shift-tab to cycle through results
     zstyle ':fzf-tab:*' switch-group '<' '>'
@@ -177,3 +177,5 @@ ZSH_HIGHLIGHT_STYLES[comment]='fg=242'
 if [[ -f "/opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]; then
     source /opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 fi
+
+

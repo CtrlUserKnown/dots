@@ -15,7 +15,7 @@ shell-integration = zsh
 shell-integration-features = sudo,title
 
 # --- Theme ---
-theme = "knew-pines"
+theme = "noir-cat"
 background-blur = true
 background-blur-radius = 18
 background-opacity = 0.95
