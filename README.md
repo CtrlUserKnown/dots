@@ -62,7 +62,7 @@ cd tests
 
 - **Char Model:** A clean, minimal Zsh prompt. [View Config](src/zsh/zsh/themes/charModel)
 - **Ghostty Themes:** [noir-cat](src/ghostty/themes/noir-cat) and [knew-pines](src/ghostty/themes/knew-pines).
-- **Rosé Pine:** Rosé Pine, Rosé Pine Moon, and Rosé Pine Dawn color schemes for `bat`. See [`src/bat/themes/`](src/bat/themes/).
+- **KnewPines:** KnewPines, KnewPines Moon, and KnewPines Dawn color schemes for `bat`. See [`src/bat/themes/`](src/bat/themes/).
 
 ---
 *Neovim configuration has been migrated to its own repository: [Charvim](https://github.com/CtrlUserKnown/Charvim)*
