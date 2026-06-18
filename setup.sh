@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # --- dotfiles:macOS install script ---
-# dotfiles v1.2.0
+# dotfiles v1.3.0
 # date created: 08.29.2025
 
 # --- charfile:start ---

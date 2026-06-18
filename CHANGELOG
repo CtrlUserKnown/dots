@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2026-06-17
+
+### Added
+- Neovim prompt: user is asked during setup if they want Neovim and/or Neovim config, with conditional install and linking
+- Version markers (`dotfiles v1.3.0`) added to all key config files for release tracking
+- Cross-platform `run_timeout` wrapper so `setup.sh` works on macOS runners without GNU `timeout`
+
+### Changed
+- `brew-sync.zsh` now respects neovim opt-out: if neovim was removed from the Brewfile, the sync hook won't re-add it
+
+### Fixed
+- GitHub Actions `macos-latest` runner no longer fails with `timeout: command not found` — fallback to direct execution
+
 ## [1.2.0] - 2026-06-17
 
 ### Added
