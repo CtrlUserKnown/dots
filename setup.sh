@@ -1,9 +1,22 @@
 #!/usr/bin/env bash
 
 # --- dotfiles:macOS install script ---
+# dotfiles v1.2.0
 # date created: 08.29.2025
 
 # --- charfile:start ---
+
+# --- cross-platform timeout wrapper ---
+# timeout is not available on macOS by default
+run_timeout() {
+    local duration="$1"
+    shift
+    if command -v timeout &> /dev/null; then
+        timeout "$duration" "$@"
+    else
+        "$@"
+    fi
+}
 
 # --- script prompting:gum ---
 # ensure gum is installed (silent)
@@ -13,7 +26,7 @@ install_gum() {
 
         # Use Homebrew to install gum if available, otherwise manual install
         if command -v brew &> /dev/null; then
-            timeout 30s brew install gum >/dev/null 2>&1
+            run_timeout 30s brew install gum >/dev/null 2>&1
             return $?
         fi
 
@@ -31,7 +44,7 @@ install_gum() {
         tmpdir=$(mktemp -d)
 
         # Download and extract gum
-        if timeout 30s curl -sSL "https://github.com/charmbracelet/gum/releases/latest/download/gum_${OS}_${ARCH}.tar.gz" \
+        if run_timeout 30s curl -sSL "https://github.com/charmbracelet/gum/releases/latest/download/gum_${OS}_${ARCH}.tar.gz" \
             | tar -xz -C "$tmpdir" 2>/dev/null; then
             sudo mv "$tmpdir/gum" /usr/local/bin/gum 2>/dev/null || {
                 # Fallback if sudo fails (CI environment)
@@ -146,11 +159,18 @@ install_brew_entry() {
     # Brew formula
     elif [[ "$line" =~ ^brew\ \"(.*)\"$ ]]; then
         local pkg="${BASH_REMATCH[1]}"
+
+        # Skip neovim if user declined
+        if [ "$pkg" = "neovim" ] && [ "$INSTALL_NEOVIM" = false ]; then
+            echo "⏭️ Skipping neovim (declined by user)"
+            return 0
+        fi
+
         if brew_installed "$pkg"; then
             echo "✅ $pkg already installed"
         else
             run_with_spinner "Installing $pkg..." \
-                timeout "$DEPENDENCY_TIMEOUT" brew install "$pkg" || \
+                run_timeout "$DEPENDENCY_TIMEOUT" brew install "$pkg" || \
                 echo "⚠️ $pkg failed to install (timeout or error)"
         fi
 
@@ -161,7 +181,7 @@ install_brew_entry() {
             echo "✅ $pkg (cask) already installed"
         else
             run_with_spinner "Installing $pkg (cask)..." \
-                timeout "$DEPENDENCY_TIMEOUT" brew install --cask "$pkg" || \
+                run_timeout "$DEPENDENCY_TIMEOUT" brew install --cask "$pkg" || \
                 echo "⚠️ $pkg (cask) failed to install (timeout or error)"
         fi
 
@@ -185,7 +205,7 @@ install_brew_entry() {
             echo "✅ $bin_name (cargo) already installed"
         else
             run_with_spinner "Installing $bin_name (cargo)..." \
-                timeout "$DEPENDENCY_TIMEOUT" cargo install "$bin_name" || \
+                run_timeout "$DEPENDENCY_TIMEOUT" cargo install "$bin_name" || \
                 echo "⚠️ $bin_name (cargo) failed to install"
         fi
     fi
@@ -219,7 +239,7 @@ install_fzf_tab() {
     else
         echo "🔧 Installing fzf-tab from GitHub..."
         mkdir -p "$(dirname "$target")"
-        if timeout 30s git clone --depth 1 https://github.com/Aloxaf/fzf-tab.git "$target"; then
+        if run_timeout 30s git clone --depth 1 https://github.com/Aloxaf/fzf-tab.git "$target"; then
             echo "✅ fzf-tab installed"
         else
             echo "⚠️ fzf-tab failed to install"
@@ -234,7 +254,7 @@ install_opencode_deps() {
         echo "🔧 Installing opencode dependencies..."
         if command -v npm &>/dev/null; then
             run_with_spinner "Installing opencode npm packages..." \
-                timeout 60s npm install --prefix "$dir" || \
+                run_timeout 60s npm install --prefix "$dir" || \
                 echo "⚠️ opencode npm install failed"
         else
             echo "⚠️ npm not found, skipping opencode dependencies"
@@ -254,6 +274,9 @@ relink_and_verify() {
     ln -sf "$dots_dir/src/ghostty" "$HOME/.config/ghostty"
     ln -sf "$dots_dir/src/zsh/zsh" "$HOME/.config/zsh"
     ln -sf "$dots_dir/src/zsh/.zshrc" "$HOME/.zshrc"
+    if [ "$INSTALL_NEOVIM_CONFIG" = true ] && [ -d "$dots_dir/src/nvim" ]; then
+        ln -sf "$dots_dir/src/nvim" "$HOME/.config/nvim"
+    fi
 
     # verify
     local all_good=true
@@ -353,11 +376,11 @@ EOF
     if [ ! -d ~/.dots ]; then
         echo "🔧 Setting up Dotfiles (~/.dots)..."
 
-        if ! timeout 30s git clone https://github.com/CtrlUserKnown/dotfiles.git ~/.dots; then
+        if ! run_timeout 30s git clone https://github.com/CtrlUserKnown/dotfiles.git ~/.dots; then
             echo "⚠️  Standard clone timed out or failed. Trying a shallow clone..."
             rm -rf ~/.dots
 
-            if ! timeout 20s git clone --depth 1 https://github.com/CtrlUserKnown/dotfiles.git ~/.dots; then
+            if ! run_timeout 20s git clone --depth 1 https://github.com/CtrlUserKnown/dotfiles.git ~/.dots; then
                 echo "❌  Both attempts failed. Skipping dotfiles for now."
             else
                 echo "✅  Shallow clone successful!"
@@ -368,6 +391,30 @@ EOF
         sleep 1
     else
         echo "Dotfiles directory has already been created ✅"
+    fi
+
+    # --- packages:neovim prompt ---
+    # Ask user if they want Neovim and/or Neovim config
+    INSTALL_NEOVIM=true
+    INSTALL_NEOVIM_CONFIG=true
+    if [ -z "$CI" ]; then
+        if command -v gum &> /dev/null; then
+            gum confirm "Install Neovim?" --default=true || INSTALL_NEOVIM=false
+            if [ "$INSTALL_NEOVIM" = true ]; then
+                if [ -d "$(dirname "$0")/src/nvim" ]; then
+                    gum confirm "Link Neovim config from dotfiles?" --default=true || INSTALL_NEOVIM_CONFIG=false
+                fi
+            fi
+        else
+            read -p "Install Neovim? (Y/n) " -n 1 -r
+            echo
+            [[ ! $REPLY =~ ^[Yy]$ ]] && INSTALL_NEOVIM=false
+            if [ "$INSTALL_NEOVIM" = true ] && [ -d "$(dirname "$0")/src/nvim" ]; then
+                read -p "Link Neovim config from dotfiles? (Y/n) " -n 1 -r
+                echo
+                [[ ! $REPLY =~ ^[Yy]$ ]] && INSTALL_NEOVIM_CONFIG=false
+            fi
+        fi
     fi
 
     # --- packages:Brewfile ---

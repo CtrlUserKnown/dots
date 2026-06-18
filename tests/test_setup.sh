@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 # --- CharVim:test suite ---
+# dotfiles v1.2.0
 # this script test setup.sh in a isolated environment to verify its behavior.
 # all hail microslop!
 

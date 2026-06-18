@@ -1,4 +1,5 @@
 # Homebrew sync hook — auto-updates Brewfile on install/uninstall/tap/untap
+# dotfiles v1.2.0
 # Only runs when DEVELOPER_MODE is set (avoids trampling other users' Brewfiles)
 
 if [[ -z "$DEVELOPER_MODE" || ! -d ~/.dots/.git ]]; then
@@ -9,17 +10,27 @@ _brew_sync() {
     local brewfile="$HOME/.dots/assets/Brewfile"
     local go_entries=()
     local cargo_entries=()
+    local has_neovim=false
 
     while IFS= read -r line || [ -n "$line" ]; do
         [[ "$line" =~ ^go\ \"(.*)\"$ ]] && go_entries+=("$line")
         [[ "$line" =~ ^cargo\ \"(.*)\"$ ]] && cargo_entries+=("$line")
+        [[ "$line" =~ ^brew\ \"neovim\"$ ]] && has_neovim=true
     done < "$brewfile"
 
     command brew bundle dump --force --file="$brewfile" 2>/dev/null
 
+    # Restore go/cargo entries (brew bundle dump omits them)
     for entry in "${go_entries[@]}" "${cargo_entries[@]}"; do
         echo "$entry" >> "$brewfile"
     done
+
+    # If neovim was removed from the Brewfile (user opted out), keep it out
+    if [[ "$has_neovim" == false ]]; then
+        if grep -q '^brew "neovim"$' "$brewfile"; then
+            grep -v '^brew "neovim"$' "$brewfile" > "${brewfile}.tmp" && mv "${brewfile}.tmp" "$brewfile"
+        fi
+    fi
 }
 
 brew() {

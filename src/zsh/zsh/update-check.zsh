@@ -1,4 +1,5 @@
 # Dotfiles update check
+# dotfiles v1.2.0
 # Sources from .zshrc — checks daily for upstream changes
 # Set DEVELOPER_MODE=1 in your .zshrc to disable auto-updates
 
