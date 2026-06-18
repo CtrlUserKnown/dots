@@ -2,11 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.3.0] - 2026-06-17
+## [1.2.1] - 2026-06-17
 
 ### Added
 - Neovim prompt: user is asked during setup if they want Neovim and/or Neovim config, with conditional install and linking
-- Version markers (`dotfiles v1.3.0`) added to all key config files for release tracking
+- Version markers (`dotfiles v1.2.1`) added to all key config files for release tracking
 - Cross-platform `run_timeout` wrapper so `setup.sh` works on macOS runners without GNU `timeout`
 
 ### Changed
