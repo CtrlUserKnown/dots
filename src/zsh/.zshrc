@@ -14,6 +14,11 @@ elif [[ -f "/usr/local/bin/brew" ]]; then
     eval "$(/usr/local/bin/brew shellenv)"
 fi
 
+# --- config:XDG (Linux) ---
+if [[ "$(uname -s)" == "Linux" ]]; then
+    export PATH="$HOME/.local/bin:$PATH"
+fi
+
 # --- config:editor ---
 export EDITOR="nvim"
 export VISUAL="nvim"
@@ -94,6 +99,8 @@ fi
 # --- config:completions ---
 if [[ -d "/opt/homebrew/share/zsh-completions" ]]; then
     fpath=(/opt/homebrew/share/zsh-completions $fpath)
+elif [[ -d "/usr/share/zsh/site-functions" ]]; then
+    fpath=(/usr/share/zsh/site-functions $fpath)
 fi
 
 autoload -Uz compinit
@@ -176,17 +183,25 @@ bindkey '^E' edit-command-line
 bindkey '^_' undo
 
 # --- config:ruby ---
-export PATH="/opt/homebrew/opt/ruby@3.4/bin:$PATH"
-export LDFLAGS="-L/opt/homebrew/opt/ruby@3.4/lib"
-export CPPFLAGS="-I/opt/homebrew/opt/ruby@3.4/include"
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    export PATH="/opt/homebrew/opt/ruby@3.4/bin:$PATH"
+    export LDFLAGS="-L/opt/homebrew/opt/ruby@3.4/lib"
+    export CPPFLAGS="-I/opt/homebrew/opt/ruby@3.4/include"
+fi
 
 # --- config:java ---
-export JAVA_HOME=$(/usr/libexec/java_home)
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    export JAVA_HOME=$(/usr/libexec/java_home 2>/dev/null)
+elif command -v java &>/dev/null; then
+    export JAVA_HOME=$(dirname "$(dirname "$(readlink -f "$(which java)")")")
+fi
 
 # --- config:plugins ---
 # zsh-autosuggestions
 if [[ -f "/opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh" ]]; then
     source /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+elif [[ -f "/usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh" ]]; then
+    source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
 fi
 unset ZSH_AUTOSUGGEST_USE_ASYNC
 ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=242'
@@ -196,6 +211,8 @@ ZSH_AUTOSUGGEST_CLEAR_WIDGETS+=(expand-or-complete)
 # zsh-history-substring-search
 if [[ -f "/opt/homebrew/share/zsh-history-substring-search/zsh-history-substring-search.zsh" ]]; then
     source /opt/homebrew/share/zsh-history-substring-search/zsh-history-substring-search.zsh
+elif [[ -f "$HOME/.config/zsh/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh" ]]; then
+    source "$HOME/.config/zsh/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh"
 fi
 bindkey '^[[A' history-substring-search-up
 bindkey '^[[B' history-substring-search-down
@@ -206,6 +223,8 @@ typeset -A ZSH_HIGHLIGHT_STYLES
 ZSH_HIGHLIGHT_STYLES[comment]='fg=242'
 if [[ -f "/opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]; then
     source /opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+elif [[ -f "/usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]; then
+    source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 fi
 
 
