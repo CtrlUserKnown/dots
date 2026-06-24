@@ -29,8 +29,10 @@ alias lz="lazygit"
 # --- alias:ai ---
 alias opc="opencode"
 alias llama="ollama"
-alias antigravity="open -a Antigravity"
-alias anti="open -a Antigravity"
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    alias antigravity="open -a Antigravity"
+    alias anti="open -a Antigravity"
+fi
 
 # --- alias:application ---
 alias mux="command tmux"
