@@ -1,0 +1,87 @@
+# Fedora (dnf) package list
+# dotfiles v1.3.0
+#
+# Format:
+#   copr  "owner/repo"   — enable a Copr repository
+#   dnf   "package"      — install via dnf
+#   cargo "crate"        — install via cargo install
+#   go    "import/path"  — install via go install
+#   npm   "package"      — install via npm install -g
+#
+# Special installs (docker, ollama, yt-dlp, gh) are handled
+# directly in setup.sh via setup_fedora_repos().
+
+# --- Copr repositories (enable before their packages) ---
+copr "atim/fastfetch"
+copr "atim/eza"
+copr "atim/lazygit"
+
+# --- Core tools ---
+dnf "bash-completion"
+dnf "bat"
+dnf "btop"
+dnf "chafa"
+dnf "cmake"
+dnf "cmatrix"
+dnf "cowsay"
+dnf "curl"
+dnf "emacs"
+dnf "eza"
+dnf "fastfetch"
+dnf "fd-find"
+dnf "figlet"
+dnf "fzf"
+dnf "gcc"
+dnf "git"
+dnf "golang"
+dnf "gnucobol"
+dnf "gh"
+dnf "java-17-openjdk"
+dnf "jp2a"
+dnf "lazygit"
+dnf "llvm"
+dnf "lolcat"
+dnf "lua"
+dnf "luarocks"
+dnf "maven"
+dnf "neovim"
+dnf "ninja-build"
+dnf "nmap"
+dnf "nodejs"
+dnf "npm"
+dnf "postgresql-server"
+dnf "python3"
+dnf "python3-pip"
+dnf "ripgrep"
+dnf "ruby"
+dnf "ShellCheck"
+dnf "stow"
+dnf "subversion"
+dnf "tmux"
+dnf "tree"
+dnf "wget"
+dnf "zoxide"
+dnf "zsh"
+dnf "zsh-autosuggestions"
+dnf "zsh-syntax-highlighting"
+# zsh-history-substring-search is not in Fedora repos — setup.sh installs it via git clone
+
+# --- Cargo installs (not in Fedora repos) ---
+cargo "himalaya"
+cargo "resvg"
+cargo "rustlings"
+cargo "sqlx-cli"
+cargo "typst-cli"
+cargo "yazi-fm"
+
+# --- Go installs ---
+go "golang.org/x/tools/gopls"
+go "github.com/brianstrauch/solitaire-tui"
+go "github.com/charmbracelet/glow"
+
+# --- npm installs ---
+npm "bash-language-server"
+npm "generator-code"
+npm "opencode"
+npm "vsce"
+npm "yo"
