@@ -14,7 +14,7 @@ function commands() {
             "Swift"        "swiftinit:swift package init|sps:swift package show-dependencies|spt:swift package test"
             "Java"         "jv:java|jc:javac"
             "Rust"         "rn:rustc|cr:cargo run"
-            "Functions"    "commands:list all commands|config:edit config files|create:scaffold a new project|attach:attach to a tmux session|duplicate:duplicate a file or folder|download:download a file"
+            "Functions"    "commands:list all commands|config:edit config files|create:scaffold a new project|attach:attach to a tmux session|duplicate:duplicate a file or folder|download:download a file|ssm:ssh session manager"
         )
 
         local order=("Navigation" "Shell" "Python" "Swift" "Java" "Rust" "Functions")
@@ -212,4 +212,9 @@ function download() {
         echo "Error: Neither curl nor wget is installed." >&2
         return 1
     fi
+}
+
+# --- functions:ssm ---
+function ssm() {
+    python3 ~/.config/zsh/ssm.py "$@"
 }
