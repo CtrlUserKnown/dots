@@ -39,8 +39,6 @@ brew "docker-buildx"
 brew "docker-compose"
 # .NET Core
 brew "dotnet"
-# GNU Emacs text editor
-brew "emacs", restart_service: :changed
 # Modern, maintained replacement for ls
 brew "eza"
 # Powerful, lightweight programming language
@@ -123,6 +121,8 @@ brew "resvg"
 brew "ruby@3.4"
 # Static analysis and lint tool, for (ba)sh scripts
 brew "shellcheck"
+# Non-interactive SSH password auth
+brew "sshpass"
 # Organize software neatly under a single directory tree (e.g. /usr/local)
 brew "stow"
 # Version control system designed to be a better CVS
@@ -218,6 +218,26 @@ go "github.com/brianstrauch/solitaire-tui"
 go "golang.org/x/tools/gopls"
 go "github.com/brianstrauch/solitaire-tui"
 go "golang.org/x/tools/gopls"
+go "github.com/brianstrauch/solitaire-tui"
+go "golang.org/x/tools/gopls"
+go "github.com/brianstrauch/solitaire-tui"
+go "golang.org/x/tools/gopls"
+go "github.com/brianstrauch/solitaire-tui"
+go "golang.org/x/tools/gopls"
+go "github.com/brianstrauch/solitaire-tui"
+go "golang.org/x/tools/gopls"
+go "github.com/brianstrauch/solitaire-tui"
+go "golang.org/x/tools/gopls"
+cargo "rustlings"
+cargo "sqlx-cli"
+cargo "rustlings"
+cargo "sqlx-cli"
+cargo "rustlings"
+cargo "sqlx-cli"
+cargo "rustlings"
+cargo "sqlx-cli"
+cargo "rustlings"
+cargo "sqlx-cli"
 cargo "rustlings"
 cargo "sqlx-cli"
 cargo "rustlings"
