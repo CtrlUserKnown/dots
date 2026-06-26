@@ -53,10 +53,9 @@ function commands() {
 function config() {
     if [[ -z "$1" ]]; then
         echo "Select configuration to edit:"
-        select option in "Terminal/ZSH" "Tmux" "Ghostty" "Aliases" "Cancel"; do
+        select option in "Terminal/ZSH" "Ghostty" "Aliases" "Cancel"; do
             case "$option" in
                 "Terminal/ZSH") ${EDITOR:-nvim} ~/development/dots/src/zsh/; break;;
-                "Tmux") ${EDITOR:-nvim} ~/development/dots/src/tmux/tmux.conf; break;;
                 "Ghostty") ${EDITOR:-nvim} ~/development/dots/src/ghostty/config; break;;
                 "Aliases") ${EDITOR:-nvim} ~/development/dots/src/zsh/zsh/.aliases; break;;
                 "Cancel") return 0;;
@@ -65,7 +64,6 @@ function config() {
     else
         case "$1" in
             terminal|zsh) ${EDITOR:-nvim} ~/development/dots/src/zsh/;;
-            tmux|mux) ${EDITOR:-nvim} ~/development/dots/src/tmux/tmux.conf;;
             ghostty|ghost) ${EDITOR:-nvim} ~/development/dots/src/ghostty/config;;
             alias|aliases) ${EDITOR:-nvim} ~/development/dots/src/zsh/zsh/.aliases;;
             *) echo "Unknown config type: $1"; return 1;;

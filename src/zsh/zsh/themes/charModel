@@ -2,7 +2,7 @@
 # dotfiles v1.2.1
 # Date: 2026-03-19
 
-# Cached git info — updated once per command via precmd, not on every keypress
+# git status is computed in precmd (once per prompt) to avoid blocking on every keypress
 _GIT_INFO=""
 
 function _update_git_info() {
@@ -10,6 +10,7 @@ function _update_git_info() {
     branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
     if [[ -n $branch ]]; then
         if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+            # * indicates a dirty working tree
             _GIT_INFO=" ($branch*)"
         else
             _GIT_INFO=" ($branch)"
@@ -24,12 +25,16 @@ add-zsh-hook precmd _update_git_info
 
 setopt prompt_subst
 
+# teal in tmux (username already in the status bar), purple in standalone terminal
 if [[ -n $TMUX ]]; then
     PROMPT='[%F{#9ccfd8}%~%f]${_GIT_INFO} » '
 else
     PROMPT='[%F{#907aa9}%n%f: %~]${_GIT_INFO} » '
 fi
 
+# emacs line-editing mode (ctrl+a/e for line start/end)
 bindkey -e
+# escape in the completion menu cancels without selecting
 bindkey -M menuselect '^[' undo
+# / selects the entry & drills into the next path component
 bindkey -M menuselect '/' accept-and-infer-next-history

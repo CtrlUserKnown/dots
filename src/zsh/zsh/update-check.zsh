@@ -6,6 +6,7 @@
 if [[ -z "$DEVELOPER_MODE" && -d ~/.dots/.git && $- == *i* ]]; then
     stamp="$HOME/.config/zsh/.update_stamp"
     version_stamp="$HOME/.config/zsh/.version_stamp"
+    # stamp throttles the daily check, version_stamp persists the last version to detect upgrades on next shell open
     now=$(date +%s)
     last_check=0
     [[ -f "$stamp" ]] && last_check=$(<"$stamp")
@@ -29,6 +30,7 @@ if [[ -z "$DEVELOPER_MODE" && -d ~/.dots/.git && $- == *i* ]]; then
         echo "$now" > "$stamp"
         (
             cd ~/.dots 2>/dev/null || exit
+            # shallow fetch — only grabs the latest ref to minimize bandwidth
             git fetch --depth 1 origin 2>/dev/null
             behind=$(git rev-list --count HEAD..origin/HEAD 2>/dev/null)
             if [[ -n "$behind" && "$behind" -gt 0 ]]; then
@@ -42,11 +44,11 @@ if [[ -z "$DEVELOPER_MODE" && -d ~/.dots/.git && $- == *i* ]]; then
                 read -q reply
                 print ""
                 if [[ "$reply" == "y" || "$reply" == "Y" || -z "$reply" ]]; then
+                    # refuse to merge if diverged — this repo should never have local commits
                     git pull --ff-only 2>/dev/null
                     ln -sf "$HOME/.dots/src/bat" "$HOME/.config/bat"
                     ln -sf "$HOME/.dots/src/fastfetch" "$HOME/.config/fastfetch"
                     ln -sf "$HOME/.dots/src/ghostty" "$HOME/.config/ghostty"
-                    ln -sf "$HOME/.dots/src/tmux" "$HOME/.config/tmux"
                     ln -sf "$HOME/.dots/src/zsh/zsh" "$HOME/.config/zsh"
                     ln -sf "$HOME/.dots/src/zsh/.zshrc" "$HOME/.zshrc"
                     # Write the new version to stamp so next shell open shows the upgrade notice

@@ -7,9 +7,9 @@ DOTFILES_VERSION="1.3.0"
 # --- config:locale ---
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
-export PATH="$HOME/.config/emacs/bin:$PATH"
 
 # --- config:Homebrew ---
+# /opt/homebrew is apple silicon, /usr/local is intel
 if [[ -f "/opt/homebrew/bin/brew" ]]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
 elif [[ -f "/usr/local/bin/brew" ]]; then
@@ -22,6 +22,7 @@ if [[ "$(uname -s)" == "Linux" ]]; then
 fi
 
 # --- config:editor ---
+# both needed — some programs check EDITOR (tty), others check VISUAL (full-screen)
 export EDITOR="nvim"
 export VISUAL="nvim"
 
@@ -37,10 +38,13 @@ ex=38;2;86;148;159:\
 *.yml=38;5;180:\
 *.yaml=38;5;180"
 
+# LS_COLORS subset is used by zsh completions via zstyle
 export LS_COLORS="di=38;2;196;167;231:ln=38;5;211:ex=38;2;86;148;159"
 
 # --- config:fzf ---
+# fd respects .gitignore by default & is faster than find
 export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
+# alt-enter opens the selected file in nvim without exiting fzf
 export FZF_DEFAULT_OPTS='
   --height 40%
   --layout=reverse
@@ -61,12 +65,16 @@ export FZF_CTRL_R_OPTS='--preview "echo {}" --preview-window down:3:wrap'
 
 # --- config:history ---
 HISTFILE=${ZDOTDIR:-$HOME}/.zsh_history
+# HISTSIZE is in-memory, SAVEHIST is written to disk — both should match
 HISTSIZE=10000
 SAVEHIST=10000
+# IGNORE_ALL_DUPS deduplicates globally, SHARE_HISTORY syncs across open sessions
 setopt HIST_IGNORE_ALL_DUPS SHARE_HISTORY APPEND_HISTORY INC_APPEND_HISTORY
 
 # --- config:options ---
+# removes / so ctrl+w stops at path separators
 WORDCHARS=${WORDCHARS//[\/]}
+# EXTENDED_GLOB enables ** & ^pattern globs, AUTO_CD lets you enter a dir without typing cd
 setopt EXTENDED_GLOB AUTO_CD
 
 # --- config:developer mode ---
@@ -90,6 +98,7 @@ if [[ -f ~/.config/zsh/update-check.zsh ]]; then
 fi
 
 # --- config:fastfetch ---
+# $$ is the shell pid — runs once per terminal process, not once per subshell
 if [[ ! -f /tmp/zsh_fastfetch_$$ ]] && [[ $- == *i* ]]; then
     fastfetch
     print ""
@@ -111,9 +120,11 @@ zmodload zsh/complist
 compinit
 
 # --- config:zoxide ---
+# smarter cd that learns & ranks your most visited directories
 eval "$(zoxide init zsh)"
 
 # --- config:carapace ---
+# completion engine for many cli tools
 if command -v carapace >/dev/null 2>&1; then
     source <(carapace _carapace)
 fi
@@ -168,6 +179,7 @@ if [[ -f ~/.config/zsh/.functions ]]; then
 fi
 
 # --- config:hooks ---
+# auto-run ls when entering these frequently-navigated directories
 chpwd() {
     local current_dir="${PWD}"
     if [[ "$current_dir" == "${HOME}/.config" || "$current_dir" == "${HOME}/development" ]]; then
@@ -181,12 +193,15 @@ source ~/.config/zsh/themes/charModel
 # --- config:keybindings ---
 autoload -Uz edit-command-line
 zle -N edit-command-line
+# opens the current command in $EDITOR
 bindkey '^E' edit-command-line
+# ctrl+_ is zsh's built-in line-edit undo
 bindkey '^_' undo
 
 # --- config:ruby ---
 if [[ "$(uname -s)" == "Darwin" ]]; then
     export PATH="/opt/homebrew/opt/ruby@3.4/bin:$PATH"
+    # needed to build native gems that link against homebrew ruby instead of system ruby
     export LDFLAGS="-L/opt/homebrew/opt/ruby@3.4/lib"
     export CPPFLAGS="-I/opt/homebrew/opt/ruby@3.4/include"
 fi
@@ -205,9 +220,12 @@ if [[ -f "/opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh" ]]; t
 elif [[ -f "/usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh" ]]; then
     source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
 fi
+# async mode can cause rendering glitches
 unset ZSH_AUTOSUGGEST_USE_ASYNC
 ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=242'
+# skip suggestions on long lines for performance
 ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE=20
+# clear the ghost suggestion when tab is pressed
 ZSH_AUTOSUGGEST_CLEAR_WIDGETS+=(expand-or-complete)
 
 # zsh-history-substring-search
@@ -220,6 +238,7 @@ bindkey '^[[A' history-substring-search-up
 bindkey '^[[B' history-substring-search-down
 
 # zsh-syntax-highlighting — must be sourced last
+# main colors syntax, brackets highlights matched pairs
 ZSH_HIGHLIGHT_HIGHLIGHTERS=(main brackets)
 typeset -A ZSH_HIGHLIGHT_STYLES
 ZSH_HIGHLIGHT_STYLES[comment]='fg=242'

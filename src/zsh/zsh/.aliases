@@ -4,6 +4,7 @@
 # date created: 08.28.2025
 
 # --- alias:functionality ---
+# command bypasses alias lookup — ensures the real binary is called
 alias cls="command clear"
 alias ls="command eza --color=auto"
 alias la="command eza -al --icons --color=auto"
@@ -40,6 +41,7 @@ alias b="command btop"
 alias f="fzf"
 
 # --- alias:suffix ---
+# suffix aliases — typing file.rs runs $EDITOR file.rs automatically
 alias -s md="$EDITOR"
 alias -s rs="$EDITOR"
 alias -s swift="$EDITOR"

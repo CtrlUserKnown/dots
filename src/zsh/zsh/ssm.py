@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 SESSIONS_FILE = Path.home() / ".config" / "ssm" / "sessions.json"
+# TODO: passwords are stored in plaintext in sessions.json — could be an issue
 
 
 # ── storage ──────────────────────────────────────────────────────────────────
@@ -383,6 +384,7 @@ def do_connect(session: dict) -> None:
     port     = str(session.get("port", 22))
     password = session.get("password", "")
 
+    # TODO: skipping host key verification could be an issue on untrusted networks
     ssh_opts = [
         "-p", port,
         "-o", "StrictHostKeyChecking=no",
@@ -395,6 +397,7 @@ def do_connect(session: dict) -> None:
     if password:
         pw_opts = ["-o", "PubkeyAuthentication=no", "-o", "PreferredAuthentications=password"]
         if shutil.which("sshpass"):
+            # reads the password from env var so it doesn't show up in ps output
             cmd = ["sshpass", "-e", "ssh"] + ssh_opts + pw_opts + ssh_target
             env["SSHPASS"] = password
         else:

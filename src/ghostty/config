@@ -11,11 +11,14 @@ adjust-cell-width = 0
 adjust-cell-height = 0
 
 # --- Terminal behavior ---
+# enables cursor shape changes & osc prompt markers
 shell-integration = zsh
+# sudo preserves integration under sudo, title sets window title to the running command
 shell-integration-features = sudo,title
 
 # --- Theme ---
 theme = "noir-cat"
+# blur only shows if opacity < 1.0 — both needed together on macos
 background-blur = true
 background-blur-radius = 18
 background-opacity = 0.95
@@ -23,11 +26,12 @@ background-opacity = 0.95
 # --- Padding/Margins ---
 window-padding-x = 25, 25
 window-padding-y = 15, 15
+# distributes padding evenly rather than only applying to the inner edge
 window-padding-balance = true
 
 # --- Cursor ---
 cursor-style = block
 cursor-style-blink = true
 
-# Quick terminal toggle
+# global: means this fires even when ghostty doesn't have focus
 # keybind = global:ctrl+grave_accent=toggle_quick_terminal

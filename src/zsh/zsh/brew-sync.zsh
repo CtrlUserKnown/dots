@@ -12,6 +12,7 @@ _brew_sync() {
     local cargo_entries=()
     local has_neovim=false
 
+    # brew bundle dump doesn't track go or cargo installs — re-append them manually
     while IFS= read -r line || [ -n "$line" ]; do
         [[ "$line" =~ ^go\ \"(.*)\"$ ]] && go_entries+=("$line")
         [[ "$line" =~ ^cargo\ \"(.*)\"$ ]] && cargo_entries+=("$line")
@@ -25,7 +26,7 @@ _brew_sync() {
         echo "$entry" >> "$brewfile"
     done
 
-    # If neovim was removed from the Brewfile (user opted out), keep it out
+    # keep neovim out if the user intentionally removed it
     if [[ "$has_neovim" == false ]]; then
         if grep -q '^brew "neovim"$' "$brewfile"; then
             grep -v '^brew "neovim"$' "$brewfile" > "${brewfile}.tmp" && mv "${brewfile}.tmp" "$brewfile"
