@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2026-06-25
+
+### Added
+- `DOTFILES_VERSION` variable in `.zshrc` for explicit version tracking across config files
+- Version-change prompt in `update-check.zsh`: on the first shell open after an update, shows "✨ Dotfiles updated: vX.X.X → vY.Y.Y" with a pointer to `config` and the CHANGELOG
+- Upstream version preview in the update prompt — shows the new version number before the user accepts a pull
+- `~/.config/zsh/.version_stamp` file to persist the last-seen version between shell sessions
+
+### Changed
+- Version comments bumped to `v1.3.0` in `.zshrc`, `update-check.zsh`, `.aliases`, and `.functions`
+- `update-check.zsh` writes the new version stamp immediately after a successful pull so the upgrade notice fires on the next shell open
+
 ## [1.2.1] - 2026-06-17
 
 ### Added

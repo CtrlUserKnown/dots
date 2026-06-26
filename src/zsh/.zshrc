@@ -1,6 +1,8 @@
 # CtrlUserKnown zshrc configuration file
-# dotfiles v1.2.1
+# dotfiles v1.3.0
 # date created: 10.14.2025
+
+DOTFILES_VERSION="1.3.0"
 
 # --- config:locale ---
 export LANG=en_US.UTF-8
