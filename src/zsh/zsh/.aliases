@@ -11,6 +11,7 @@ alias la="command eza -al --icons --color=auto"
 alias lla="command eza -al --icons --color=auto"
 alias ll="command eza -l --icons --color=auto"
 alias reload="source ~/.zshrc"
+alias exi="exit"
 
 # --- alias:programming ---
 alias y="yazi"
