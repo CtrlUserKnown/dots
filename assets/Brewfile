@@ -71,12 +71,16 @@ brew "gnu-tar"
 brew "gnucobol"
 # Open source programming language to build simple/reliable/efficient software
 brew "go"
+# Open-source build automation tool based on the Groovy and Kotlin DSL
+brew "gradle"
 # Tool for glamorous shell scripts
 brew "gum"
 # CLI email client written in Rust
 brew "himalaya"
 # Convert JPG images to ASCII
 brew "jp2a"
+# Statically typed programming language for the JVM
+brew "kotlin"
 # Simple terminal UI for git commands
 brew "lazygit"
 # ISO/IEC 23008-12:2017 HEIF file format decoder and encoder
@@ -103,8 +107,6 @@ brew "ninja"
 brew "nmap"
 # Recreates the SETEC ASTRONOMY effect from 'Sneakers'
 brew "no-more-secrets"
-# Create, run, and share large language models (LLMs)
-brew "ollama"
 # Search tool like grep and The Silver Searcher
 brew "ripgrep"
 # AI coding agent, built for the terminal
@@ -157,8 +159,6 @@ brew "zsh-completions"
 brew "zsh-history-substring-search"
 # Fish shell like syntax highlighting for zsh
 brew "zsh-syntax-highlighting"
-# Agent orchestration platform
-cask "antigravity"
 # 3D creation suite
 cask "blender"
 # Terminal-based AI coding assistant
@@ -213,33 +213,3 @@ cargo "sqlx-cli"
 npm "generator-code"
 npm "vsce"
 npm "yo"
-go "golang.org/x/tools/gopls"
-go "github.com/brianstrauch/solitaire-tui"
-go "golang.org/x/tools/gopls"
-go "github.com/brianstrauch/solitaire-tui"
-go "golang.org/x/tools/gopls"
-go "github.com/brianstrauch/solitaire-tui"
-go "golang.org/x/tools/gopls"
-go "github.com/brianstrauch/solitaire-tui"
-go "golang.org/x/tools/gopls"
-go "github.com/brianstrauch/solitaire-tui"
-go "golang.org/x/tools/gopls"
-go "github.com/brianstrauch/solitaire-tui"
-go "golang.org/x/tools/gopls"
-go "github.com/brianstrauch/solitaire-tui"
-go "golang.org/x/tools/gopls"
-cargo "rustlings"
-cargo "sqlx-cli"
-cargo "rustlings"
-cargo "sqlx-cli"
-cargo "rustlings"
-cargo "sqlx-cli"
-cargo "rustlings"
-cargo "sqlx-cli"
-cargo "rustlings"
-cargo "sqlx-cli"
-cargo "rustlings"
-cargo "sqlx-cli"
-cargo "rustlings"
-cargo "sqlx-cli"
-cargo "rustlings"
