@@ -548,6 +548,7 @@ def do_connect(session: dict) -> None:
         "-o", "StrictHostKeyChecking=no",
         "-o", "UserKnownHostsFile=/dev/null",
         "-o", "ConnectTimeout=5",
+        "-o", "SetEnv HERDR_AUTOSTART=1",
     ]
     ssh_target = [f"{user}@{host}"]
 
