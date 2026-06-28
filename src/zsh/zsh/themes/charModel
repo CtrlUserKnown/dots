@@ -1,5 +1,5 @@
 # CharModel zsh theme
-# dotfiles v1.5.0
+# dotfiles v1.5.1
 # Date: 2026-06-28
 
 # git status is computed in precmd (once per prompt) to avoid blocking on every keypress
