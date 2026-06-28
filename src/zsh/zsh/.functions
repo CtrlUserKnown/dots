@@ -1,46 +1,26 @@
 #!/usr/bin/env zsh
 # zsh functions
-# dotfiles v1.3.1
+# dotfiles v1.4.0
 # Author: CrtlUserUnknown
 
 # --- functions:devUx ---
 function commands() {
-    if [[ "$1" == "custom" ]]; then
-        # Aliases — parsed live from .aliases so this list never drifts
-        echo "\n\033[1;35m[Aliases]\033[0m"
-        while IFS= read -r line; do
-            [[ "$line" =~ ^'alias '[a-zA-Z0-9_-]+= ]] || continue
-            [[ "$line" == *'#'* ]] || continue
-            local name="${line#alias }"; name="${name%%=*}"
-            local desc="${line##*# }"
-            printf "  \033[1;36m%-14s\033[0m %s\n" "$name" "$desc"
-        done < ~/.config/zsh/.aliases
+    # collect all system commands from PATH
+    local all_cmds
+    all_cmds=$(echo $PATH | tr ':' '\n' | while read dir; do
+        CLICOLOR=0 command ls "$dir" 2>/dev/null
+    done | sort -u | grep -v '/' | grep -v '@')
 
-        # Functions — short curated list (names are self-documenting)
-        echo "\n\033[1;35m[Functions]\033[0m"
-        local fns=(dots ssm create download duplicate)
-        for fn in "${fns[@]}"; do
-            printf "  \033[1;36m%s\033[0m\n" "$fn"
-        done
-
+    if [[ -n "$1" ]]; then
+        echo "$all_cmds" | grep "$1" | column -c $(tput cols)
     else
-        # collect all system commands from PATH
-        local all_cmds
-        all_cmds=$(echo $PATH | tr ':' '\n' | while read dir; do
-            CLICOLOR=0 command ls "$dir" 2>/dev/null
-        done | sort -u | grep -v '/' | grep -v '@')
-
-        if [[ -n "$1" ]]; then
-            echo "$all_cmds" | grep "$1" | column -c $(tput cols)
-        else
-            echo "$all_cmds" | fzf \
-                --prompt="commands > " \
-                --height=50% \
-                --layout=reverse \
-                --border \
-                --preview="man {} 2>/dev/null | head -20 || echo 'no man page available'" \
-                --preview-window=right:50%
-        fi
+        echo "$all_cmds" | fzf \
+            --prompt="commands > " \
+            --height=50% \
+            --layout=reverse \
+            --border \
+            --preview="man {} 2>/dev/null | head -20 || echo 'no man page available'" \
+            --preview-window=right:50%
     fi
 }
 

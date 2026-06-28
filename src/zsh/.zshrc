@@ -1,5 +1,5 @@
 # CtrlUserKnown zshrc configuration file
-# dotfiles v1.3.1
+# dotfiles v1.4.0
 # date created: 10.14.2025
 
 # Derived from the latest git tag — no manual version bumping needed
@@ -103,7 +103,7 @@ fi
 if [[ ! -f /tmp/zsh_fastfetch_$$ ]] && [[ $- == *i* ]]; then
     fastfetch
     print ""
-    print "run 'dots' to customize your setup  ·  'commands custom' for shortcuts"
+    print "run 'dots' to customize your setup"
     print ""
     touch /tmp/zsh_fastfetch_$$
 fi

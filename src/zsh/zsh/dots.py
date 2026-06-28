@@ -123,6 +123,7 @@ EDIT_ACTION     = "__edit__"
 ALIAS_ACTION    = "__alias__"
 PERSONAL_ACTION = "__personal__"
 GIT_ACTION      = "__git__"
+ALIASES_ACTION  = "__aliases__"
 RELOAD_ACTION   = "__reload__"
 LOGS_ACTION     = "__logs__"
 RESET_ACTION    = "__reset__"
@@ -175,6 +176,7 @@ def build_menu(dev: bool) -> list[tuple]:
     base = [
         ("Health",       HEALTH_ACTION,   "check symlinks, tools & plugins"),
         ("Theme",        THEME_ACTION,    "pick a terminal color theme"),
+        ("Aliases",      ALIASES_ACTION,  "view custom shell aliases"),
         ("Settings",     SETTINGS_ACTION, "configure dots preferences"),
         ("Developer",    DEV_ACTION,      "enable developer mode for advanced options"),
     ]
@@ -194,6 +196,7 @@ def build_menu(dev: bool) -> list[tuple]:
     return [
         ("Health",   HEALTH_ACTION,   "check symlinks, tools & plugins"),
         ("Theme",    THEME_ACTION,    "pick a terminal color theme"),
+        ("Aliases",  ALIASES_ACTION,  "view custom shell aliases"),
         ("Settings", SETTINGS_ACTION, "configure dots preferences"),
     ] + dev_items
 
@@ -955,6 +958,83 @@ def run_logs_view(stdscr) -> None:
     show_output(stdscr, " logs ", "\n".join(lines))
 
 
+# ── aliases view ─────────────────────────────────────────────────────────────
+
+def parse_aliases() -> list[tuple]:
+    """Returns list of ("section", name) or ("alias", name, desc) tuples."""
+    aliases_path = DOTS_DIR / "src/zsh/zsh/.aliases"
+    result: list[tuple] = []
+    try:
+        for line in aliases_path.read_text().splitlines():
+            m = re.match(r'^#\s*---\s*alias:(\S+?)\s*---', line)
+            if m:
+                result.append(("section", m.group(1)))
+                continue
+            m = re.match(r'^alias\s+([a-zA-Z0-9_-]+)=.+#\s*(.+)', line)
+            if m:
+                result.append(("alias", m.group(1), m.group(2).strip()))
+    except Exception:
+        pass
+    return result
+
+
+def run_aliases_view(stdscr) -> None:
+    display  = parse_aliases()
+    nav_items = [(i, d[1], d[2]) for i, d in enumerate(display) if d[0] == "alias"]
+
+    if not nav_items:
+        show_message(stdscr, " aliases ", ["  No aliases found or .aliases file missing."])
+        return
+
+    idx    = 0
+    offset = 0
+
+    while True:
+        stdscr.erase()
+        h, w = stdscr.getmaxyx()
+        draw_header(stdscr, " aliases ")
+
+        visible  = h - 6
+        sel_di   = nav_items[idx][0]
+        if sel_di < offset:
+            offset = sel_di
+        elif sel_di >= offset + visible:
+            offset = sel_di - visible + 1
+        offset = max(0, min(offset, max(0, len(display) - visible)))
+
+        nav_i = -1
+        for di, item in enumerate(display):
+            row = 2 + di - offset
+            if item[0] == "alias":
+                nav_i += 1
+            if row < 2 or row >= 2 + visible:
+                continue
+            if item[0] == "section":
+                safe_addstr(stdscr, row, 2, item[1],
+                            curses.color_pair(COLOR_DIM) | curses.A_BOLD)
+            elif item[0] == "alias":
+                _, name, desc = item
+                is_sel = nav_i == idx
+                safe_addstr(stdscr, row, 0, "▶" if is_sel else " ",
+                            curses.color_pair(COLOR_SELECT) | curses.A_BOLD if is_sel else 0)
+                safe_addstr(stdscr, row, 2, f"{name:<14}",
+                            curses.color_pair(COLOR_HEADER) | curses.A_BOLD if is_sel else curses.color_pair(COLOR_HEADER))
+                safe_addstr(stdscr, row, 16, desc,
+                            curses.A_BOLD if is_sel else 0)
+
+        draw_desc(stdscr, nav_items[idx][2])
+        draw_footer(stdscr, " j/k navigate  q back ")
+        stdscr.refresh()
+
+        key = stdscr.getch()
+        if key in (ord("q"), ord("Q"), 27):
+            return
+        elif key in (ord("j"), curses.KEY_DOWN):
+            idx = min(idx + 1, len(nav_items) - 1)
+        elif key in (ord("k"), curses.KEY_UP):
+            idx = max(0, idx - 1)
+
+
 # ── main TUI ──────────────────────────────────────────────────────────────────
 
 def run_tui(stdscr):
@@ -1026,6 +1106,8 @@ def run_tui(stdscr):
                     return result
             elif path == THEME_ACTION:
                 run_theme_view(stdscr)
+            elif path == ALIASES_ACTION:
+                run_aliases_view(stdscr)
             elif path == SETTINGS_ACTION:
                 run_settings_view(stdscr)
             elif path == DEV_ACTION:
