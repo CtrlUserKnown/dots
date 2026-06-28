@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0] - 2026-06-28
+
+### Added
+- **ssm.py**: Update check view in the SSH session manager TUI — bound to `u` key, fetches upstream commits and offers to pull
+- **ssm.py**: Autoreload sessions when `sessions.json` changes externally
+
+### Changed
+- **ssm.py**: Refactored TUI layout with `draw_header`, `draw_footer`, `draw_desc` helper functions
+- **ssm.py**: Consolidated color definitions (removed `COLOR_SUCCESS`, `COLOR_ACCENT`)
+
 ## [1.4.1] - 2026-06-28
 
 ### Fixed

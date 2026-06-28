@@ -1,5 +1,5 @@
 # Homebrew sync hook — auto-updates Brewfile on install/uninstall/tap/untap
-# dotfiles v1.4.1
+# dotfiles v1.5.0
 # Only runs when DEVELOPER_MODE is set (avoids trampling other users' Brewfiles)
 
 if [[ -z "$DEVELOPER_MODE" || ! -d ~/.dots/.git ]]; then
