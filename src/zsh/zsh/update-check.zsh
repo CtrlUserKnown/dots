@@ -1,6 +1,6 @@
 # Dotfiles update check
 # dotfiles v1.3.1
-# Sources from .zshrc — checks daily for upstream changes
+# Sources from .zshrc — checks every 10 minutes for upstream changes
 # Set DEVELOPER_MODE=1 in your .zshrc to disable auto-updates
 
 if [[ -z "$DEVELOPER_MODE" && -d ~/.dots/.git && $- == *i* ]]; then
@@ -17,7 +17,7 @@ if [[ -z "$DEVELOPER_MODE" && -d ~/.dots/.git && $- == *i* ]]; then
         if [[ -n "${DOTFILES_VERSION:-}" && "$last_version" != "$DOTFILES_VERSION" ]]; then
             print ""
             print "✨ Dotfiles updated: v${last_version} → v${DOTFILES_VERSION}"
-            print "   Run 'config' to review your config files, or check the CHANGELOG at ~/.dots/CHANGELOG"
+            print "   Run 'dots' to review your config files, or check the CHANGELOG at ~/.dots/CHANGELOG"
             print ""
             echo "$DOTFILES_VERSION" > "$version_stamp"
         fi
@@ -26,16 +26,15 @@ if [[ -z "$DEVELOPER_MODE" && -d ~/.dots/.git && $- == *i* ]]; then
         [[ -n "${DOTFILES_VERSION:-}" ]] && echo "$DOTFILES_VERSION" > "$version_stamp"
     fi
 
-    if (( now - last_check > 86400 )); then
+    if (( now - last_check > 600 )); then
         echo "$now" > "$stamp"
         (
             cd ~/.dots 2>/dev/null || exit
             # shallow fetch — only grabs the latest ref to minimize bandwidth
-            git fetch --depth 1 origin 2>/dev/null
+            git fetch --depth 1 --tags origin 2>/dev/null
             behind=$(git rev-list --count HEAD..origin/HEAD 2>/dev/null)
             if [[ -n "$behind" && "$behind" -gt 0 ]]; then
-                # Peek at the version in the upstream .zshrc before pulling
-                upstream_version=$(git show origin/HEAD:src/zsh/.zshrc 2>/dev/null | grep '^DOTFILES_VERSION=' | head -1 | tr -d '"' | cut -d= -f2)
+                upstream_version=$(git describe --tags --abbrev=0 origin/HEAD 2>/dev/null | sed 's/^v//')
 
                 print ""
                 print "📦 Dotfiles update available ($behind new commit(s))"
@@ -46,11 +45,7 @@ if [[ -z "$DEVELOPER_MODE" && -d ~/.dots/.git && $- == *i* ]]; then
                 if [[ "$reply" == "y" || "$reply" == "Y" || -z "$reply" ]]; then
                     # refuse to merge if diverged — this repo should never have local commits
                     git pull --ff-only 2>/dev/null
-                    ln -sf "$HOME/.dots/src/bat" "$HOME/.config/bat"
-                    ln -sf "$HOME/.dots/src/fastfetch" "$HOME/.config/fastfetch"
-                    ln -sf "$HOME/.dots/src/ghostty" "$HOME/.config/ghostty"
-                    ln -sf "$HOME/.dots/src/zsh/zsh" "$HOME/.config/zsh"
-                    ln -sf "$HOME/.dots/src/zsh/.zshrc" "$HOME/.zshrc"
+                    python3 ~/.config/zsh/dots.py --repair-symlinks
                     # Write the new version to stamp so next shell open shows the upgrade notice
                     [[ -n "$upstream_version" ]] && echo "$upstream_version" > "$version_stamp"
                     print "✅ Dotfiles updated to v${upstream_version:-?}. Restart your shell to apply changes."
