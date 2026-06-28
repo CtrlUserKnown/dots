@@ -60,7 +60,7 @@ cd tests
 
 ## Themes
 
-- **Char Model:** A clean, minimal Zsh prompt. [View Config](src/zsh/zsh/themes/charModel)
+- **Char Model:** A clean, minimal Zsh prompt with SSH connection awareness (shows `(ssh)` indicator in remote sessions). [View Config](src/zsh/zsh/themes/charModel)
 - **Ghostty Themes:** [noir-cat](src/ghostty/themes/noir-cat) and [knew-pines](src/ghostty/themes/knew-pines).
 - **KnewPines:** KnewPines, KnewPines Moon, and KnewPines Dawn color schemes for `bat`. See [`src/bat/themes/`](src/bat/themes/).
 
