@@ -90,6 +90,7 @@ SYMLINKS = [
     (Path.home() / ".config/bat",       DOTS_DIR / "src/bat"),
     (Path.home() / ".config/fastfetch", DOTS_DIR / "src/fastfetch"),
     (Path.home() / ".config/ghostty",   DOTS_DIR / "src/ghostty"),
+    (Path.home() / ".config/herdr",     DOTS_DIR / "src/herdr"),
     (Path.home() / ".config/zsh",       DOTS_DIR / "src/zsh/zsh"),
     (Path.home() / ".zshrc",            DOTS_DIR / "src/zsh/.zshrc"),
 ]

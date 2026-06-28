@@ -1,0 +1,6 @@
+# herdr configuration
+# Place this file at ~/.config/herdr/config.toml
+
+[experimental]
+# Allow launching herdr from inside a herdr-managed pane.
+allow_nested = true
