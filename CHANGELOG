@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] - 2026-06-28
+
+### Added
+- `dots.py` — a curses-based TUI for managing dotfiles: health checks, theme picker (200+ Ghostty themes), settings, git operations, add alias, view logs, and reset. Also includes CLI flags (`--repair-symlinks`, `--install-deps`, `--health`, `--theme`, etc.) for headless use.
+- `dots` shell function — entry point to the `dots.py` TUI; also accepts `dots -v` for version info.
+- `.developer` marker file — create/delete `~/.dots/.developer` to toggle developer mode (no more `DEVELOPER_MODE` env var or `$USER` check).
+- Interactive package categories during setup (Ghostty, Neovim config, optional tools, personal packages) with Gum-powered prompts when available.
+- `dots.py --install-optional` / `--install-personal` for installing optional and personal package tiers.
+- Settings persistence (`~/.dots/.settings` JSON file) — update check and greeting preferences.
+- `herdr` integration — replaces `tmux` as the default terminal multiplexer.
+
+### Changed
+- `setup.sh`: replaced Brewfile-based install with `dots.py` dependency manager; replaced manual symlink commands with `dots.py --repair-symlinks`; added Ghostty install step.
+- `.zshrc`: `DOTFILES_VERSION` now derived from latest git tag (`git describe --tags`) instead of manual bumps; developer mode detected via `.developer` file; removed `brew-sync.zsh` hook; greeting now hints at `dots` command.
+- `.aliases`: `mux` and `attach` aliases now point to `herdr` instead of `tmux`; added inline comments documenting every alias.
+- `.functions`: `commands custom` parses aliases live from `.aliases` file (no drift); removed `config()` function (replaced by `dots` → Edit Configs); removed `attach()` (use `herdr` directly); refactored `create()` with `_create_project` helper.
+- `update-check.zsh`: reduced poll interval from 24h to 10 minutes; derive version from git tags instead of parsing `.zshrc`; replaced manual `ln -sf` calls with `dots.py --repair-symlinks`; fetches with `--tags`.
+- `charModel` prompt: SSH indicator changed from `(ssh)` to a compact `∧` symbol.
+- `.gitignore`: added `.developer`, `.settings`, `.update_stamp`, `.version_stamp`.
+
+### Removed
+- `assets/Brewfile` — 215-line Homebrew manifest replaced by declarative `DEPS` list in `dots.py` (supports brew, dnf, and apt).
+- `brew-sync.zsh` — no longer needed without a Brewfile to sync to.
+- `config()` function — replaced by `dots.py`'s Edit Configs menu.
+- `attach()` function — use `herdr` directly.
+
 ## [1.3.1] - 2026-06-27
 
 ### Added
