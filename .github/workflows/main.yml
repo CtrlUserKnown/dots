@@ -12,10 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Run ShellCheck (Bash scripts only)
-        uses: ludeeus/action-shellcheck@master
+        uses: ludeeus/action-shellcheck@2.0.0
         with:
           scandir: '.'
           ignore_paths: 'src/zsh' # Ignore non-bash files
@@ -40,7 +40,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Make scripts executable
         run: |
@@ -66,7 +66,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Mock macOS 10.15 environment
         run: |
