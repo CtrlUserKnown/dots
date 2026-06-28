@@ -97,7 +97,7 @@ fi
 if [[ $- == *i* && -n "${SSH_CLIENT:-}${SSH_TTY:-}" && -z "${HERDR_AUTOSTART:-}" ]]; then
     if command -v herdr >/dev/null 2>&1; then
         export HERDR_AUTOSTART=1
-        exec herdr
+        herdr
     fi
 fi
 
