@@ -5,18 +5,18 @@
 
 # --- alias:functionality ---
 # command bypasses alias lookup — ensures the real binary is called
-alias cls="command clear"
-alias ls="command eza --color=auto"
-alias la="command eza -al --icons --color=auto"
-alias lla="command eza -al --icons --color=auto"
-alias ll="command eza -l --icons --color=auto"
-alias reload="source ~/.zshrc"
-alias exi="exit"
+alias cls="command clear"                        # clear the terminal
+alias ls="command eza --color=auto"              # list with color
+alias la="command eza -al --icons --color=auto"  # list all with icons
+alias lla="command eza -al --icons --color=auto" # list all with icons (long)
+alias ll="command eza -l --icons --color=auto"   # list with icons
+alias reload="source ~/.zshrc"                   # reload shell config
+alias exi="exit"                                 # exit shell
 
 # --- alias:programming ---
-alias y="yazi"
-alias py="python3"
-alias ipy="ipython3"
+alias y="yazi"          # file manager
+alias py="python3"      # python
+alias ipy="ipython3"    # interactive python
 alias swiftinit="swift package init"
 alias sps="swift package show-dependencies"
 alias spt="swift package test"
@@ -26,20 +26,21 @@ alias rn="rustc"
 alias cr="cargo run"
 
 # --- alias:alias ---
-alias lz="lazygit"
+alias lz="lazygit"      # git TUI
 
 # --- alias:ai ---
-alias opc="opencode"
-alias llama="ollama"
+alias opc="opencode"    # opencode AI
+alias llama="ollama"    # local LLMs
 if [[ "$(uname -s)" == "Darwin" ]]; then
     alias antigravity="open -a Antigravity"
     alias anti="open -a Antigravity"
 fi
 
 # --- alias:application ---
-alias mux="command tmux"
-alias b="command btop"
-alias f="fzf"
+alias mux="herdr"        # multiplexer
+alias attach="herdr"     # attach to a session
+alias b="command btop"   # system monitor
+alias f="fzf"            # fuzzy finder
 
 # --- alias:suffix ---
 # suffix aliases — typing file.rs runs $EDITOR file.rs automatically

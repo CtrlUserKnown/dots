@@ -27,7 +27,7 @@ setopt prompt_subst
 
 # SSH indicator — computed once at load time since it never changes mid-session
 if [[ -n "${SSH_CLIENT:-}" || -n "${SSH_TTY:-}" ]]; then
-    _SSH_INDICATOR="%F{#eb6f92}(ssh)%f "
+    _SSH_INDICATOR="%F{cyan}∧%f "
 else
     _SSH_INDICATOR=""
 fi

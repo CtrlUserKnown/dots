@@ -2,7 +2,9 @@
 # dotfiles v1.3.1
 # date created: 10.14.2025
 
-DOTFILES_VERSION="1.3.1"
+# Derived from the latest git tag — no manual version bumping needed
+DOTFILES_VERSION=$(git -C "${HOME}/.dots" describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')
+: "${DOTFILES_VERSION:=dev}"
 
 # --- config:locale ---
 export LANG=en_US.UTF-8
@@ -77,18 +79,17 @@ WORDCHARS=${WORDCHARS//[\/]}
 # EXTENDED_GLOB enables ** & ^pattern globs, AUTO_CD lets you enter a dir without typing cd
 setopt EXTENDED_GLOB AUTO_CD
 
-# --- config:developer mode ---
-# Author is auto-enrolled in developer mode (no update prompts).
-# Other users get auto-updates by default.
-# Override by setting DEVELOPER_MODE=0 or DEVELOPER_MODE=1 before this line.
-if [[ -z "${DEVELOPER_MODE:-}" ]]; then
-    [[ "$USER" == "christian" ]] && typeset -g DEVELOPER_MODE=1
+# --- config:symlink check ---
+# Warns early if the ~/.config/zsh symlink is broken (e.g. after moving the repo).
+if [[ $- == *i* && ! -e "${HOME}/.config/zsh/themes/charModel" ]]; then
+    print "⚠️  dots: ~/.config/zsh symlink is broken — run setup.sh to repair"
 fi
 
-# --- config:developer hooks ---
-# brew sync — auto-updates Brewfile on install/uninstall (developer mode only)
-if [[ -f ~/.config/zsh/brew-sync.zsh ]]; then
-    source ~/.config/zsh/brew-sync.zsh
+# --- config:developer mode ---
+# Create ~/.dots/.developer to opt into developer mode (disables update prompts).
+# Delete the file to re-enable auto-updates.
+if [[ -z "${DEVELOPER_MODE:-}" ]]; then
+    [[ -f "${HOME}/.dots/.developer" ]] && typeset -g DEVELOPER_MODE=1
 fi
 
 # --- config:update check ---
@@ -102,7 +103,7 @@ fi
 if [[ ! -f /tmp/zsh_fastfetch_$$ ]] && [[ $- == *i* ]]; then
     fastfetch
     print ""
-    print "run 'commands custom' to see your aliases and functions"
+    print "run 'dots' to customize your setup  ·  'commands custom' for shortcuts"
     print ""
     touch /tmp/zsh_fastfetch_$$
 fi
