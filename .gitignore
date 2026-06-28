@@ -1,3 +1,13 @@
+# developer mode marker — create this file to disable update prompts
+.developer
+
+# user settings — not committed (theme, update prefs)
+/.settings
+
+# runtime stamps — not committed
+src/zsh/zsh/.update_stamp
+src/zsh/zsh/.version_stamp
+
 # editors
 ./.DS_Store
 ./*/.DS_Store
