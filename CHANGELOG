@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.1] - 2026-06-28
+
+### Fixed
+- **charModel prompt**: SSH indicator (`∧`) and machine symbol (`⋧`/`⟚`) are now mutually exclusive — SSH sessions show only `∧`, local herdr machines show only `⟚`, and other local machines show only `⋧`.
+- **.zshrc**: Added `config:herdr` block that auto-launches herdr via `exec` on SSH start, with `HERDR_AUTOSTART=1` guard to prevent re-entry in child shells. Falls back gracefully if herdr is not installed.
+- Bumped all `# dotfiles v` version headers to v1.4.1.
+
 ## [1.4.0] - 2026-06-28
 
 ### Added

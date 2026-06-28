@@ -24,3 +24,7 @@ src/tmux/plugins/
 # python
 ./__pycache__
 **/__pycache__
+
+# ai
+CLAUDE.md
+**/CLAUDE.md

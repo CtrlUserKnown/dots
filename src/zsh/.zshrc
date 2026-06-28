@@ -1,5 +1,5 @@
 # CtrlUserKnown zshrc configuration file
-# dotfiles v1.4.0
+# dotfiles v1.4.1
 # date created: 10.14.2025
 
 # Derived from the latest git tag — no manual version bumping needed
@@ -90,6 +90,15 @@ fi
 # Delete the file to re-enable auto-updates.
 if [[ -z "${DEVELOPER_MODE:-}" ]]; then
     [[ -f "${HOME}/.dots/.developer" ]] && typeset -g DEVELOPER_MODE=1
+fi
+
+# --- config:herdr ---
+# Auto-launch herdr when SSH'd in. HERDR_AUTOSTART guards against re-entry in herdr's child shells.
+if [[ $- == *i* && -n "${SSH_CLIENT:-}${SSH_TTY:-}" && -z "${HERDR_AUTOSTART:-}" ]]; then
+    if command -v herdr >/dev/null 2>&1; then
+        export HERDR_AUTOSTART=1
+        exec herdr
+    fi
 fi
 
 # --- config:update check ---

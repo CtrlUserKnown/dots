@@ -1,5 +1,5 @@
 # CharModel zsh theme
-# dotfiles v1.4.0
+# dotfiles v1.4.1
 # Date: 2026-06-28
 
 # git status is computed in precmd (once per prompt) to avoid blocking on every keypress
@@ -25,17 +25,16 @@ add-zsh-hook precmd _update_git_info
 
 setopt prompt_subst
 
-# Machine symbol — ⟚ on herdr, ⋧ everywhere else
-if [[ "$(hostname -s)" == "herdr" ]]; then
+# SSH takes priority — the ∧ indicator already signals remote, so drop the machine symbol.
+# Outside SSH: ⟚ on herdr, ⋧ everywhere else.
+if [[ -n "${SSH_CLIENT:-}" || -n "${SSH_TTY:-}" ]]; then
+    _MACHINE_SYMBOL=""
+    _SSH_INDICATOR="%F{cyan}∧%f "
+elif [[ "$(hostname -s)" == "herdr" ]]; then
     _MACHINE_SYMBOL="⟚ "
+    _SSH_INDICATOR=""
 else
     _MACHINE_SYMBOL="⋧ "
-fi
-
-# SSH indicator — computed once at load time since it never changes mid-session
-if [[ -n "${SSH_CLIENT:-}" || -n "${SSH_TTY:-}" ]]; then
-    _SSH_INDICATOR="%F{cyan}∧%f "
-else
     _SSH_INDICATOR=""
 fi
 
