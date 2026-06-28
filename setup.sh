@@ -433,43 +433,20 @@ relink_and_verify() {
     local dots_dir="$1"
 
     echo "🔧 Creating links for configuration files..."
-    mkdir -p "$HOME/.config/bat" "$HOME/.config/fastfetch" "$HOME/.config/ghostty" "$HOME/.config/zsh"
-    rmdir "$HOME/.config/bat" "$HOME/.config/fastfetch" "$HOME/.config/ghostty" "$HOME/.config/zsh" 2>/dev/null
-    ln -sf "$dots_dir/src/bat" "$HOME/.config/bat"
-    ln -sf "$dots_dir/src/fastfetch" "$HOME/.config/fastfetch"
-    ln -sf "$dots_dir/src/ghostty" "$HOME/.config/ghostty"
-    ln -sf "$dots_dir/src/zsh/zsh" "$HOME/.config/zsh"
-    ln -sf "$dots_dir/src/zsh/.zshrc" "$HOME/.zshrc"
+    if python3 "$dots_dir/src/zsh/zsh/dots.py" --repair-symlinks; then
+        echo "✅ All configuration files verified successfully"
+    else
+        echo "⚠️ Some symlinks could not be created (a real file may be in the way)"
+        [ -z "$CI" ] && exit 1
+    fi
+
     if [ "$INSTALL_NEOVIM_CONFIG" = true ] && [ -d "$dots_dir/src/nvim" ]; then
         ln -sf "$dots_dir/src/nvim" "$HOME/.config/nvim"
     fi
 
-    # verify
-    local all_good=true
-    for dir in bat fastfetch ghostty zsh; do
-        if [ ! -L "$HOME/.config/$dir" ]; then
-            echo "⚠️ Missing symlink: $HOME/.config/$dir"
-            all_good=false
-        fi
-    done
-
-    if [ ! -L "$HOME/.zshrc" ]; then
-        echo "⚠️ Missing symlink: $HOME/.zshrc"
-        all_good=false
-    fi
-
     if [ ! -d "$dots_dir/.git" ]; then
         echo "⚠️ Dotfiles repository not properly cloned"
-        all_good=false
-    fi
-
-    if [ "$all_good" = true ]; then
-        echo "✅ All configuration files verified successfully"
-    else
-        echo "⚠️ Some files are missing or not properly linked"
-        if [ -z "$CI" ]; then
-            exit 1
-        fi
+        [ -z "$CI" ] && exit 1
     fi
 }
 
@@ -529,27 +506,48 @@ EOF
         echo "Dotfiles directory has already been created ✅"
     fi
 
-    # --- packages:neovim prompt ---
+    # --- packages:prompts ---
+    # Collect all install choices upfront so the rest of the script runs unattended.
+    INSTALL_GHOSTTY=true
     INSTALL_NEOVIM=true
     INSTALL_NEOVIM_CONFIG=true
+    INSTALL_OPTIONAL=false
+    INSTALL_PERSONAL=false
+
     if [ -z "$CI" ]; then
+        echo ""
         if command -v gum &> /dev/null; then
-            gum confirm "Install Neovim?" --default=true || INSTALL_NEOVIM=false
-            if [ "$INSTALL_NEOVIM" = true ]; then
-                if [ -d "$(dirname "$0")/src/nvim" ]; then
-                    gum confirm "Link Neovim config from dotfiles?" --default=true || INSTALL_NEOVIM_CONFIG=false
-                fi
+            if [[ "$CURRENT_OS" == "Darwin" ]]; then
+                gum confirm "Install Ghostty terminal? (the terminal this config is built for)" \
+                    --default=true  || INSTALL_GHOSTTY=false
             fi
-        else
-            read -p "Install Neovim? (Y/n) " -n 1 -r
-            echo
-            [[ ! $REPLY =~ ^[Yy]$ ]] && INSTALL_NEOVIM=false
+            gum confirm "Install Neovim text editor?" \
+                --default=true      || INSTALL_NEOVIM=false
             if [ "$INSTALL_NEOVIM" = true ] && [ -d "$(dirname "$0")/src/nvim" ]; then
-                read -p "Link Neovim config from dotfiles? (Y/n) " -n 1 -r
-                echo
-                [[ ! $REPLY =~ ^[Yy]$ ]] && INSTALL_NEOVIM_CONFIG=false
+                gum confirm "  ↳ Link Neovim config from dotfiles?" \
+                    --default=true  || INSTALL_NEOVIM_CONFIG=false
             fi
+            gum confirm "Install optional tools? (btop, lazygit, yazi, herdr)" \
+                --default=false     && INSTALL_OPTIONAL=true
+            gum confirm "Install personal packages? (dev tools, apps — ~30 packages)" \
+                --default=false     && INSTALL_PERSONAL=true
+        else
+            if [[ "$CURRENT_OS" == "Darwin" ]]; then
+                read -p "Install Ghostty terminal? (Y/n) " -n 1 -r; echo
+                [[ $REPLY =~ ^[Nn]$ ]] && INSTALL_GHOSTTY=false
+            fi
+            read -p "Install Neovim text editor? (Y/n) " -n 1 -r; echo
+            [[ $REPLY =~ ^[Nn]$ ]] && INSTALL_NEOVIM=false
+            if [ "$INSTALL_NEOVIM" = true ] && [ -d "$(dirname "$0")/src/nvim" ]; then
+                read -p "  Link Neovim config from dotfiles? (Y/n) " -n 1 -r; echo
+                [[ $REPLY =~ ^[Nn]$ ]] && INSTALL_NEOVIM_CONFIG=false
+            fi
+            read -p "Install optional tools? (btop, lazygit, yazi, herdr) (y/N) " -n 1 -r; echo
+            [[ $REPLY =~ ^[Yy]$ ]] && INSTALL_OPTIONAL=true
+            read -p "Install personal packages? (dev tools, apps) (y/N) " -n 1 -r; echo
+            [[ $REPLY =~ ^[Yy]$ ]] && INSTALL_PERSONAL=true
         fi
+        echo ""
     fi
 
     # --- OS-specific package install ---
@@ -583,8 +581,38 @@ EOF
             fi
         fi
 
-        # --- packages:Brewfile ---
-        install_brewfile "./assets/Brewfile"
+        # --- packages:ghostty ---
+        if [ "$INSTALL_GHOSTTY" = true ]; then
+            if cask_installed "ghostty"; then
+                echo "✅ Ghostty already installed"
+            else
+                run_with_spinner "Installing Ghostty..." \
+                    run_timeout "$DEPENDENCY_TIMEOUT" brew install --cask ghostty || \
+                    echo "⚠️ Ghostty failed to install"
+            fi
+        fi
+
+        # --- packages:deps ---
+        if [ -f "$HOME/.dots/src/zsh/zsh/dots.py" ]; then
+            echo "📦 Installing config dependencies..."
+            if [ "$INSTALL_NEOVIM" = false ]; then
+                DOTS_SKIP_BINS=nvim python3 "$HOME/.dots/src/zsh/zsh/dots.py" --install-deps
+            else
+                python3 "$HOME/.dots/src/zsh/zsh/dots.py" --install-deps
+            fi
+        fi
+
+        # --- packages:optional ---
+        if [ "$INSTALL_OPTIONAL" = true ] && [ -f "$HOME/.dots/src/zsh/zsh/dots.py" ]; then
+            echo "📦 Installing optional tools..."
+            python3 "$HOME/.dots/src/zsh/zsh/dots.py" --install-optional
+        fi
+
+        # --- packages:personal ---
+        if [ "$INSTALL_PERSONAL" = true ] && [ -f "$HOME/.dots/src/zsh/zsh/dots.py" ]; then
+            echo "📦 Installing personal packages..."
+            python3 "$HOME/.dots/src/zsh/zsh/dots.py" --install-personal
+        fi
 
         # --- configuration:Edits ---
         rm -f ~/.zprofile
