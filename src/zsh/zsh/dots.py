@@ -15,6 +15,18 @@ DOTS_DIR     = Path(__file__).resolve().parents[3]
 SETTINGS_FILE = DOTS_DIR / ".settings"
 VERSION       = os.environ.get("DOTS_VERSION", "")
 
+VERSION_STAMP = Path.home() / ".config" / "zsh" / ".version_stamp"
+CHECK_ACTION  = "__check_updates__"
+
+UPDATE_FREQ_OPTIONS = [
+    (60,    "Every hour"),
+    (360,   "Every 6 hours"),
+    (720,   "Every 12 hours"),
+    (1440,  "Daily"),
+    (4320,  "Every 3 days"),
+    (10080, "Weekly"),
+]
+
 # ── data structures ───────────────────────────────────────────────────────────
 
 class Dep(NamedTuple):
@@ -144,6 +156,7 @@ MIN_H, MIN_W = 14, 50
 _DEFAULT_SETTINGS = {
     "update_check": True,
     "greeting":     True,
+    "update_frequency": 1440,
 }
 
 
@@ -505,6 +518,65 @@ def set_ghostty_theme(name: str) -> bool:
         return False
 
 
+# ── update check helpers ──────────────────────────────────────────────────────
+
+
+def check_upstream() -> tuple[int, str]:
+    """Fetch upstream and return (commits_behind, upstream_version). -1 = error."""
+    if not (DOTS_DIR / ".git").exists():
+        return -1, ""
+    try:
+        subprocess.run(
+            ["git", "-C", str(DOTS_DIR), "fetch", "--depth", "1", "--tags", "origin"],
+            capture_output=True, timeout=15,
+        )
+        r = subprocess.run(
+            ["git", "-C", str(DOTS_DIR), "rev-list", "--count", "HEAD..origin/HEAD"],
+            capture_output=True, text=True, timeout=5,
+        )
+        behind = int(r.stdout.strip() or "0")
+        ver = ""
+        if behind:
+            rv = subprocess.run(
+                ["git", "-C", str(DOTS_DIR), "describe", "--tags", "--abbrev=0", "origin/HEAD"],
+                capture_output=True, text=True, timeout=5,
+            )
+            ver = rv.stdout.strip().lstrip("v")
+        return behind, ver
+    except Exception:
+        return -1, ""
+
+
+def do_pull() -> tuple[bool, str]:
+    """Fast-forward pull + symlink repair. Returns (ok, new_version_or_msg)."""
+    try:
+        r = subprocess.run(
+            ["git", "-C", str(DOTS_DIR), "pull", "--ff-only"],
+            capture_output=True, text=True, timeout=30,
+        )
+        if r.returncode != 0:
+            return False, r.stderr.strip() or "pull failed"
+        subprocess.run(
+            ["python3", str(DOTS_DIR / "src/zsh/zsh/dots.py"), "--repair-symlinks"],
+            capture_output=True, timeout=15,
+        )
+        rv = subprocess.run(
+            ["git", "-C", str(DOTS_DIR), "describe", "--tags", "--abbrev=0"],
+            capture_output=True, text=True, timeout=5,
+        )
+        new_ver = rv.stdout.strip().lstrip("v")
+        if new_ver:
+            try:
+                VERSION_STAMP.write_text(new_ver)
+            except Exception:
+                pass
+        return True, new_ver
+    except subprocess.TimeoutExpired:
+        return False, "timed out"
+    except Exception as e:
+        return False, str(e)
+
+
 # ── health view ───────────────────────────────────────────────────────────────
 
 def run_health_view(stdscr) -> None:
@@ -693,16 +765,111 @@ def run_theme_view(stdscr) -> None:
                 flash = "  ✗ Could not write to ghostty config"
 
 
+# ── check for updates view ────────────────────────────────────────────────────
+
+def run_check_updates_view(stdscr) -> None:
+    state  = "checking"
+    msg    = ""
+    behind = 0
+    up_ver = ""
+
+    while True:
+        stdscr.erase()
+        draw_header(stdscr, " check for updates ")
+
+        if state == "checking":
+            safe_addstr(stdscr, 2, 2, "Checking for updates…",
+                        curses.color_pair(COLOR_DIM))
+            draw_footer(stdscr, "")
+            stdscr.refresh()
+            behind, up_ver = check_upstream()
+            if behind == -1:
+                state = "error"
+                msg   = "Could not check for updates (offline or not a git repo)."
+            elif behind == 0:
+                state = "uptodate"
+            else:
+                state = "available"
+
+        elif state == "uptodate":
+            safe_addstr(stdscr, 2, 2, "✓  No updates found. You're up to date!",
+                        curses.color_pair(COLOR_SELECT) | curses.A_BOLD)
+            if VERSION:
+                safe_addstr(stdscr, 3, 2, f"  Current version: v{VERSION}")
+            draw_footer(stdscr, "  q back ")
+            stdscr.refresh()
+            if stdscr.getch() not in (curses.KEY_RESIZE,):
+                return
+
+        elif state == "available":
+            lines = [f"  Update available: v{VERSION} → v{up_ver}" if VERSION
+                     else f"  Update available (v{up_ver})"]
+            lines += ["", "  Press 'y' to update, any other key to skip."]
+            for i, line in enumerate(lines):
+                safe_addstr(stdscr, 2 + i, 0, line)
+            draw_footer(stdscr, "  y update  q back ")
+            stdscr.refresh()
+            key = stdscr.getch()
+            if key in (ord("q"), ord("Q"), 27):
+                return
+            elif key in (ord("y"), ord("Y")):
+                state = "pulling"
+
+        elif state == "pulling":
+            safe_addstr(stdscr, 2, 2, "Applying update…",
+                        curses.color_pair(COLOR_DIM))
+            stdscr.refresh()
+            ok, new_ver = do_pull()
+            if ok:
+                state = "done"
+            else:
+                state = "error"
+                msg = f"Pull failed: {new_ver}"
+
+        elif state == "done":
+            safe_addstr(stdscr, 2, 2,
+                        "✓  Dotfiles updated! Restart your shell to apply.",
+                        curses.color_pair(COLOR_SELECT) | curses.A_BOLD)
+            draw_footer(stdscr, "  q back ")
+            stdscr.refresh()
+            if stdscr.getch() not in (curses.KEY_RESIZE,):
+                return
+
+        elif state == "error":
+            safe_addstr(stdscr, 2, 2, f"✗  {msg}",
+                        curses.color_pair(COLOR_ERROR) | curses.A_BOLD)
+            draw_footer(stdscr, "  q back ")
+            stdscr.refresh()
+            if stdscr.getch() not in (curses.KEY_RESIZE,):
+                return
+
+
 # ── settings view ─────────────────────────────────────────────────────────────
 
 def run_settings_view(stdscr) -> None:
     s   = load_settings()
     idx = 0
 
+    def _freq_label():
+        val = s.get("update_frequency", 1440)
+        for mins, label in UPDATE_FREQ_OPTIONS:
+            if mins == val:
+                return label
+        return f"{val} min"
+
+    def _next_freq():
+        val = s.get("update_frequency", 1440)
+        for i, (mins, _) in enumerate(UPDATE_FREQ_OPTIONS):
+            if mins == val:
+                return UPDATE_FREQ_OPTIONS[(i + 1) % len(UPDATE_FREQ_OPTIONS)][0]
+        return UPDATE_FREQ_OPTIONS[0][0]
+
     # (label, key, type, options)
     fields = [
-        ("Update check",   "update_check", "bool",   None),
-        ("Shell greeting", "greeting",     "bool",   None),
+        ("Check for updates", CHECK_ACTION,        "action", None),
+        ("Auto-updates",      "update_check",       "bool",   None),
+        ("Check interval",    "update_frequency",   "choice", _freq_label),
+        ("Shell greeting",    "greeting",           "bool",   None),
     ]
 
     while True:
@@ -710,15 +877,19 @@ def run_settings_view(stdscr) -> None:
         h, w = stdscr.getmaxyx()
         draw_header(stdscr, " settings ")
 
-        for i, (label, key, kind, _) in enumerate(fields):
-            val    = s.get(key)
+        for i, (label, key, kind, opt_fn) in enumerate(fields):
             is_sel = i == idx
             cursor = "▶" if is_sel else " "
             if kind == "bool":
+                val = s.get(key, True)
                 display = "ON" if val else "OFF"
                 val_attr = curses.color_pair(COLOR_SELECT) if val else curses.color_pair(COLOR_ERROR)
+            elif kind == "choice":
+                display = opt_fn() if opt_fn else ""
+                val_attr = curses.color_pair(COLOR_HEADER)
             else:
-                display, val_attr = str(val), 0
+                display = ""
+                val_attr = 0
 
             safe_addstr(stdscr, 2 + i, 0, cursor,
                         curses.color_pair(COLOR_SELECT) | curses.A_BOLD if is_sel else 0)
@@ -727,11 +898,13 @@ def run_settings_view(stdscr) -> None:
             safe_addstr(stdscr, 2 + i, 22, display, val_attr)
 
         descs = {
-            "update_check": "check for dotfiles updates every 10 minutes",
-            "greeting":     "show fastfetch system info when opening a terminal",
+            CHECK_ACTION:       "manually check for dotfiles updates right now",
+            "update_check":     "automatically check for updates in the background",
+            "update_frequency": "how often to check for updates",
+            "greeting":         "show fastfetch system info when opening a terminal",
         }
         draw_desc(stdscr, descs.get(fields[idx][1], ""))
-        draw_footer(stdscr, " j/k navigate  space/enter toggle  q save & back")
+        draw_footer(stdscr, " j/k navigate  space/enter activate  q save & back")
         stdscr.refresh()
 
         key = stdscr.getch()
@@ -746,6 +919,10 @@ def run_settings_view(stdscr) -> None:
             _, fkey, fkind, _ = fields[idx]
             if fkind == "bool":
                 s[fkey] = not s.get(fkey, True)
+            elif fkind == "choice":
+                s[fkey] = _next_freq()
+            elif fkind == "action" and fkey == CHECK_ACTION:
+                run_check_updates_view(stdscr)
 
 
 # ── personal packages view (dev) ──────────────────────────────────────────────

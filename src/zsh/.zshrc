@@ -110,7 +110,15 @@ fi
 
 # --- config:fastfetch ---
 # $$ is the shell pid — runs once per terminal process, not once per subshell
-if [[ ! -f /tmp/zsh_fastfetch_$$ ]] && [[ $- == *i* ]]; then
+# Respects the "greeting" setting in ~/.dots/.settings (toggled via 'dots' TUI)
+_dots_greeting=true
+if [[ -f ~/.dots/.settings ]]; then
+    _dots_raw=$(<~/.dots/.settings)
+    if [[ "$_dots_raw" =~ '"greeting":[[:space:]]*(true|false)' ]]; then
+        _dots_greeting="$match[1]"
+    fi
+fi
+if [[ "$_dots_greeting" == "true" && ! -f /tmp/zsh_fastfetch_$$ ]] && [[ $- == *i* ]]; then
     fastfetch
     print ""
     print "run 'dots' to customize your setup"
