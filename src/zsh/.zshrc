@@ -1,5 +1,5 @@
 # CtrlUserKnown zshrc configuration file
-# dotfiles v1.5.2
+# dotfiles v1.5.3
 # date created: 10.14.2025
 
 # Derived from the latest git tag — no manual version bumping needed
@@ -98,6 +98,7 @@ if [[ $- == *i* && -n "${SSH_CLIENT:-}${SSH_TTY:-}" && -z "${HERDR_AUTOSTART:-}"
     if command -v herdr >/dev/null 2>&1; then
         export HERDR_AUTOSTART=1
         herdr
+        exit
     fi
 fi
 

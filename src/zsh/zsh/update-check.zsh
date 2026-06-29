@@ -1,5 +1,5 @@
 # Dotfiles update check
-# dotfiles v1.5.2
+# dotfiles v1.5.3
 # Sources from .zshrc — checks every 10 minutes for upstream changes
 # Set DEVELOPER_MODE=1 in your .zshrc to disable auto-updates
 
@@ -30,29 +30,29 @@ if [[ -z "$DEVELOPER_MODE" && -d ~/.dots/.git && $- == *i* ]]; then
         echo "$now" > "$stamp"
         (
             cd ~/.dots 2>/dev/null || exit
-            # shallow fetch — only grabs the latest ref to minimize bandwidth
             git fetch --depth 1 --tags origin 2>/dev/null
-            behind=$(git rev-list --count HEAD..origin/HEAD 2>/dev/null)
-            if [[ -n "$behind" && "$behind" -gt 0 ]]; then
-                upstream_version=$(git describe --tags --abbrev=0 origin/HEAD 2>/dev/null | sed 's/^v//')
+            upstream_version=$(git tag --list 'v*' --sort=-version:refname 2>/dev/null | head -1 | sed 's/^v//')
+            local_version="${DOTFILES_VERSION:-}"
 
-                print ""
-                print "📦 Dotfiles update available ($behind new commit(s))"
-                [[ -n "$upstream_version" ]] && print "   New version: v${upstream_version}"
-                print -n "Pull changes? [Y/n] "
-                read -q reply
-                print ""
-                if [[ "$reply" == "y" || "$reply" == "Y" || -z "$reply" ]]; then
-                    # refuse to merge if diverged — this repo should never have local commits
-                    git pull --ff-only 2>/dev/null
-                    python3 ~/.config/zsh/dots.py --repair-symlinks
-                    # Write the new version to stamp so next shell open shows the upgrade notice
-                    [[ -n "$upstream_version" ]] && echo "$upstream_version" > "$version_stamp"
-                    print "✅ Dotfiles updated to v${upstream_version:-?}. Restart your shell to apply changes."
-                else
-                    print "Skipped."
+            if [[ -n "$upstream_version" && -n "$local_version" && "$upstream_version" != "$local_version" ]]; then
+                newer=$(printf '%s\n%s' "$local_version" "$upstream_version" | sort -V | tail -1)
+                if [[ "$newer" == "$upstream_version" ]]; then
+                    print ""
+                    print "📦 Dotfiles update available: v${local_version} → v${upstream_version}"
+                    print -n "Pull changes? [Y/n] "
+                    read -q reply
+                    print ""
+                    if [[ "$reply" == "y" || "$reply" == "Y" || -z "$reply" ]]; then
+                        # refuse to merge if diverged — this repo should never have local commits
+                        git pull --ff-only 2>/dev/null
+                        python3 ~/.config/zsh/dots.py --repair-symlinks
+                        echo "$upstream_version" > "$version_stamp"
+                        print "✅ Dotfiles updated to v${upstream_version}. Restart your shell to apply changes."
+                    else
+                        print "Skipped."
+                    fi
+                    print ""
                 fi
-                print ""
             fi
         )
     fi
