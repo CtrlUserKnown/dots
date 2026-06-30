@@ -1,0 +1,46 @@
+# Personal packages file — copy this to your own location and customise.
+#
+# The install script will prompt you for the path to your personal file.
+# brew/cask lines are processed on macOS; dnf/cargo/go/npm lines work on
+# both platforms (each side ignores lines it doesn't understand).
+#
+# Format:
+#   brew  "formula"      — Homebrew formula (macOS)
+#   cask  "app"          — Homebrew cask / GUI app (macOS only)
+#   dnf   "package"      — Fedora dnf package
+#   cargo "crate"        — cargo install (cross-platform)
+#   go    "import/path"  — go install (cross-platform)
+#   npm   "package"      — npm install -g (cross-platform)
+
+# --- macOS apps ---
+# cask "rectangle"
+# cask "maccy"
+# cask "obs"
+# cask "zoom"
+# cask "karabiner-elements"
+# cask "localsend"
+# cask "blender"
+
+# --- eye-candy (both platforms) ---
+# brew "cmatrix"
+# brew "lolcat"
+# brew "figlet"
+# brew "cowsay"
+# dnf  "cmatrix"
+# dnf  "lolcat"
+# dnf  "figlet"
+# dnf  "cowsay"
+
+# --- cargo installs ---
+# cargo "himalaya"
+# cargo "resvg"
+# cargo "rustlings"
+# cargo "sqlx-cli"
+
+# --- go installs ---
+# go "github.com/brianstrauch/solitaire-tui"
+
+# --- npm installs ---
+# npm "generator-code"
+# npm "vsce"
+# npm "yo"

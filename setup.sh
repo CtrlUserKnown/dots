@@ -413,10 +413,10 @@ install_zsh_history_substring_search() {
     fi
 }
 
-install_opencode_deps() {
+install_opencode_config_deps() {
     local dir="$HOME/.dots/src/opencode"
     if [ -f "$dir/package.json" ] && [ ! -d "$dir/node_modules" ]; then
-        echo "🔧 Installing opencode dependencies..."
+        echo "🔧 Installing opencode config dependencies..."
         if command -v npm &>/dev/null; then
             run_with_spinner "Installing opencode npm packages..." \
                 run_timeout 60s npm install --prefix "$dir" || \
@@ -425,8 +425,38 @@ install_opencode_deps() {
             echo "⚠️ npm not found, skipping opencode dependencies"
         fi
     elif [ -d "$dir/node_modules" ]; then
-        echo "✅ opencode dependencies already installed"
+        echo "✅ opencode config dependencies already installed"
     fi
+}
+
+install_opencode() {
+    if command -v opencode &>/dev/null; then
+        echo "✅ opencode already installed"
+    else
+        run_with_spinner "Installing opencode..." \
+            run_timeout 60s bash -c "curl -fsSL https://opencode.ai/install | sh" || \
+            echo "⚠️ opencode failed to install"
+    fi
+}
+
+install_fedorafile_section() {
+    local file="$1"
+    local section="$2"
+
+    if [ ! -f "$file" ]; then
+        echo "⚠️ $file not found. Skipping."
+        return 1
+    fi
+
+    local in_section=false
+    while IFS= read -r line || [ -n "$line" ]; do
+        if [[ "$line" =~ ^\#\ \[([a-z]+)\]$ ]]; then
+            [[ "${BASH_REMATCH[1]}" == "$section" ]] && in_section=true || in_section=false
+            continue
+        fi
+        [[ "$in_section" == false || -z "$line" || "$line" == \#* ]] && continue
+        install_dnf_entry "$line"
+    done < "$file"
 }
 
 relink_and_verify() {
@@ -448,6 +478,39 @@ relink_and_verify() {
         echo "⚠️ Dotfiles repository not properly cloned"
         [ -z "$CI" ] && exit 1
     fi
+}
+
+install_charvim() {
+    local charvim_dir="$HOME/.charvim"
+    local charvim_repo="https://github.com/CrtlUserKnown/Charvim.git"
+    local nvim_link="$HOME/.config/nvim"
+
+    if [ -d "$charvim_dir/.git" ]; then
+        run_with_spinner "Updating Charvim..." git -C "$charvim_dir" pull
+        echo "✅ Charvim updated"
+    else
+        if run_timeout 30s git clone "$charvim_repo" "$charvim_dir" 2>/dev/null; then
+            echo "✅ Charvim cloned to $charvim_dir"
+        else
+            echo "⚠️ Charvim clone timed out. Trying shallow clone..."
+            rm -rf "$charvim_dir"
+            if run_timeout 20s git clone --depth 1 "$charvim_repo" "$charvim_dir" 2>/dev/null; then
+                echo "✅ Charvim shallow clone successful"
+            else
+                echo "❌ Charvim clone failed. Skipping."
+                return 1
+            fi
+        fi
+    fi
+
+    if [ -e "$nvim_link" ] || [ -L "$nvim_link" ]; then
+        local backup="${nvim_link}.bak.$(date +%Y%m%d_%H%M%S)"
+        mv "$nvim_link" "$backup"
+        echo "✅ Backed up existing nvim config to $backup"
+    fi
+
+    ln -sf "$charvim_dir/nvim" "$nvim_link"
+    echo "✅ Linked: $charvim_dir/nvim → $nvim_link"
 }
 
 # --- install ---
@@ -511,8 +574,10 @@ EOF
     INSTALL_GHOSTTY=true
     INSTALL_NEOVIM=true
     INSTALL_NEOVIM_CONFIG=true
+    INSTALL_CHARVIM=false
     INSTALL_OPTIONAL=false
-    INSTALL_PERSONAL=false
+    INSTALL_DEV=false
+    PERSONAL_PKG_FILE=""
 
     if [ -z "$CI" ]; then
         echo ""
@@ -527,10 +592,18 @@ EOF
                 gum confirm "  ↳ Link Neovim config from dotfiles?" \
                     --default=true  || INSTALL_NEOVIM_CONFIG=false
             fi
+            if [ "$INSTALL_NEOVIM" = true ]; then
+                gum confirm "  ↳ Install Charvim (Neovim config)?" \
+                    --default=true  || INSTALL_CHARVIM=false
+            fi
             gum confirm "Install optional tools? (btop, lazygit, yazi, herdr)" \
                 --default=false     && INSTALL_OPTIONAL=true
-            gum confirm "Install personal packages? (dev tools, apps — ~30 packages)" \
-                --default=false     && INSTALL_PERSONAL=true
+            gum confirm "Install developer tools? (gh, java, go, cmake, gcc, docker...)" \
+                --default=false     && INSTALL_DEV=true
+            if gum confirm "Import a personal packages file?" --default=false; then
+                PERSONAL_PKG_FILE=$(gum input --placeholder "Path to file (e.g. ~/system-packages/packages.personal)")
+                PERSONAL_PKG_FILE="${PERSONAL_PKG_FILE/#\~/$HOME}"
+            fi
         else
             if [[ "$CURRENT_OS" == "Darwin" ]]; then
                 read -p "Install Ghostty terminal? (Y/n) " -n 1 -r; echo
@@ -542,10 +615,16 @@ EOF
                 read -p "  Link Neovim config from dotfiles? (Y/n) " -n 1 -r; echo
                 [[ $REPLY =~ ^[Nn]$ ]] && INSTALL_NEOVIM_CONFIG=false
             fi
+            if [ "$INSTALL_NEOVIM" = true ]; then
+                read -p "  Install Charvim (Neovim config)? (Y/n) " -n 1 -r; echo
+                [[ $REPLY =~ ^[Nn]$ ]] && INSTALL_CHARVIM=false
+            fi
             read -p "Install optional tools? (btop, lazygit, yazi, herdr) (y/N) " -n 1 -r; echo
             [[ $REPLY =~ ^[Yy]$ ]] && INSTALL_OPTIONAL=true
-            read -p "Install personal packages? (dev tools, apps) (y/N) " -n 1 -r; echo
-            [[ $REPLY =~ ^[Yy]$ ]] && INSTALL_PERSONAL=true
+            read -p "Install developer tools? (gh, java, go, cmake, gcc, docker...) (y/N) " -n 1 -r; echo
+            [[ $REPLY =~ ^[Yy]$ ]] && INSTALL_DEV=true
+            read -p "Personal packages file path (press Enter to skip): " PERSONAL_PKG_FILE
+            PERSONAL_PKG_FILE="${PERSONAL_PKG_FILE/#\~/$HOME}"
         fi
         echo ""
     fi
@@ -608,10 +687,10 @@ EOF
             python3 "$HOME/.dots/src/zsh/zsh/dots.py" --install-optional
         fi
 
-        # --- packages:personal ---
-        if [ "$INSTALL_PERSONAL" = true ] && [ -f "$HOME/.dots/src/zsh/zsh/dots.py" ]; then
-            echo "📦 Installing personal packages..."
-            python3 "$HOME/.dots/src/zsh/zsh/dots.py" --install-personal
+        # --- packages:dev ---
+        if [ "$INSTALL_DEV" = true ] && [ -f "$HOME/.dots/src/zsh/zsh/dots.py" ]; then
+            echo "📦 Installing developer tools..."
+            python3 "$HOME/.dots/src/zsh/zsh/dots.py" --install-dev
         fi
 
         # --- configuration:Edits ---
@@ -621,8 +700,19 @@ EOF
         echo "🐧 Fedora detected — using dnf"
 
         setup_fedora_repos
-        install_fedorafile "./assets/packages.fedora"
+        install_fedorafile_section "$HOME/.dots/assets/packages.fedora" "required"
         install_zsh_history_substring_search
+
+        if [ "$INSTALL_OPTIONAL" = true ]; then
+            echo "📦 Installing optional tools..."
+            install_fedorafile_section "$HOME/.dots/assets/packages.fedora" "optional"
+        fi
+
+        if [ "$INSTALL_DEV" = true ]; then
+            echo "📦 Installing developer tools..."
+            install_fedorafile_section "$HOME/.dots/assets/packages.fedora" "dev"
+        fi
+
         install_ollama
         install_yt_dlp
 
@@ -635,11 +725,30 @@ EOF
     # --- packages:GitHub ---
     install_fzf_tab
 
-    # --- packages:npm ---
-    install_opencode_deps
+    # --- packages:opencode ---
+    install_opencode
+    install_opencode_config_deps
+
+    # --- packages:personal ---
+    if [ -n "$PERSONAL_PKG_FILE" ] && [ -f "$PERSONAL_PKG_FILE" ]; then
+        echo "📦 Installing personal packages from $PERSONAL_PKG_FILE..."
+        if [[ "$CURRENT_OS" == "Darwin" ]]; then
+            install_brewfile "$PERSONAL_PKG_FILE"
+        elif is_fedora; then
+            install_fedorafile "$PERSONAL_PKG_FILE"
+        fi
+    elif [ -n "$PERSONAL_PKG_FILE" ]; then
+        echo "⚠️ Personal packages file not found at: $PERSONAL_PKG_FILE"
+    fi
 
     # --- configuration:Links & Verify ---
     relink_and_verify "$HOME/.dots"
+
+    # --- configuration:Charvim ---
+    if [ "$INSTALL_CHARVIM" = true ]; then
+        echo "🔧 Installing Charvim..."
+        install_charvim
+    fi
 }
 
 do_install

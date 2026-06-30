@@ -1,5 +1,5 @@
 # CtrlUserKnown zshrc configuration file
-# dotfiles v1.5.3
+# dotfiles v1.5.4
 # date created: 10.14.2025
 
 # Derived from the latest git tag — no manual version bumping needed
@@ -226,9 +226,15 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
 fi
 
 # --- config:java ---
-if [[ "$(uname -s)" == "Darwin" ]]; then
-    export JAVA_HOME=$(/usr/libexec/java_home 2>/dev/null)
-elif command -v java &>/dev/null; then
+if [[ "$(uname -s)" == "Darwin" ]] && command -v brew &>/dev/null; then
+    _jdk="$(brew --prefix openjdk@21 2>/dev/null)/libexec/openjdk.jdk/Contents/Home"
+    if [[ -d "$_jdk" ]]; then
+        export JAVA_HOME="$_jdk"
+        export PATH="$JAVA_HOME/bin:$PATH"
+    fi
+    unset _jdk
+fi
+if [[ -z "$JAVA_HOME" ]] && command -v java &>/dev/null; then
     export JAVA_HOME=$(dirname "$(dirname "$(readlink -f "$(which java)")")")
 fi
 

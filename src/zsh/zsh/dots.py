@@ -2,6 +2,7 @@
 """dots — dotfiles manager TUI."""
 
 import curses
+import datetime
 import json
 import os
 import re
@@ -35,7 +36,7 @@ class Dep(NamedTuple):
     dnf:      str        # fedora dnf package
     apt:      str        # debian/ubuntu apt package
     desc:     str
-    category: str        # "required" | "optional" | "personal"
+    category: str        # "required" | "optional" | "dev"
     tap:      str  = ""  # brew tap to enable first
     cask:     bool = False
 
@@ -56,45 +57,32 @@ DEPS: list[Dep] = [
     Dep("lazygit",   "lazygit",   "lazygit",   "lazygit",   "git TUI (lz alias)",                 "optional"),
     Dep("yazi",      "yazi",      "",          "",          "file manager (y alias)",              "optional"),
     Dep("carapace",  "carapace",  "carapace",  "",          "shell completions engine",            "optional"),
-    # ── personal ────────────────────────────────────────────────────────────
-    # languages
-    Dep("go",        "go",        "golang",    "golang",    "Go programming language",             "personal"),
-    Dep("crystal",   "crystal",   "",          "",          "Crystal programming language",        "personal"),
-    Dep("lua",       "lua",       "lua",       "lua",       "Lua scripting language",              "personal"),
-    Dep("mvn",       "maven",     "maven",     "maven",     "Java / Maven build tool",             "personal"),
-    Dep("gradle",    "gradle",    "gradle",    "gradle",    "Gradle build tool",                   "personal"),
-    Dep("dotnet",    "dotnet",    "",          "",          ".NET SDK",                            "personal"),
-    # build / dev
-    Dep("cmake",     "cmake",     "cmake",     "cmake",     "cross-platform build system",         "personal"),
-    Dep("gcc",       "gcc",       "gcc",       "gcc",       "GNU C/C++ compiler",                  "personal"),
-    Dep("rg",        "ripgrep",   "ripgrep",   "ripgrep",   "fast grep replacement",               "personal"),
-    Dep("shellcheck","shellcheck","ShellCheck","shellcheck","shell script linter",                  "personal"),
-    Dep("gh",        "gh",        "gh",        "gh",        "GitHub CLI",                          "personal"),
-    Dep("glow",      "glow",      "",          "",          "markdown renderer",                   "personal"),
-    Dep("typst",     "typst",     "",          "",          "markup typesetting system",            "personal"),
-    Dep("opencode",  "opencode",  "",          "",          "AI coding agent",                     "personal"),
-    Dep("stow",      "stow",      "stow",      "stow",      "symlink farm manager",                "personal"),
+    # ── dev ─────────────────────────────────────────────────────────────────
+    # runtime / languages
+    Dep("java",      "openjdk@21","java-21-openjdk","default-jdk","Java Development Kit (LTS)", "dev"),
+    Dep("go",        "go",        "golang",    "golang",    "Go programming language",             "dev"),
+    Dep("crystal",   "crystal",   "",          "",          "Crystal programming language",        "dev"),
+    Dep("lua",       "lua",       "lua",       "lua",       "Lua scripting language",              "dev"),
+    Dep("mvn",       "maven",     "maven",     "maven",     "Java / Maven build tool",             "dev"),
+    Dep("gradle",    "gradle",    "gradle",    "gradle",    "Gradle build tool",                   "dev"),
+    Dep("dotnet",    "dotnet",    "",          "",          ".NET SDK",                            "dev"),
+    # build tools
+    Dep("cmake",     "cmake",     "cmake",     "cmake",     "cross-platform build system",         "dev"),
+    Dep("gcc",       "gcc",       "gcc",       "gcc",       "GNU C/C++ compiler",                  "dev"),
+    Dep("rg",        "ripgrep",   "ripgrep",   "ripgrep",   "fast grep replacement",               "dev"),
+    Dep("shellcheck","shellcheck","ShellCheck","shellcheck","shell script linter",                  "dev"),
+    Dep("gh",        "gh",        "gh",        "gh",        "GitHub CLI",                          "dev"),
+    Dep("glow",      "glow",      "",          "",          "markdown renderer",                   "dev"),
+    Dep("typst",     "typst",     "",          "",          "markup typesetting system",            "dev"),
+    Dep("stow",      "stow",      "stow",      "stow",      "symlink farm manager",                "dev"),
     # devops / infra
-    Dep("docker",    "docker",    "",          "",          "container runtime",                   "personal"),
-    Dep("psql",      "postgresql@14","","",    "PostgreSQL database",                             "personal"),
-    Dep("nmap",      "nmap",      "nmap",      "nmap",      "network scanner",                     "personal"),
+    Dep("docker",    "docker",    "",          "",          "container runtime",                   "dev"),
+    Dep("psql",      "postgresql@14","","",    "PostgreSQL database",                             "dev"),
+    Dep("nmap",      "nmap",      "nmap",      "nmap",      "network scanner",                     "dev"),
     # media / utilities
-    Dep("ffmpeg",    "ffmpeg",    "ffmpeg",    "ffmpeg",    "audio/video converter",               "personal"),
-    Dep("yt-dlp",    "yt-dlp",    "",          "",          "video downloader",                    "personal"),
-    Dep("gemini",    "gemini-cli","",          "",          "Google Gemini CLI",                   "personal"),
-    # fun / eye-candy
-    Dep("cmatrix",   "cmatrix",   "cmatrix",   "cmatrix",   "matrix rain effect",                  "personal"),
-    Dep("lolcat",    "lolcat",    "lolcat",    "lolcat",    "rainbow text output",                 "personal"),
-    Dep("figlet",    "figlet",    "figlet",    "figlet",    "ASCII art text",                      "personal"),
-    Dep("cowsay",    "cowsay",    "cowsay",    "cowsay",    "ASCII cow speech bubble",             "personal"),
-    # macOS apps (casks)
-    Dep("",   "rectangle",         "","","window manager",              "personal", "", True),
-    Dep("",   "maccy",             "","","clipboard manager",           "personal", "", True),
-    Dep("",   "obs",               "","","screen recording & streaming","personal", "", True),
-    Dep("",   "zoom",              "","","video conferencing",          "personal", "", True),
-    Dep("",   "karabiner-elements","","","keyboard remapper",           "personal", "", True),
-    Dep("",   "localsend",         "","","local file sharing",          "personal", "", True),
-    Dep("",   "blender",           "","","3D creation suite",           "personal", "", True),
+    Dep("ffmpeg",    "ffmpeg",    "ffmpeg",    "ffmpeg",    "audio/video converter",               "dev"),
+    Dep("yt-dlp",    "yt-dlp",    "",          "",          "video downloader",                    "dev"),
+    Dep("gemini",    "gemini-cli","",          "",          "Google Gemini CLI",                   "dev"),
 ]
 
 # Symlinks required for the config to work
@@ -201,7 +189,7 @@ def build_menu(dev: bool) -> list[tuple]:
         ("──",           SEPARATOR,       ""),
         ("Edit Configs", EDIT_ACTION,     "open config files directly in $EDITOR"),
         ("Add Alias",    ALIAS_ACTION,    "create a new shell alias interactively"),
-        ("Personal Pkgs",PERSONAL_ACTION, "manage your personal package list"),
+        ("Dev Packages",  PERSONAL_ACTION, "manage developer package list"),
         ("Git",          GIT_ACTION,      "status, log, pull & push dotfiles repo"),
         ("Reload",       RELOAD_ACTION,   "instructions to reload your shell config"),
         ("View Logs",    LOGS_ACTION,     "show update checker history"),
@@ -351,15 +339,49 @@ def check_symlink(link: Path, target: Path) -> str:
     return "WRONG TARGET"
 
 
+def read_version_header(path: Path) -> str:
+    """Return the dotfiles version string from a file header comment, or '' if not found."""
+    try:
+        for line in path.read_text(errors="ignore").splitlines()[:10]:
+            m = re.match(r"#\s*dotfiles\s+v(\S+)", line)
+            if m:
+                return m.group(1)
+    except OSError:
+        pass
+    return ""
+
+
+def _backup_path(path: Path) -> Path:
+    stamp = datetime.date.today().strftime("%Y%m%d")
+    base  = path.parent / f"{path.name}.bak.{stamp}"
+    if not base.exists():
+        return base
+    i = 1
+    while True:
+        candidate = path.parent / f"{path.name}.bak.{stamp}.{i}"
+        if not candidate.exists():
+            return candidate
+        i += 1
+
+
 def repair_symlink(link: Path, target: Path) -> bool:
     if link.exists() and not link.is_symlink():
         if link.is_dir():
             try:
-                link.rmdir()
+                shutil.move(str(link), str(_backup_path(link)))
             except OSError:
                 return False
         else:
-            return False
+            # For regular files check for a dotfiles version header.
+            # If the version matches the repo file, it is already current — skip.
+            repo_ver  = read_version_header(target)
+            file_ver  = read_version_header(link)
+            if repo_ver and file_ver == repo_ver:
+                return True
+            try:
+                shutil.move(str(link), str(_backup_path(link)))
+            except OSError:
+                return False
     if link.is_symlink():
         link.unlink()
     link.symlink_to(target)
@@ -925,18 +947,18 @@ def run_settings_view(stdscr) -> None:
                 run_check_updates_view(stdscr)
 
 
-# ── personal packages view (dev) ──────────────────────────────────────────────
+# ── dev packages view ─────────────────────────────────────────────────────────
 
 def run_personal_view(stdscr):
     flash  = ""
     idx    = 0
     offset = 0
-    pkgs   = [d for d in DEPS if d.category == "personal"]
+    pkgs   = [d for d in DEPS if d.category == "dev"]
 
     while True:
         stdscr.erase()
         h, w = stdscr.getmaxyx()
-        draw_header(stdscr, " personal packages ")
+        draw_header(stdscr, " dev packages ")
 
         missing = []
         visible = h - 6
@@ -1388,8 +1410,8 @@ if __name__ == "__main__":
     elif "--install-optional" in sys.argv:
         missing = [d for d in DEPS if d.category == "optional" and not check_dep(d)]
         install_deps_cli(missing)
-    elif "--install-personal" in sys.argv:
-        missing = [d for d in DEPS if d.category == "personal" and not check_dep(d)]
+    elif "--install-dev" in sys.argv:
+        missing = [d for d in DEPS if d.category == "dev" and not check_dep(d)]
         install_deps_cli(missing)
     elif "--health" in sys.argv:
         check_deps_cli()

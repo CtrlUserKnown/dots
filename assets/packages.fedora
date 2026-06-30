@@ -1,5 +1,5 @@
 # Fedora (dnf) package list
-# dotfiles v1.3.0
+# dotfiles v1.5.3
 #
 # Format:
 #   copr  "owner/repo"   — enable a Copr repository
@@ -8,80 +8,60 @@
 #   go    "import/path"  — install via go install
 #   npm   "package"      — install via npm install -g
 #
-# Special installs (docker, ollama, yt-dlp, gh) are handled
-# directly in setup.sh via setup_fedora_repos().
+# Sections: [required] [optional] [dev]
+# setup.sh installs [required] always, [optional] and [dev] only when the
+# user opts in at the install prompt.
+#
+# Personal packages (eye-candy, apps, etc.) go in your own file outside this
+# repo — the install script will prompt you to provide a path to it.
 
-# --- Copr repositories (enable before their packages) ---
+# [required]
 copr "atim/fastfetch"
 copr "atim/eza"
-copr "atim/lazygit"
-
-# --- Core tools ---
 dnf "bash-completion"
 dnf "bat"
-dnf "btop"
-dnf "chafa"
-dnf "cmake"
-dnf "cmatrix"
-dnf "cowsay"
 dnf "curl"
-dnf "emacs"
 dnf "eza"
 dnf "fastfetch"
 dnf "fd-find"
-dnf "figlet"
 dnf "fzf"
-dnf "gcc"
 dnf "git"
-dnf "golang"
-dnf "gnucobol"
-dnf "gh"
-dnf "java-17-openjdk"
-dnf "jp2a"
-dnf "lazygit"
-dnf "llvm"
-dnf "lolcat"
-dnf "lua"
-dnf "luarocks"
-dnf "maven"
 dnf "neovim"
+dnf "python3"
+dnf "python3-pip"
+dnf "zoxide"
+dnf "zsh"
+dnf "zsh-autosuggestions"
+dnf "zsh-syntax-highlighting"
+
+# [optional]
+copr "atim/lazygit"
+dnf "btop"
+dnf "carapace"
+dnf "lazygit"
+cargo "yazi-fm"
+go "github.com/charmbracelet/herdr/cmd/herdr"
+
+# [dev]
+dnf "cmake"
+dnf "gcc"
+dnf "gh"
+dnf "golang"
+dnf "java-21-openjdk"
+dnf "llvm"
+dnf "lua"
+dnf "maven"
 dnf "ninja-build"
 dnf "nmap"
 dnf "nodejs"
 dnf "npm"
 dnf "postgresql-server"
-dnf "python3"
-dnf "python3-pip"
 dnf "ripgrep"
-dnf "ruby"
 dnf "ShellCheck"
 dnf "stow"
-dnf "subversion"
-go "github.com/charmbracelet/herdr/cmd/herdr"
 dnf "tree"
 dnf "wget"
-dnf "zoxide"
-dnf "zsh"
-dnf "zsh-autosuggestions"
-dnf "zsh-syntax-highlighting"
-# zsh-history-substring-search is not in Fedora repos — setup.sh installs it via git clone
-
-# --- Cargo installs (not in Fedora repos) ---
-cargo "himalaya"
-cargo "resvg"
-cargo "rustlings"
-cargo "sqlx-cli"
 cargo "typst-cli"
-cargo "yazi-fm"
-
-# --- Go installs ---
 go "golang.org/x/tools/gopls"
-go "github.com/brianstrauch/solitaire-tui"
 go "github.com/charmbracelet/glow"
-
-# --- npm installs ---
 npm "bash-language-server"
-npm "generator-code"
-npm "opencode"
-npm "vsce"
-npm "yo"
