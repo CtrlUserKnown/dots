@@ -9,9 +9,8 @@ src/zsh/zsh/.update_stamp
 src/zsh/zsh/.version_stamp
 
 # editors
-./.DS_Store
-./*/.DS_Store
-./*/*/.DS_Store
+.DS_Store
+**/.DS_Store
 
 # Ignore tmux plugin repos
 ./src/tmux/plugins/
