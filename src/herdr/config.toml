@@ -1,6 +1,24 @@
 # herdr configuration
-# Place this file at ~/.config/herdr/config.toml
+# ctrl user known
+# ~/.config/herdr/config.toml
 
 [experimental]
 # Allow launching herdr from inside a herdr-managed pane.
 allow_nested = true
+
+[keys]
+prefix="ctrl+space"
+split_horizontal = "prefix+minus"
+split_vertical = "prefix+plus"
+cycle_pane_next = "prefix+tab"
+focus_pane_left = "prefix+h"
+focus_pane_down = "prefix+j"
+focus_pane_up = "prefix+k"
+focus_pane_right = "prefix+l"
+
+# open lazygit
+[[keys.command]]
+key = "prefix+g"
+type = "pane"
+command = "lazygit"
+description = "run lazygit"
