@@ -23,6 +23,9 @@ if [[ "$(uname -s)" == "Linux" ]]; then
     export PATH="$HOME/.local/bin:$PATH"
 fi
 
+# --- config:Antigravity ---
+export PATH="/Users/christian/.local/bin:$PATH"
+
 # --- config:editor ---
 # both needed — some programs check EDITOR (tty), others check VISUAL (full-screen)
 export EDITOR="nvim"
@@ -274,3 +277,7 @@ elif [[ -f "/usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]; 
 fi
 
 
+
+
+# Added by Antigravity CLI installer
+export PATH="/Users/christian/.local/bin:$PATH"
