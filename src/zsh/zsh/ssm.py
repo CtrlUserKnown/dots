@@ -554,7 +554,6 @@ def do_connect(session: dict) -> None:
         "-o", "StrictHostKeyChecking=no",
         "-o", "UserKnownHostsFile=/dev/null",
         "-o", "ConnectTimeout=5",
-        "-o", "SetEnv HERDR_AUTOSTART=1",
     ]
     ssh_target = [f"{user}@{host}"]
 
@@ -562,16 +561,16 @@ def do_connect(session: dict) -> None:
     if password:
         pw_opts = ["-o", "PubkeyAuthentication=no", "-o", "PreferredAuthentications=password"]
         if shutil.which("sshpass"):
-            cmd            = ["sshpass", "-e", "ssh"] + ssh_opts + pw_opts + ssh_target
+            cmd            = ["sshpass", "-e", "herdr", "ssh"] + ssh_opts + pw_opts + ssh_target
             env["SSHPASS"] = password
         else:
             print(
                 "Tip: install sshpass (`brew install hudochenkov/sshpass/sshpass`) "
                 "to use stored passwords automatically."
             )
-            cmd = ["ssh"] + ssh_opts + pw_opts + ssh_target
+            cmd = ["herdr", "ssh"] + ssh_opts + pw_opts + ssh_target
     else:
-        cmd = ["ssh"] + ssh_opts + ssh_target
+        cmd = ["herdr", "ssh"] + ssh_opts + ssh_target
 
     print(f"→ connecting to {user}@{host}:{port}")
     try:
