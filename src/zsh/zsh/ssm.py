@@ -77,11 +77,17 @@ def safe_addstr(win, y: int, x: int, text: str, attr: int = 0) -> None:
 def draw_header(win, title: str) -> None:
     _, w = win.getmaxyx()
     attr = curses.color_pair(COLOR_HEADER) | curses.A_BOLD
-    safe_addstr(win, 0, 0, "─" * w, attr)
-    safe_addstr(win, 0, max(0, (w - len(title)) // 2), title, attr)
-    if VERSION:
-        ver = f" v{VERSION} "
-        safe_addstr(win, 0, max(0, w - len(ver) - 1), ver, attr)
+    ver  = f" v{VERSION} " if VERSION else ""
+    line = ["─"] * w
+    for i, ch in enumerate(title):
+        if 4 + i < w:
+            line[4 + i] = ch
+    if ver:
+        vx = max(4 + len(title), w - len(ver) - 2)
+        for i, ch in enumerate(ver):
+            if vx + i < w:
+                line[vx + i] = ch
+    safe_addstr(win, 0, 0, "".join(line), attr)
 
 
 def draw_footer(win, hint: str) -> None:

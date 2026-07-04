@@ -125,5 +125,5 @@ function dots() {
 
 # --- functions:ssm ---
 function ssm() {
-    python3 ~/.config/zsh/ssm.py "$@"
+    DOTS_VERSION="${DOTFILES_VERSION:-}" python3 -B ~/.config/zsh/ssm.py "$@"
 }

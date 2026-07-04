@@ -92,3 +92,42 @@
 2026-06-30T19:45:41.071285Z  INFO herdr::logging: checking for updates event="update.check.start" subsystem="update" outcome="started"
 2026-06-30T20:15:41.098819Z  INFO herdr::logging: checking for updates event="update.check.start" subsystem="update" outcome="started"
 2026-06-30T20:45:41.028472Z  INFO herdr::logging: checking for updates event="update.check.start" subsystem="update" outcome="started"
+2026-07-03T18:52:43.488798Z  INFO herdr::platform::macos: raised server file descriptor soft limit previous=256 target=8192
+2026-07-03T18:52:43.490680Z  INFO herdr::api::server: api server listening path=/Users/christian/.config/herdr/herdr.sock
+2026-07-03T18:52:43.495539Z  INFO herdr::logging: spawning pane terminal event="pane.spawn.start" subsystem="pane" outcome="started" pane_id=1 rows=24 cols=80 scrollback_limit_bytes=10000000
+2026-07-03T18:52:43.501356Z  INFO herdr::logging: pane child spawned event="pane.spawned" subsystem="pane" outcome="ok" pane_id=1 pid=9428
+2026-07-03T18:52:43.502214Z  INFO herdr::logging: session restore evaluated event="persist.restore" subsystem="persist" outcome="ok" workspaces=1
+2026-07-03T18:52:43.502259Z  INFO herdr::app: using pane scrollback configuration pane_scrollback_limit_bytes=10000000
+2026-07-03T18:52:43.532133Z  INFO herdr::logging: checking for updates event="update.check.start" subsystem="update" outcome="started"
+2026-07-03T18:52:43.532310Z  INFO herdr::server::headless: restored session already has workspaces; ignoring startup cwd cwd=/Users/christian/development/dots
+2026-07-03T18:52:43.532529Z  INFO herdr::server::headless: client protocol socket listening path=/Users/christian/.config/herdr/herdr-client.sock
+2026-07-03T18:52:43.532547Z  INFO herdr::server::headless: herdr server started api_socket=/Users/christian/.config/herdr/herdr.sock client_socket=/Users/christian/.config/herdr/herdr-client.sock
+2026-07-03T18:52:43.532579Z  INFO herdr::logging: herdr starting event="app.startup" subsystem="server" outcome="started" pid=9427
+2026-07-03T18:52:43.536888Z  INFO herdr::server::headless: client connected client_id=2 cols=171 rows=47 cell_width_px=0 cell_height_px=0 render_encoding=SemanticFrame
+2026-07-03T18:53:01.283133Z  INFO herdr::server::headless: client detach requested via keybind client_id=2
+2026-07-03T18:53:01.286575Z  INFO herdr::server::headless: client disconnected client_id=2
+2026-07-03T19:22:43.463813Z  INFO herdr::logging: checking for updates event="update.check.start" subsystem="update" outcome="started"
+2026-07-03T19:44:17.805335Z  INFO herdr::server::headless: client connected client_id=4 cols=171 rows=46 cell_width_px=0 cell_height_px=0 render_encoding=SemanticFrame
+2026-07-03T19:44:25.188214Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/Users/christian/.config/herdr/session.json workspaces=1
+2026-07-03T19:44:30.672292Z  INFO herdr::logging: spawning pane terminal event="pane.spawn.start" subsystem="pane" outcome="started" pane_id=2 rows=22 cols=83 scrollback_limit_bytes=10000000
+2026-07-03T19:44:30.680315Z  INFO herdr::logging: pane child spawned event="pane.spawned" subsystem="pane" outcome="ok" pane_id=2 pid=11075
+2026-07-03T19:44:36.328704Z  INFO herdr::logging: spawning pane terminal event="pane.spawn.start" subsystem="pane" outcome="started" pane_id=3 rows=22 cols=83 scrollback_limit_bytes=10000000
+2026-07-03T19:44:36.338797Z  INFO herdr::logging: pane child spawned event="pane.spawned" subsystem="pane" outcome="ok" pane_id=3 pid=11133
+2026-07-03T19:44:36.906449Z  INFO herdr::logging: pane child exited event="pane.exit" subsystem="pane" outcome="completed" pane_id=2 status="ExitStatus { code: 1, signal: None }"
+2026-07-03T19:44:36.928618Z  INFO herdr::pane: pane session terminated pane=2 pid=11075 signal=Hangup
+2026-07-03T19:44:36.929716Z  WARN herdr::app::actions: PaneDied for unknown pane pane=2
+2026-07-03T19:44:41.341969Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/Users/christian/.config/herdr/session.json workspaces=1
+2026-07-03T19:44:46.500003Z  INFO herdr::pane: agent changed pane=3 previous_agent=None agent=Some(OpenCode) process=opencode pgid=Some(11174)
+2026-07-03T19:44:51.525417Z  INFO herdr::server::headless: client detach requested via keybind client_id=4
+2026-07-03T19:44:51.526852Z  INFO herdr::server::headless: client disconnected client_id=4
+2026-07-03T19:44:54.824181Z  INFO herdr::server::headless: client connected client_id=6 cols=171 rows=46 cell_width_px=0 cell_height_px=0 render_encoding=SemanticFrame
+2026-07-03T19:44:58.654572Z  INFO herdr::pane: agent changed pane=3 previous_agent=Some(OpenCode) agent=None pgid=Some(11133)
+2026-07-03T19:45:16.343440Z  INFO herdr::server::headless: client detach requested via keybind client_id=6
+2026-07-03T19:45:16.345351Z  INFO herdr::server::headless: client disconnected client_id=6
+2026-07-03T19:45:18.438075Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/Users/christian/.config/herdr/session.json workspaces=1
+2026-07-03T19:52:43.266877Z  INFO herdr::logging: checking for updates event="update.check.start" subsystem="update" outcome="started"
+2026-07-03T19:52:46.361251Z  INFO herdr::logging: pane child exited event="pane.exit" subsystem="pane" outcome="completed" pane_id=3 status="ExitStatus { code: 1, signal: None }"
+2026-07-03T19:52:46.383040Z  INFO herdr::pane: pane session terminated pane=3 pid=11133 signal=Hangup
+2026-07-03T19:52:46.383463Z  WARN herdr::app::actions: PaneDied for unknown pane pane=3
+2026-07-03T22:01:47.981784Z  INFO herdr::logging: checking for updates event="update.check.start" subsystem="update" outcome="started"
+2026-07-03T22:31:47.876896Z  INFO herdr::logging: checking for updates event="update.check.start" subsystem="update" outcome="started"

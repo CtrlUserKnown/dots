@@ -1,0 +1,123 @@
+.TH DOTS 1 "2026-07" "dots" "User Commands"
+.SH NAME
+dots \- dotfiles manager
+.SH SYNOPSIS
+.B dots
+[\fIOPTION\fR]
+.SH DESCRIPTION
+.B dots
+is an interactive TUI and CLI for managing the CtrlUserKnown dotfiles environment.
+Without options it opens the curses menu. Flags bypass the TUI and run a specific
+operation directly.
+.SH OPTIONS
+.TP
+.BR \-v ", " \-\-version
+Print the current dotfiles version and exit.
+.TP
+.B \-\-docs
+Open this man page.
+.TP
+.B \-\-health
+Print a dependency status table for all required and optional tools, then exit.
+Non-zero exit code when anything is missing.
+.TP
+.B \-\-check\-deps
+Alias for \fB\-\-health\fR.
+.TP
+.B \-\-install\-deps
+Install any missing \fBrequired\fR packages via the system package manager
+(Homebrew, dnf, or apt).
+.TP
+.B \-\-install\-optional
+Install any missing \fBoptional\fR packages.
+.TP
+.B \-\-install\-dev
+Install any missing \fBdev\fR packages.
+.TP
+.B \-\-repair\-symlinks
+Re-create all managed symlinks under \fI~/.config/\fR and \fI~/.zshrc\fR.
+Moves conflicting regular files to date-stamped backups.
+.TP
+.B \-\-dev\-mode\ \fI<on|off>\fR
+Enable or disable developer mode, which unlocks additional TUI options (Edit
+Configs, Add Alias, Git, Logs, Reset).
+.TP
+.B \-\-set\ \fIkey=value\fR
+Write a setting directly to the settings file without opening the TUI.
+.TP
+.B \-\-theme\ \fIname\fR
+Set the Ghostty terminal theme to \fIname\fR without opening the TUI.
+.SH TUI KEYS
+.SS Main menu
+.TP
+.B j / k
+Navigate down / up.
+.TP
+.B enter
+Select the highlighted item.
+.TP
+.B q
+Quit.
+.SS Session list (ssm)
+.TP
+.B j / k
+Navigate.
+.TP
+.B gg / G
+Jump to top / bottom.
+.TP
+.B enter
+Connect to the selected session.
+.TP
+.B a
+Add a new session.
+.TP
+.B e
+Edit the selected session.
+.TP
+.B d
+Delete the selected session.
+.TP
+.B u
+Check for dotfiles updates.
+.TP
+.B q
+Quit.
+.SH FILES
+.TP
+.I ~/.config/zsh/dots.py
+Main TUI and CLI script (symlinked from the repo).
+.TP
+.I ~/.config/zsh/ssm.py
+SSH Session Manager TUI (symlinked from the repo).
+.TP
+.I ~/.config/zsh/.aliases
+Custom shell aliases.
+.TP
+.I ~/.config/ghostty/config
+Ghostty terminal configuration and active theme.
+.TP
+.I ~/.config/ssm/sessions.json
+Stored SSH sessions (plain text, contains passwords if set).
+.TP
+.I ~/.dots/.settings
+dots settings (JSON): update_check, greeting, update_frequency, theme.
+.TP
+.I ~/.config/zsh/.update_stamp
+Unix timestamp of the last background update check.
+.SH ENVIRONMENT
+.TP
+.B DOTS_VERSION
+Version string injected by the \fBdots\fR shell function.
+Set automatically from the latest git tag.
+.TP
+.B DOTFILES_VERSION
+Source of truth for the version, derived at shell startup via
+.I git describe \-\-tags.
+.SH AUTHOR
+CtrlUserKnown
+.SH SEE ALSO
+.BR zsh (1),
+.BR ssh (1),
+.BR herdr (1),
+.BR git (1)
