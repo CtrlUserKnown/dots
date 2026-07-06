@@ -95,16 +95,6 @@ if [[ -z "${DEVELOPER_MODE:-}" ]]; then
     [[ -f "${HOME}/.dots/.developer" ]] && typeset -g DEVELOPER_MODE=1
 fi
 
-# --- config:herdr ---
-# Auto-launch herdr when SSH'd in. HERDR_AUTOSTART guards against re-entry in herdr's child shells.
-if [[ $- == *i* && -n "${SSH_CLIENT:-}${SSH_TTY:-}" && -z "${HERDR_AUTOSTART:-}" ]]; then
-    if command -v herdr >/dev/null 2>&1; then
-        export HERDR_AUTOSTART=1
-        herdr
-        exit
-    fi
-fi
-
 # --- config:update check ---
 # checks daily for dotfiles updates (skipped in developer mode)
 if [[ -f ~/.config/zsh/update-check.zsh ]]; then
