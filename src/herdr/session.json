@@ -4,11 +4,12 @@
     {
       "id": "w2",
       "custom_name": null,
-      "identity_cwd": "/Users/christian",
+      "identity_cwd": "/Users/christian/development/ctrlvim/ctrlvim/src/nvim",
       "public_pane_numbers": {
-        "1": 1
+        "1": 1,
+        "2": 4
       },
-      "next_public_pane_number": 4,
+      "next_public_pane_number": 5,
       "public_tab_numbers": [
         1
       ],
@@ -17,15 +18,27 @@
         {
           "custom_name": null,
           "layout": {
-            "Pane": 1
+            "Split": {
+              "direction": "Horizontal",
+              "ratio": 0.5,
+              "first": {
+                "Pane": 1
+              },
+              "second": {
+                "Pane": 2
+              }
+            }
           },
           "panes": {
             "1": {
-              "cwd": "/Users/christian"
+              "cwd": "/Users/christian/development/ctrlvim/ctrlvim/src/nvim"
+            },
+            "2": {
+              "cwd": "/Users/christian/development/ctrlvim/ctrlvim/src"
             }
           },
           "zoomed": false,
-          "focused": 1,
+          "focused": 2,
           "root_pane": 1
         }
       ],
