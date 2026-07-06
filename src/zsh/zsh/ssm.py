@@ -179,7 +179,8 @@ def run_update_view(stdscr) -> None:
                         curses.color_pair(COLOR_DIM))
             draw_footer(stdscr, "")
             stdscr.refresh()
-            behind, up_ver = check_upstream(DOTS_DIR)
+            dev = (DOTS_DIR / ".developer").exists()
+            behind, up_ver = check_upstream(DOTS_DIR, dev_mode=dev)
             if behind == -1:
                 state = "error"
             elif behind == 0:
@@ -197,9 +198,12 @@ def run_update_view(stdscr) -> None:
                 return
 
         elif state == "available":
-            lines = [f"  {behind} new commit(s) available."]
-            if up_ver:
-                lines.append(f"  New version: v{up_ver}")
+            if dev:
+                lines = [f"  {behind} new commit(s) on origin (latest: {up_ver})"]
+            else:
+                lines = [f"  {behind} new commit(s) available."]
+                if up_ver:
+                    lines.append(f"  New version: v{up_ver}")
             lines += ["", "  Press p to pull, or q to skip."]
             for i, line in enumerate(lines):
                 safe_addstr(stdscr, 2 + i, 0, line)

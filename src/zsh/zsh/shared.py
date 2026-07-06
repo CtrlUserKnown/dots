@@ -78,27 +78,39 @@ def clamp(val: int, lo: int, hi: int) -> int:
 
 # ── update check ──────────────────────────────────────────────────────────────
 
-def check_upstream(dots_dir: Path) -> tuple[int, str]:
-    """Fetch upstream and return (commits_behind, upstream_version). -1 = error."""
+def check_upstream(dots_dir: Path, dev_mode: bool = False) -> tuple[int, str]:
+    """Fetch upstream and return (commits_behind, label). -1 = error.
+
+    Normal mode: label is the latest release tag (semver string).
+    Dev mode:    label is the short SHA of the latest origin commit.
+    """
     if not (dots_dir / ".git").exists():
         return -1, ""
     try:
-        subprocess.run(
-            ["git", "-C", str(dots_dir), "fetch", "--depth", "1", "--tags", "origin"],
-            capture_output=True, timeout=15,
-        )
+        fetch_args = ["git", "-C", str(dots_dir), "fetch", "--depth", "1", "origin"]
+        if not dev_mode:
+            fetch_args.append("--tags")
+        subprocess.run(fetch_args, capture_output=True, timeout=15)
+
         r = subprocess.run(
             ["git", "-C", str(dots_dir), "rev-list", "--count", "HEAD..origin/HEAD"],
             capture_output=True, text=True, timeout=5,
         )
         behind = int(r.stdout.strip() or "0")
-        ver    = ""
+        label  = ""
         if behind:
-            rv = subprocess.run(
-                ["git", "-C", str(dots_dir), "describe", "--tags", "--abbrev=0", "origin/HEAD"],
-                capture_output=True, text=True, timeout=5,
-            )
-            ver = rv.stdout.strip().lstrip("v")
-        return behind, ver
+            if dev_mode:
+                rv = subprocess.run(
+                    ["git", "-C", str(dots_dir), "rev-parse", "--short", "origin/HEAD"],
+                    capture_output=True, text=True, timeout=5,
+                )
+                label = rv.stdout.strip()
+            else:
+                rv = subprocess.run(
+                    ["git", "-C", str(dots_dir), "describe", "--tags", "--abbrev=0", "origin/HEAD"],
+                    capture_output=True, text=True, timeout=5,
+                )
+                label = rv.stdout.strip().lstrip("v")
+        return behind, label
     except Exception:
         return -1, ""

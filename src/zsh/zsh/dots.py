@@ -750,7 +750,8 @@ def run_check_updates_view(stdscr) -> None:
                         curses.color_pair(COLOR_DIM))
             draw_footer(stdscr, "")
             stdscr.refresh()
-            behind, up_ver = check_upstream(DOTS_DIR)
+            dev = is_dev_mode()
+            behind, up_ver = check_upstream(DOTS_DIR, dev_mode=dev)
             if behind == -1:
                 state = "error"
                 msg   = "Could not check for updates (offline or not a git repo)."
@@ -762,7 +763,9 @@ def run_check_updates_view(stdscr) -> None:
         elif state == "uptodate":
             safe_addstr(stdscr, 2, 2, "✓  No updates found. You're up to date!",
                         curses.color_pair(COLOR_SELECT) | curses.A_BOLD)
-            if VERSION:
+            if dev and VERSION:
+                safe_addstr(stdscr, 3, 2, f"  Current commit: {VERSION} (dev mode)")
+            elif VERSION:
                 safe_addstr(stdscr, 3, 2, f"  Current version: v{VERSION}")
             draw_footer(stdscr, "  q back ")
             stdscr.refresh()
@@ -770,8 +773,11 @@ def run_check_updates_view(stdscr) -> None:
                 return
 
         elif state == "available":
-            lines = [f"  Update available: v{VERSION} → v{up_ver}" if VERSION
-                     else f"  Update available (v{up_ver})"]
+            if dev:
+                lines = [f"  {behind} new commit(s) on origin (latest: {up_ver})"]
+            else:
+                lines = [f"  Update available: v{VERSION} → v{up_ver}" if VERSION
+                         else f"  Update available (v{up_ver})"]
             lines += ["", "  Press 'y' to update, any other key to skip."]
             for i, line in enumerate(lines):
                 safe_addstr(stdscr, 2 + i, 0, line)
@@ -1443,20 +1449,26 @@ if __name__ == "__main__":
         print(f"  Developer mode: {'ON' if is_dev_mode() else 'OFF'}")
     elif "--set" in sys.argv:
         i = sys.argv.index("--set")
-        if i + 1 < len(sys.argv) and "=" in sys.argv[i + 1]:
-            k, v = sys.argv[i + 1].split("=", 1)
-            _BOOL_MAP = {"true": True, "false": False, "1": True, "0": False}
-            def _coerce(val: str):
-                if val.lower() in _BOOL_MAP:
-                    return _BOOL_MAP[val.lower()]
-                try:
-                    return int(val)
-                except ValueError:
-                    return val
-            s = load_settings()
-            s[k] = _coerce(v)
-            save_settings(s)
-            print(f"  Set {k} = {s[k]}")
+        _VALID_KEYS = set(_DEFAULT_SETTINGS) | {"theme"}
+        if i + 1 >= len(sys.argv) or "=" not in sys.argv[i + 1]:
+            print("error: --set requires key=value", file=sys.stderr)
+            sys.exit(1)
+        k, v = sys.argv[i + 1].split("=", 1)
+        if k not in _VALID_KEYS:
+            print(f"error: unknown setting '{k}'. Valid keys: {', '.join(sorted(_VALID_KEYS))}", file=sys.stderr)
+            sys.exit(1)
+        _BOOL_MAP = {"true": True, "false": False, "1": True, "0": False}
+        def _coerce(val: str):
+            if val.lower() in _BOOL_MAP:
+                return _BOOL_MAP[val.lower()]
+            try:
+                return int(val)
+            except ValueError:
+                return val
+        s = load_settings()
+        s[k] = _coerce(v)
+        save_settings(s)
+        print(f"  Set {k} = {s[k]}")
     elif "--theme" in sys.argv:
         i = sys.argv.index("--theme")
         if i + 1 < len(sys.argv):
