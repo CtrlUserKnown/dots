@@ -1,5 +1,5 @@
 # Dotfiles update check
-# dotfiles v1.5.4
+# dotfiles v1.5.5
 # Sources from .zshrc — periodically checks for upstream changes.
 # Controlled by ~/.dots/.settings (update_check, update_frequency).
 

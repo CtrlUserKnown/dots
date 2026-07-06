@@ -1,5 +1,5 @@
 # CtrlUserKnown zshrc configuration file
-# dotfiles v1.5.4
+# dotfiles v1.5.5
 # date created: 10.14.2025
 
 # Derived from the latest git tag — no manual version bumping needed

@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.5] - 2026-07-05
+
+### Added
+- Dev-mode support for update checking: `check_upstream` accepts `dev_mode` param; fetches without `--tags` in dev mode, returns short SHA instead of release tag
+- Python syntax check and test-python job in CI workflow
+- Settings key validation in `dots.py --set` — unknown keys are now rejected with a friendly error
+
+### Changed
+- `dots.py` / `ssm.py`: update views show commit info instead of version when in dev mode
+- `update-check.zsh`: split dev/normal update paths; skip version stamp and upgrade notices in dev mode; dev mode prompt shows commit count and SHA
+- Bumped all `# dotfiles v` version headers to v1.5.5
+
 ## [1.5.0] - 2026-06-28
 
 ### Added
