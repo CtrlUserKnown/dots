@@ -1,4 +1,6 @@
-# CtrlUserKnown Dots
+<p align="center">
+  <img src="img/svg/dots_logo_color_title.svg" alt="dots" width="180" />
+</p>
 
 A professional, performance-oriented macOS development environment. This repository automates the setup of a modern terminal workflow using Homebrew, Zsh, and Ghostty.
 
