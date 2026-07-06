@@ -379,6 +379,17 @@ install_yt_dlp() {
     fi
 }
 
+# Install keyring for secure SSM password storage
+install_keyring() {
+    if python3 -c "import keyring" 2>/dev/null; then
+        echo "✅ keyring already installed"
+    else
+        run_with_spinner "Installing keyring..." \
+            pip3 install --user keyring || \
+            echo "⚠️ keyring failed to install — SSM passwords will fall back to plaintext storage"
+    fi
+}
+
 # --- shared installers ---
 
 install_fzf_tab() {
@@ -810,6 +821,9 @@ EOF
     # --- packages:opencode ---
     install_opencode
     install_opencode_config_deps
+
+    # --- packages:keyring ---
+    install_keyring
 
     # --- packages:personal ---
     if [ -n "$PERSONAL_PKG_FILE" ] && [ -f "$PERSONAL_PKG_FILE" ]; then

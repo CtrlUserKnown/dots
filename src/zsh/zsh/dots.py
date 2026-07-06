@@ -12,9 +12,19 @@ import sys
 from pathlib import Path
 from typing import Any, NamedTuple, Optional
 
-DOTS_DIR     = Path(__file__).resolve().parents[3]
+from shared import (
+    DOTS_DIR, COLOR_HEADER, COLOR_SELECT, COLOR_ERROR, COLOR_DIM,
+    init_colors, safe_addstr, draw_header as _draw_header, draw_footer, draw_desc,
+    clamp, check_upstream,
+)
+
 SETTINGS_FILE = DOTS_DIR / ".settings"
 VERSION       = os.environ.get("DOTS_VERSION", "")
+
+
+def draw_header(win, title: str) -> None:
+    _draw_header(win, title, VERSION)
+
 
 VERSION_STAMP = Path.home() / ".config" / "zsh" / ".version_stamp"
 CHECK_ACTION  = "__check_updates__"
@@ -220,69 +230,6 @@ def build_menu(dev: bool) -> list[tuple]:
         ("SSM",      SSM_ACTION,      "SSH session manager — install & configure herdr"),
         ("Settings", SETTINGS_ACTION, "configure dots preferences"),
     ] + dev_items
-
-# ── colors ────────────────────────────────────────────────────────────────────
-
-COLOR_HEADER = 1
-COLOR_SELECT = 2
-COLOR_ERROR  = 3
-COLOR_DIM    = 4
-
-
-def init_colors() -> None:
-    curses.use_default_colors()
-    curses.init_pair(COLOR_HEADER, curses.COLOR_CYAN,   -1)
-    curses.init_pair(COLOR_SELECT, curses.COLOR_GREEN,  -1)
-    curses.init_pair(COLOR_ERROR,  curses.COLOR_RED,    -1)
-    curses.init_pair(COLOR_DIM,    curses.COLOR_YELLOW, -1)
-
-
-# ── drawing helpers ───────────────────────────────────────────────────────────
-
-def safe_addstr(win, y: int, x: int, text: str, attr: int = 0) -> None:
-    h, w = win.getmaxyx()
-    if y < 0 or y >= h or x < 0 or x >= w:
-        return
-    max_len = w - x - 1
-    if max_len <= 0:
-        return
-    try:
-        win.addstr(y, x, text[:max_len], attr)
-    except curses.error:
-        pass
-
-
-def draw_header(win, title: str) -> None:
-    _, w = win.getmaxyx()
-    attr = curses.color_pair(COLOR_HEADER) | curses.A_BOLD
-    ver  = f" v{VERSION} " if VERSION else ""
-    line = ["─"] * w
-    for i, ch in enumerate(title):
-        if 4 + i < w:
-            line[4 + i] = ch
-    if ver:
-        vx = max(4 + len(title), w - len(ver) - 2)
-        for i, ch in enumerate(ver):
-            if vx + i < w:
-                line[vx + i] = ch
-    safe_addstr(win, 0, 0, "".join(line), attr)
-
-
-def draw_footer(win, hint: str) -> None:
-    h, w = win.getmaxyx()
-    safe_addstr(win, h - 3, 0, "─" * w, curses.color_pair(COLOR_HEADER))
-    safe_addstr(win, h - 2, 0, hint[:w - 1], curses.color_pair(COLOR_DIM))
-
-
-def draw_desc(win, text: str, flash: str = "") -> None:
-    h, _ = win.getmaxyx()
-    if flash:
-        safe_addstr(win, h - 4, 2, flash,
-                    curses.color_pair(COLOR_SELECT) | curses.A_BOLD)
-    else:
-        safe_addstr(win, h - 4, 2, "›", curses.color_pair(COLOR_DIM))
-        safe_addstr(win, h - 4, 4, text,
-                    curses.color_pair(COLOR_HEADER) | curses.A_BOLD)
 
 
 def show_message(stdscr, title: str, lines: list[str]) -> None:
@@ -568,32 +515,6 @@ def set_ghostty_theme(name: str) -> bool:
 # ── update check helpers ──────────────────────────────────────────────────────
 
 
-def check_upstream() -> tuple[int, str]:
-    """Fetch upstream and return (commits_behind, upstream_version). -1 = error."""
-    if not (DOTS_DIR / ".git").exists():
-        return -1, ""
-    try:
-        subprocess.run(
-            ["git", "-C", str(DOTS_DIR), "fetch", "--depth", "1", "--tags", "origin"],
-            capture_output=True, timeout=15,
-        )
-        r = subprocess.run(
-            ["git", "-C", str(DOTS_DIR), "rev-list", "--count", "HEAD..origin/HEAD"],
-            capture_output=True, text=True, timeout=5,
-        )
-        behind = int(r.stdout.strip() or "0")
-        ver = ""
-        if behind:
-            rv = subprocess.run(
-                ["git", "-C", str(DOTS_DIR), "describe", "--tags", "--abbrev=0", "origin/HEAD"],
-                capture_output=True, text=True, timeout=5,
-            )
-            ver = rv.stdout.strip().lstrip("v")
-        return behind, ver
-    except Exception:
-        return -1, ""
-
-
 def do_pull() -> tuple[bool, str]:
     """Fast-forward pull + symlink repair. Returns (ok, new_version_or_msg)."""
     try:
@@ -627,7 +548,7 @@ def do_pull() -> tuple[bool, str]:
 # ── health view ───────────────────────────────────────────────────────────────
 
 def run_health_view(stdscr) -> None:
-    flash = ""
+    flash: tuple | None = None
     idx   = 0  # navigable item index
 
     while True:
@@ -723,7 +644,7 @@ def run_health_view(stdscr) -> None:
         hints.append("q back")
         draw_footer(stdscr, " j/k navigate  " + "  ".join(hints))
         stdscr.refresh()
-        flash = ""
+        flash = None
 
         key = stdscr.getch()
         if key in (ord("q"), ord("Q"), 27):
@@ -741,7 +662,7 @@ def run_health_view(stdscr) -> None:
             parts = []
             if rep: parts.append(f"{rep} repaired")
             if skp: parts.append(f"{skp} skipped")
-            flash = "  ".join(parts)
+            flash = ("  ".join(parts), COLOR_SELECT)
         elif key == ord("i") and any_missing_tools:
             missing = [d for d in DEPS
                        if d.category in ("required", "optional") and not check_dep(d)]
@@ -751,7 +672,7 @@ def run_health_view(stdscr) -> None:
 # ── theme view ────────────────────────────────────────────────────────────────
 
 def run_theme_view(stdscr) -> None:
-    flash    = ""
+    flash: tuple | None = None
     themes   = list_ghostty_themes()
     current  = get_current_theme()
 
@@ -794,7 +715,7 @@ def run_theme_view(stdscr) -> None:
         draw_desc(stdscr, f"enter to apply  current: {current}", flash)
         draw_footer(stdscr, " j/k navigate  enter apply  q back")
         stdscr.refresh()
-        flash = ""
+        flash = None
 
         key = stdscr.getch()
         if key in (ord("q"), ord("Q"), 27):
@@ -807,9 +728,9 @@ def run_theme_view(stdscr) -> None:
             name = themes[idx]
             if set_ghostty_theme(name):
                 current = name
-                flash   = f"  ✓ Theme set to {name} — restart Ghostty to apply"
+                flash   = (f"  ✓ Theme set to {name} — restart Ghostty to apply", COLOR_SELECT)
             else:
-                flash = "  ✗ Could not write to ghostty config"
+                flash = ("  ✗ Could not write to ghostty config", COLOR_ERROR)
 
 
 # ── check for updates view ────────────────────────────────────────────────────
@@ -829,7 +750,7 @@ def run_check_updates_view(stdscr) -> None:
                         curses.color_pair(COLOR_DIM))
             draw_footer(stdscr, "")
             stdscr.refresh()
-            behind, up_ver = check_upstream()
+            behind, up_ver = check_upstream(DOTS_DIR)
             if behind == -1:
                 state = "error"
                 msg   = "Could not check for updates (offline or not a git repo)."
@@ -975,7 +896,7 @@ def run_settings_view(stdscr) -> None:
 # ── dev packages view ─────────────────────────────────────────────────────────
 
 def run_personal_view(stdscr):
-    flash  = ""
+    flash: tuple | None = None
     idx    = 0
     offset = 0
     pkgs   = [d for d in DEPS if d.category == "dev"]
@@ -1015,7 +936,7 @@ def run_personal_view(stdscr):
                else " j/k navigate  all installed  q back"
         draw_footer(stdscr, hint)
         stdscr.refresh()
-        flash = ""
+        flash = None
 
         key = stdscr.getch()
         if key in (ord("q"), ord("Q"), 27):
@@ -1076,7 +997,7 @@ def _read_field(stdscr, prompt: str, row: int) -> str:
 
 
 def run_add_alias_view(stdscr) -> None:
-    flash = ""
+    flash: tuple | None = None
     while True:
         stdscr.erase()
         h, w = stdscr.getmaxyx()
@@ -1104,7 +1025,7 @@ def run_add_alias_view(stdscr) -> None:
                 line += f"  # {desc}"
             with aliases_path.open("a") as f:
                 f.write(f"\n{line}\n")
-            flash = f"  ✓ Added: {line}"
+            flash = (f"  ✓ Added: {line}", COLOR_SELECT)
             show_message(stdscr, " add alias ", [
                 f"  Added: alias {name}=\"{command}\"",
                 "",
@@ -1112,7 +1033,7 @@ def run_add_alias_view(stdscr) -> None:
             ])
             return
         except Exception as e:
-            flash = f"  ✗ Failed: {e}"
+            flash = (f"  ✗ Failed: {e}", COLOR_ERROR)
 
 
 # ── git view (dev) ────────────────────────────────────────────────────────────
@@ -1264,7 +1185,7 @@ def run_aliases_view(stdscr) -> None:
 
 def run_ssm_view(stdscr):
     herdr_dep = next(d for d in DEPS if d.bin == "herdr")
-    flash = ""
+    flash: tuple | None = None
 
     while True:
         installed = check_dep(herdr_dep)
@@ -1303,7 +1224,7 @@ def run_ssm_view(stdscr):
                     curses.color_pair(COLOR_DIM))
 
         draw_desc(stdscr, "", flash)
-        flash = ""
+        flash = None
 
         hints = []
         if not installed:
@@ -1323,7 +1244,7 @@ def run_ssm_view(stdscr):
         elif key == ord("h") and installed:
             cfg["use_herdr"] = not use_herdr
             save_ssm_config(cfg)
-            flash = f"  herdr mode {'ON' if not use_herdr else 'OFF'}"
+            flash = (f"  herdr mode {'ON' if not use_herdr else 'OFF'}", COLOR_SELECT)
         elif key == ord("s") and installed:
             return ("launch_ssm", None)
 
@@ -1524,10 +1445,18 @@ if __name__ == "__main__":
         i = sys.argv.index("--set")
         if i + 1 < len(sys.argv) and "=" in sys.argv[i + 1]:
             k, v = sys.argv[i + 1].split("=", 1)
+            _BOOL_MAP = {"true": True, "false": False, "1": True, "0": False}
+            def _coerce(val: str):
+                if val.lower() in _BOOL_MAP:
+                    return _BOOL_MAP[val.lower()]
+                try:
+                    return int(val)
+                except ValueError:
+                    return val
             s = load_settings()
-            s[k] = v
+            s[k] = _coerce(v)
             save_settings(s)
-            print(f"  Set {k} = {v}")
+            print(f"  Set {k} = {s[k]}")
     elif "--theme" in sys.argv:
         i = sys.argv.index("--theme")
         if i + 1 < len(sys.argv):

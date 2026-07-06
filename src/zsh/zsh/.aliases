@@ -23,7 +23,7 @@ alias spt="swift package test"
 alias jv="java"
 alias jc="javac"
 alias rn="rustc"
-alias cr="cargo run"
+alias crun="cargo run"
 
 # --- alias:alias ---
 alias lz="lazygit"      # git TUI

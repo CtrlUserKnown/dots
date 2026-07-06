@@ -9,12 +9,60 @@ import subprocess
 import sys
 from pathlib import Path
 
+from shared import (
+    DOTS_DIR, COLOR_HEADER, COLOR_SELECT, COLOR_ERROR, COLOR_DIM,
+    init_colors, safe_addstr, draw_header as _draw_header, draw_footer, draw_desc,
+    clamp, check_upstream,
+)
+
 SESSIONS_FILE = Path.home() / ".config" / "ssm" / "sessions.json"
 CONFIG_FILE   = Path.home() / ".config" / "ssm" / "config.json"
-DOTS_DIR      = Path(__file__).resolve().parents[3]
 VERSION       = os.environ.get("DOTS_VERSION", "")
 
-# TODO: passwords are stored in plaintext in sessions.json — could be an issue
+SSM_KNOWN_HOSTS = Path.home() / ".config" / "ssm" / "known_hosts"
+
+
+def draw_header(win, title: str) -> None:
+    _draw_header(win, title, VERSION)
+
+
+# ── keyring ───────────────────────────────────────────────────────────────────
+
+try:
+    import keyring as _keyring_mod
+    _KEYRING = True
+except ImportError:
+    _KEYRING = False
+
+_KR_SERVICE = "dots-ssm"
+
+
+def _kr_store(name: str, password: str) -> bool:
+    if not _KEYRING or not password:
+        return False
+    try:
+        _keyring_mod.set_password(_KR_SERVICE, name, password)
+        return True
+    except Exception:
+        return False
+
+
+def _kr_load(name: str) -> str:
+    if not _KEYRING:
+        return ""
+    try:
+        return _keyring_mod.get_password(_KR_SERVICE, name) or ""
+    except Exception:
+        return ""
+
+
+def _kr_delete(name: str) -> None:
+    if not _KEYRING:
+        return
+    try:
+        _keyring_mod.delete_password(_KR_SERVICE, name)
+    except Exception:
+        pass
 
 
 # ── config ────────────────────────────────────────────────────────────────────
@@ -43,14 +91,38 @@ def toggle_herdr(cfg: dict) -> dict:
 
 # ── storage ───────────────────────────────────────────────────────────────────
 
+def _save_sessions_raw(sessions: list) -> None:
+    """Write sessions to disk, stripping the password field."""
+    SESSIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    clean = [{k: v for k, v in s.items() if k != "password"} for s in sessions]
+    with open(SESSIONS_FILE, "w") as f:
+        json.dump(clean, f, indent=2)
+
+
 def load_sessions() -> list:
     if not SESSIONS_FILE.exists():
         return []
     try:
         with open(SESSIONS_FILE) as f:
-            return json.load(f)
+            data = json.load(f)
     except (json.JSONDecodeError, OSError):
         return []
+
+    migrated = False
+    sessions = []
+    for s in data:
+        s = dict(s)
+        plaintext_pw = s.pop("password", "")
+        if plaintext_pw and _KEYRING:
+            _kr_store(s["name"], plaintext_pw)
+            migrated = True
+        s["password"] = _kr_load(s["name"]) if _KEYRING else plaintext_pw
+        sessions.append(s)
+
+    if migrated:
+        _save_sessions_raw(sessions)
+
+    return sessions
 
 
 def sessions_mtime() -> float:
@@ -61,109 +133,19 @@ def sessions_mtime() -> float:
 
 
 def save_sessions(sessions: list) -> None:
-    SESSIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(SESSIONS_FILE, "w") as f:
-        json.dump(sessions, f, indent=2)
-
-
-# ── curses helpers ────────────────────────────────────────────────────────────
-
-COLOR_HEADER = 1
-COLOR_SELECT = 2
-COLOR_ERROR  = 3
-COLOR_DIM    = 4
-
-
-def init_colors() -> None:
-    curses.use_default_colors()
-    curses.init_pair(COLOR_HEADER, curses.COLOR_CYAN,   -1)
-    curses.init_pair(COLOR_SELECT, curses.COLOR_GREEN,  -1)
-    curses.init_pair(COLOR_ERROR,  curses.COLOR_RED,    -1)
-    curses.init_pair(COLOR_DIM,    curses.COLOR_YELLOW, -1)
-
-
-def clamp(val: int, lo: int, hi: int) -> int:
-    return max(lo, min(hi, val))
-
-
-def safe_addstr(win, y: int, x: int, text: str, attr: int = 0) -> None:
-    h, w = win.getmaxyx()
-    if y < 0 or y >= h or x < 0 or x >= w:
-        return
-    max_len = w - x - 1
-    if max_len <= 0:
-        return
-    try:
-        win.addstr(y, x, text[:max_len], attr)
-    except curses.error:
-        pass
-
-
-def draw_header(win, title: str) -> None:
-    _, w = win.getmaxyx()
-    attr = curses.color_pair(COLOR_HEADER) | curses.A_BOLD
-    ver  = f" v{VERSION} " if VERSION else ""
-    line = ["─"] * w
-    for i, ch in enumerate(title):
-        if 4 + i < w:
-            line[4 + i] = ch
-    if ver:
-        vx = max(4 + len(title), w - len(ver) - 2)
-        for i, ch in enumerate(ver):
-            if vx + i < w:
-                line[vx + i] = ch
-    safe_addstr(win, 0, 0, "".join(line), attr)
-
-
-def draw_footer(win, hint: str) -> None:
-    h, w = win.getmaxyx()
-    safe_addstr(win, h - 3, 0, "─" * w, curses.color_pair(COLOR_HEADER))
-    safe_addstr(win, h - 2, 0, hint[:w - 1], curses.color_pair(COLOR_DIM))
-
-
-def draw_desc(win, text: str, flash: tuple[str, int] | None = None) -> None:
-    """Desc row at h-4. flash is (message, COLOR_* id) or None."""
-    h, _ = win.getmaxyx()
-    if flash and flash[0]:
-        safe_addstr(win, h - 4, 2, flash[0],
-                    curses.color_pair(flash[1]) | curses.A_BOLD)
+    if _KEYRING:
+        for s in sessions:
+            pw = s.get("password", "")
+            if pw:
+                _kr_store(s["name"], pw)
+        _save_sessions_raw(sessions)
     else:
-        safe_addstr(win, h - 4, 2, "›", curses.color_pair(COLOR_DIM))
-        safe_addstr(win, h - 4, 4, text,
-                    curses.color_pair(COLOR_HEADER) | curses.A_BOLD)
+        SESSIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(SESSIONS_FILE, "w") as f:
+            json.dump(sessions, f, indent=2)
 
 
 # ── update check ──────────────────────────────────────────────────────────────
-
-def _is_git_repo() -> bool:
-    return (DOTS_DIR / ".git").exists()
-
-
-def check_upstream() -> tuple[int, str]:
-    """Fetch and return (commits_behind, upstream_version). -1 = error."""
-    if not _is_git_repo():
-        return -1, ""
-    try:
-        subprocess.run(
-            ["git", "-C", str(DOTS_DIR), "fetch", "--depth", "1", "--tags", "origin"],
-            capture_output=True, timeout=15,
-        )
-        r = subprocess.run(
-            ["git", "-C", str(DOTS_DIR), "rev-list", "--count", "HEAD..origin/HEAD"],
-            capture_output=True, text=True, timeout=5,
-        )
-        behind = int(r.stdout.strip() or "0")
-        ver    = ""
-        if behind:
-            rv = subprocess.run(
-                ["git", "-C", str(DOTS_DIR), "describe", "--tags", "--abbrev=0", "origin/HEAD"],
-                capture_output=True, text=True, timeout=5,
-            )
-            ver = rv.stdout.strip().lstrip("v")
-        return behind, ver
-    except Exception:
-        return -1, ""
-
 
 def do_pull() -> bool:
     """Fast-forward pull + symlink repair. Returns True on success."""
@@ -197,7 +179,7 @@ def run_update_view(stdscr) -> None:
                         curses.color_pair(COLOR_DIM))
             draw_footer(stdscr, "")
             stdscr.refresh()
-            behind, up_ver = check_upstream()
+            behind, up_ver = check_upstream(DOTS_DIR)
             if behind == -1:
                 state = "error"
             elif behind == 0:
@@ -537,6 +519,7 @@ def run_tui(stdscr) -> tuple | None:
 
         elif key == ord("e"):
             if sessions:
+                old_name = sessions[idx].get("name", "")
                 result = run_form(stdscr, sessions[idx])
                 if result:
                     dup = any(
@@ -546,6 +529,8 @@ def run_tui(stdscr) -> tuple | None:
                     if dup:
                         flash = (f"  ✗ Name '{result['name']}' already exists", COLOR_ERROR)
                     else:
+                        if old_name and old_name != result["name"]:
+                            _kr_delete(old_name)
                         sessions[idx] = result
                         save_sessions(sessions)
                         last_mtime    = sessions_mtime()
@@ -561,6 +546,7 @@ def run_tui(stdscr) -> tuple | None:
                 stdscr.refresh()
                 c = stdscr.getch()
                 if c in (ord("y"), ord("Y")):
+                    _kr_delete(name)
                     sessions.pop(idx)
                     idx        = clamp(idx, 0, max(0, len(sessions) - 1))
                     save_sessions(sessions)
@@ -592,11 +578,11 @@ def do_connect(session: dict, cfg: dict) -> None:
             url = f"ssh://{user}@{host}" if port == 22 else f"ssh://{user}@{host}:{port}"
             result = subprocess.run(["herdr", "--remote", url])
         else:
-            # TODO: skipping host key verification could be an issue on untrusted networks
+            SSM_KNOWN_HOSTS.parent.mkdir(parents=True, exist_ok=True)
             ssh_opts   = [
                 "-p", str(port),
-                "-o", "StrictHostKeyChecking=no",
-                "-o", "UserKnownHostsFile=/dev/null",
+                "-o", "StrictHostKeyChecking=accept-new",
+                "-o", f"UserKnownHostsFile={SSM_KNOWN_HOSTS}",
                 "-o", "ConnectTimeout=5",
             ]
             ssh_target = [f"{user}@{host}"]

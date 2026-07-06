@@ -27,3 +27,6 @@ src/tmux/plugins/
 # ai
 CLAUDE.md
 **/CLAUDE.md
+
+# logs
+*.log
