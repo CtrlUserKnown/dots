@@ -515,7 +515,8 @@ install_charvim() {
     fi
 
     if [ -e "$nvim_link" ] || [ -L "$nvim_link" ]; then
-        local backup="${nvim_link}.bak.$(date +%Y%m%d_%H%M%S)"
+        local backup
+        backup="${nvim_link}.bak.$(date +%Y%m%d_%H%M%S)"
         mv "$nvim_link" "$backup"
         echo "✅ Backed up existing nvim config to $backup"
     fi
@@ -578,7 +579,7 @@ setup_ssm() {
             if command -v gum &> /dev/null; then
                 remote_host=$(gum input --placeholder "user@host  (e.g. userknown@192.168.12.38)")
             else
-                read -p "  Remote host (user@host): " remote_host
+                read -r -p "  Remote host (user@host): " remote_host
             fi
             if [ -n "$remote_host" ]; then
                 echo "🔧 Copying public key to $remote_host..."
@@ -716,7 +717,7 @@ EOF
                 read -p "  Generate/configure SSH key for passwordless auth? (Y/n) " -n 1 -r; echo
                 [[ ! $REPLY =~ ^[Nn]$ ]] && SETUP_SSH_KEY=true
             fi
-            read -p "Personal packages file path (press Enter to skip): " PERSONAL_PKG_FILE
+            read -r -p "Personal packages file path (press Enter to skip): " PERSONAL_PKG_FILE
             PERSONAL_PKG_FILE="${PERSONAL_PKG_FILE/#\~/$HOME}"
         fi
         echo ""
