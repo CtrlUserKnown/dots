@@ -10,6 +10,9 @@ DOTFILES_VERSION=$(git -C "${HOME}/.dots" describe --tags --abbrev=0 2>/dev/null
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
 
+# --- config:manpath ---
+export MANPATH="$HOME/.dots/src/man${MANPATH:+:$MANPATH}"
+
 # --- config:Homebrew ---
 # /opt/homebrew is apple silicon, /usr/local is intel
 if [[ -f "/opt/homebrew/bin/brew" ]]; then

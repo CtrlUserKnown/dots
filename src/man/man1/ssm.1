@@ -1,0 +1,252 @@
+.TH SSM 1 "July 2026" "dotfiles" "User Commands"
+.
+.SH NAME
+ssm \- SSH session manager
+.
+.SH SYNOPSIS
+.B ssm
+.br
+.B ssm
+.I name
+.br
+.B ssm
+.B \-c
+.IR user @ host \fR[\fB: \fIport \fR]
+.br
+.B ssm
+.B \-l
+.br
+.B ssm
+.B \-h
+.
+.SH DESCRIPTION
+.B ssm
+is a curses-based SSH session manager that stores connection profiles and
+connects to remote hosts via
+.BR herdr (1)
+or plain
+.BR ssh (1).
+.PP
+When invoked with no arguments it opens an interactive TUI for browsing,
+adding, editing, and connecting to saved sessions.
+When invoked with a session name or the
+.B \-c
+flag it connects immediately without opening the TUI.
+.
+.SH MODES
+.SS TUI mode
+Running
+.B ssm
+with no arguments opens the session list.
+Sessions are stored in
+.I ~/.config/ssm/sessions.json
+and display the name, host/IP, user, and port for each entry.
+.PP
+Press
+.B Enter
+on a selected session to connect.
+.SS CLI mode
+.TP
+.B ssm \fIname\fR
+Connect to the saved session whose name matches
+.IR name .
+An unambiguous prefix is accepted; an ambiguous prefix prints all matching
+names and exits with status 1.
+.TP
+.BI ssm\ \-c\  user @ host [: port ]
+Connect directly to
+.I host
+as
+.IR user ,
+optionally on
+.IR port ,
+without opening the TUI and without saving the connection.
+If
+.I user
+is omitted,
+.B root
+is used.
+If
+.I port
+is omitted, 22 is used.
+.
+.SH OPTIONS
+.TP
+.B \-c \fIuser@host\fR[\fB:\fIport\fR]
+Connect directly to a host without a saved session.
+.TP
+.B \-l
+Print all saved sessions in plain-text tabular form together with the
+current herdr mode, then exit.
+.TP
+.B \-h
+Print a usage summary and exit.
+.
+.SH TUI KEYS
+.SS Navigation
+.TP
+.BR j / k ", " \(da / \(ua
+Move selection down / up one row.
+.TP
+.B gg
+Jump to the first session.
+.TP
+.B G
+Jump to the last session (or to session number
+.I N
+when prefixed with a count).
+.TP
+.BR ^d / ^u
+Scroll half a page down / up.
+.TP
+.BR ^f / ^b
+Scroll a full page down / up.
+.SS Actions
+.TP
+.B Enter
+Connect to the selected session.
+.TP
+.B a
+Open the add-session form.
+.TP
+.B e
+Open the edit-session form for the selected session.
+.TP
+.B d
+Delete the selected session (prompts for confirmation).
+.TP
+.B h
+Toggle herdr mode on or off.
+The header label updates immediately and the setting is saved to
+.IR ~/.config/ssm/config.json .
+.TP
+.B u
+Open the update view to check for and apply dotfiles updates.
+.TP
+.BR q / Q / Esc
+Quit ssm.
+.SS Count prefix
+Most navigation keys accept an optional numeric count typed before the key.
+For example,
+.B 5j
+moves down five rows and
+.B 10G
+jumps to session ten.
+.
+.SH HERDR MODE
+When herdr mode is
+.B ON
+(the default),
+.B ssm
+connects using
+.IP
+.B herdr \-\-remote \fIssh://user@host\fR[\fB:\fIport\fR]
+.PP
+.BR herdr (1)
+installs a lightweight server on the remote host and attaches the session
+to herdr's multiplexer so it survives disconnection.
+Key-based SSH authentication is required on this path; passwords stored
+in the session profile are ignored.
+Use
+.BR ssh-copy-id (1)
+to authorize your public key on the remote before connecting.
+.PP
+When herdr mode is
+.B OFF
+.B ssm
+connects with plain
+.BR ssh (1).
+Sessions with a stored password use
+.BR sshpass (1)
+if it is installed
+.RB ( "brew install hudochenkov/sshpass/sshpass" ).
+.
+.SH ADD / EDIT FORM KEYS
+.TP
+.BR Tab / \(da
+Move to the next field.
+.TP
+.B \(ua
+Move to the previous field.
+.TP
+.B Enter
+Advance to the next field, or save on the last field.
+.TP
+.B Backspace
+Delete the last character in the current field.
+.TP
+.B Esc
+Cancel and return to the session list without saving.
+.
+.SH SESSION FIELDS
+.TP
+.B Name
+Unique label used to identify and address the session from the CLI.
+.TP
+.B Host/IP
+Hostname or IP address of the remote server.
+.TP
+.B User
+Remote login name (default:
+.BR root ).
+.TP
+.B Password
+Optional password, stored in plain text.
+Only used when herdr mode is
+.B OFF
+and
+.BR sshpass (1)
+is installed.
+.TP
+.B Port
+SSH port (default:
+.BR 22 ).
+Port is omitted from the herdr
+.B \-\-remote
+URL when it equals 22.
+.
+.SH FILES
+.TP
+.I ~/.config/ssm/sessions.json
+Saved session profiles.
+.TP
+.I ~/.config/ssm/config.json
+Persistent configuration.
+Currently stores a single key,
+.BR use_herdr ,
+which controls whether connections route through herdr.
+Defaults to
+.B true
+if the file does not exist or is unreadable.
+.
+.SH EXIT STATUS
+.TP
+.B 0
+Success, or clean quit from the TUI.
+.TP
+.B 1
+A named session was not found, a flag was invalid, or a required argument
+was missing.
+.
+.SH NOTES
+.B ssm
+disables host key checking
+.RB ( StrictHostKeyChecking=no )
+and suppresses the known-hosts file
+.RB ( UserKnownHostsFile=/dev/null )
+when connecting with plain SSH (herdr OFF).
+This is convenient on a trusted LAN but should not be used over untrusted
+networks.
+.PP
+Passwords are stored in plain text in
+.IR ~/.config/ssm/sessions.json .
+Restrict permissions on that file
+.RB ( "chmod 600 ~/.config/ssm/sessions.json" )
+or prefer key-based authentication and omit the password field.
+.
+.SH SEE ALSO
+.BR dots (1),
+.BR herdr (1),
+.BR ssh (1),
+.BR ssh-copy-id (1),
+.BR sshpass (1)

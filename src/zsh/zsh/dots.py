@@ -128,7 +128,24 @@ ALIASES_ACTION  = "__aliases__"
 RELOAD_ACTION   = "__reload__"
 LOGS_ACTION     = "__logs__"
 RESET_ACTION    = "__reset__"
+SSM_ACTION      = "__ssm__"
 SEPARATOR       = "__sep__"
+
+SSM_CONFIG_FILE = Path.home() / ".config" / "ssm" / "config.json"
+
+
+def load_ssm_config() -> dict:
+    try:
+        with open(SSM_CONFIG_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return {"use_herdr": True}
+
+
+def save_ssm_config(cfg: dict) -> None:
+    SSM_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(SSM_CONFIG_FILE, "w") as f:
+        json.dump(cfg, f, indent=2)
 
 # Config files exposed in dev mode → Edit Configs
 EDIT_CONFIGS = [
@@ -179,6 +196,7 @@ def build_menu(dev: bool) -> list[tuple]:
         ("Health",       HEALTH_ACTION,   "check symlinks, tools & plugins"),
         ("Theme",        THEME_ACTION,    "pick a terminal color theme"),
         ("Aliases",      ALIASES_ACTION,  "view custom shell aliases"),
+        ("SSM",          SSM_ACTION,      "SSH session manager — install & configure herdr"),
         ("Settings",     SETTINGS_ACTION, "configure dots preferences"),
         ("Developer",    DEV_ACTION,      "enable developer mode for advanced options"),
     ]
@@ -199,6 +217,7 @@ def build_menu(dev: bool) -> list[tuple]:
         ("Health",   HEALTH_ACTION,   "check symlinks, tools & plugins"),
         ("Theme",    THEME_ACTION,    "pick a terminal color theme"),
         ("Aliases",  ALIASES_ACTION,  "view custom shell aliases"),
+        ("SSM",      SSM_ACTION,      "SSH session manager — install & configure herdr"),
         ("Settings", SETTINGS_ACTION, "configure dots preferences"),
     ] + dev_items
 
@@ -1241,6 +1260,74 @@ def run_aliases_view(stdscr) -> None:
             idx = max(0, idx - 1)
 
 
+# ── ssm view ─────────────────────────────────────────────────────────────────
+
+def run_ssm_view(stdscr):
+    herdr_dep = next(d for d in DEPS if d.bin == "herdr")
+    flash = ""
+
+    while True:
+        installed = check_dep(herdr_dep)
+        cfg       = load_ssm_config()
+        use_herdr = cfg.get("use_herdr", True)
+
+        stdscr.erase()
+        h, w = stdscr.getmaxyx()
+        draw_header(stdscr, " ssm ")
+
+        # herdr row
+        sym  = "✓" if installed else "✗"
+        sc   = COLOR_SELECT if installed else COLOR_ERROR
+        safe_addstr(stdscr, 2, 2, sym,     curses.color_pair(sc) | curses.A_BOLD)
+        safe_addstr(stdscr, 2, 4, "herdr", curses.A_BOLD)
+        safe_addstr(stdscr, 2, 12,
+                    "installed" if installed else "not installed",
+                    curses.color_pair(sc))
+
+        # herdr mode row (only meaningful when installed)
+        if installed:
+            mode_str  = "ON" if use_herdr else "OFF"
+            mode_attr = curses.color_pair(COLOR_SELECT if use_herdr else COLOR_ERROR)
+            safe_addstr(stdscr, 3, 4, "mode",    curses.A_BOLD)
+            safe_addstr(stdscr, 3, 12, mode_str, mode_attr | curses.A_BOLD)
+
+        # info lines
+        safe_addstr(stdscr, 5, 4,
+                    "herdr --remote connects sessions through herdr's SSH transport.",
+                    curses.color_pair(COLOR_DIM))
+        safe_addstr(stdscr, 6, 4,
+                    "Key-based SSH auth is required (password sessions not supported).",
+                    curses.color_pair(COLOR_DIM))
+        safe_addstr(stdscr, 7, 4,
+                    "Run  ssh-copy-id user@host  to authorise your key on a server.",
+                    curses.color_pair(COLOR_DIM))
+
+        draw_desc(stdscr, "", flash)
+        flash = ""
+
+        hints = []
+        if not installed:
+            hints.append("i install herdr")
+        else:
+            hints.append("h toggle mode")
+            hints.append("s open ssm")
+        hints.append("q back")
+        draw_footer(stdscr, "  " + "  ".join(hints))
+        stdscr.refresh()
+
+        key = stdscr.getch()
+        if key in (ord("q"), ord("Q"), 27):
+            return None
+        elif key == ord("i") and not installed:
+            return ("install", [herdr_dep])
+        elif key == ord("h") and installed:
+            cfg["use_herdr"] = not use_herdr
+            save_ssm_config(cfg)
+            flash = f"  herdr mode {'ON' if not use_herdr else 'OFF'}"
+        elif key == ord("s") and installed:
+            return ("launch_ssm", None)
+
+
 # ── main TUI ──────────────────────────────────────────────────────────────────
 
 def run_tui(stdscr):
@@ -1314,6 +1401,10 @@ def run_tui(stdscr):
                 run_theme_view(stdscr)
             elif path == ALIASES_ACTION:
                 run_aliases_view(stdscr)
+            elif path == SSM_ACTION:
+                result = run_ssm_view(stdscr)
+                if result is not None:
+                    return result
             elif path == SETTINGS_ACTION:
                 run_settings_view(stdscr)
             elif path == DEV_ACTION:
@@ -1403,6 +1494,9 @@ def main() -> None:
                 input()
             except EOFError:
                 break
+        elif action == "launch_ssm":
+            ssm_py = DOTS_DIR / "src/zsh/zsh/ssm.py"
+            os.execvp("python3", ["python3", "-B", str(ssm_py)])
 
 
 if __name__ == "__main__":

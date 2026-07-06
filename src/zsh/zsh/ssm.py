@@ -622,6 +622,76 @@ def do_connect(session: dict, cfg: dict) -> None:
         input(f"\nConnection failed (exit {result.returncode}). Press Enter to return…")
 
 
+# ── cli helpers ───────────────────────────────────────────────────────────────
+
+def _parse_hostspec(spec: str) -> dict:
+    """Parse user@host[:port] into a minimal session dict."""
+    user = "root"
+    port = 22
+    if "@" in spec:
+        user, hostpart = spec.split("@", 1)
+    else:
+        hostpart = spec
+    if ":" in hostpart:
+        host, port_str = hostpart.rsplit(":", 1)
+        try:
+            port = int(port_str)
+        except ValueError:
+            print(f"ssm: invalid port in '{spec}'", file=sys.stderr)
+            sys.exit(1)
+    else:
+        host = hostpart
+    return {"host": host, "user": user, "port": port, "password": ""}
+
+
+def _cli_list() -> None:
+    sessions = load_sessions()
+    cfg      = load_config()
+    mode     = "herdr ON" if cfg.get("use_herdr", True) else "herdr OFF"
+    if not sessions:
+        print(f"No sessions saved.  [{mode}]")
+        return
+    print(f"  {'NAME':<20} {'HOST/IP':<24} {'USER':<12} PORT   [{mode}]")
+    print("  " + "─" * 64)
+    for s in sessions:
+        print(f"  {s.get('name',''):<20} {s.get('host',''):<24}"
+              f" {s.get('user','root'):<12} {s.get('port', 22)}")
+
+
+def _cli_connect_name(name: str) -> None:
+    sessions = load_sessions()
+    cfg      = load_config()
+    match    = next((s for s in sessions if s["name"] == name), None)
+    if not match:
+        # Fuzzy fallback: prefix match
+        matches = [s for s in sessions if s["name"].startswith(name)]
+        if len(matches) == 1:
+            match = matches[0]
+        elif len(matches) > 1:
+            names = ", ".join(s["name"] for s in matches)
+            print(f"ssm: '{name}' is ambiguous — matches: {names}", file=sys.stderr)
+            sys.exit(1)
+        else:
+            print(f"ssm: no session named '{name}'", file=sys.stderr)
+            sys.exit(1)
+    do_connect(match, cfg)
+
+
+def _cli_connect_direct(spec: str) -> None:
+    cfg     = load_config()
+    session = _parse_hostspec(spec)
+    do_connect(session, cfg)
+
+
+def _print_help() -> None:
+    print("usage:")
+    print("  ssm                       open TUI session manager")
+    print("  ssm <name>                connect to saved session by name")
+    print("  ssm -c user@host[:port]   connect directly to host")
+    print("  ssm -l                    list saved sessions")
+    print("  ssm -h                    show this help")
+
+
 # ── entry point ───────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -638,4 +708,20 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    _args = sys.argv[1:]
+    if not _args:
+        main()
+    elif _args[0] in ("-l", "--list"):
+        _cli_list()
+    elif _args[0] in ("-c", "--connect"):
+        if len(_args) < 2:
+            print("ssm: -c requires user@host[:port]", file=sys.stderr)
+            sys.exit(1)
+        _cli_connect_direct(_args[1])
+    elif _args[0] in ("-h", "--help"):
+        _print_help()
+    elif _args[0].startswith("-"):
+        print(f"ssm: unknown flag '{_args[0]}'  (try -h)", file=sys.stderr)
+        sys.exit(1)
+    else:
+        _cli_connect_name(_args[0])
