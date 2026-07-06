@@ -1,5 +1,5 @@
 # Fedora (dnf) package list
-# dotfiles v1.5.3
+# dotfiles v1.5.5
 #
 # Format:
 #   copr  "owner/repo"   — enable a Copr repository

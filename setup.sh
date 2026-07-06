@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # --- dotfiles install script ---
-# dotfiles v1.3.0
+# dotfiles v1.5.5
 # date created: 08.29.2025
 
 # --- charfile:start ---
