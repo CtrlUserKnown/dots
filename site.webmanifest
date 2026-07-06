@@ -1,0 +1,24 @@
+{
+  "name": "dots",
+  "short_name": "dots",
+  "description": "A personal macOS development environment. Automated setup, custom shell config, and a TUI for managing it all.",
+  "start_url": "/dots/",
+  "display": "standalone",
+  "background_color": "#1a1a1a",
+  "theme_color": "#1a1a1a",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "img/svg/dots_icon_color.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "img/svg/dots_favicons_color.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

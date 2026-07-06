@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Docs — dots</title>
+  <meta name="description" content="Documentation for dots: installation, usage, configuration, and more.">
+  <meta name="author" content="CtrlUserKnown">
+
+  <link rel="icon" href="img/svg/dots_icon_color.svg" type="image/svg+xml">
+  <link rel="alternate icon" href="img/svg/dots_favicons_color.svg">
+  <link rel="apple-touch-icon" href="img/svg/dots_favicons_color.svg">
+  <link rel="manifest" href="site.webmanifest">
+  <meta name="theme-color" content="#1a1a1a">
+
+  <meta property="og:title" content="Docs — dots">
+  <meta property="og:description" content="Documentation for dots: installation, usage, and configuration.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://ctrluserknown.github.io/dots/docs.html">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <nav class="nav" role="navigation" aria-label="Main navigation">
+    <div class="nav__inner">
+      <a href="index.html" class="nav__logo" aria-label="dots home">
+        <img src="img/svg/dots_logo_alt_color.svg" alt="dots" width="80" height="26">
+      </a>
+      <button class="nav__toggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="nav-menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <div class="nav__menu" id="nav-menu">
+        <ul class="nav__links" role="list">
+          <li><a href="index.html">Home</a></li>
+          <li><a href="about.html">About</a></li>
+          <li><a href="docs.html">Docs</a></li>
+          <li><a href="changelog.html">Changelog</a></li>
+        </ul>
+        <a href="https://github.com/CtrlUserKnown/dots" class="nav__github" target="_blank" rel="noopener noreferrer" aria-label="View on GitHub">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 2C6.477 2 2 6.477 2 12c0 4.419 2.865 8.166 6.839 9.489.5.09.682-.218.682-.484 0-.236-.009-.866-.013-1.7-2.782.602-3.369-1.34-3.369-1.34-.455-1.157-1.11-1.465-1.11-1.465-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.088 2.91.833.091-.647.349-1.086.635-1.337-2.22-.251-4.555-1.111-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.252-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.026A9.578 9.578 0 0 1 12 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.026 2.747-1.026.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.741 0 .269.18.579.688.481C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/>
+          </svg>
+          GitHub
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <main>
+    <div class="container docs-wrap">
+      <div class="docs-layout">
+
+        <!-- Sidebar -->
+        <aside class="docs-sidebar" aria-label="Documentation navigation">
+          <div class="sidebar-group">
+            <span class="sidebar-label">Getting started</span>
+            <nav class="sidebar-nav">
+              <a href="#requirements">Requirements</a>
+              <a href="#installation">Installation</a>
+              <a href="#project-structure">Project structure</a>
+            </nav>
+          </div>
+          <div class="sidebar-group">
+            <span class="sidebar-label">Usage</span>
+            <nav class="sidebar-nav">
+              <a href="#dots-command">dots command</a>
+              <a href="#ssm">SSM</a>
+              <a href="#aliases">Aliases</a>
+              <a href="#functions">Functions</a>
+            </nav>
+          </div>
+          <div class="sidebar-group">
+            <span class="sidebar-label">Configuration</span>
+            <nav class="sidebar-nav">
+              <a href="#packages">Package tiers</a>
+              <a href="#zsh-config">Zsh config</a>
+              <a href="#themes">Themes</a>
+              <a href="#auto-update">Auto-update</a>
+              <a href="#developer-mode">Developer mode</a>
+            </nav>
+          </div>
+          <div class="sidebar-group">
+            <span class="sidebar-label">Tools</span>
+            <nav class="sidebar-nav">
+              <a href="#fzf">fzf</a>
+              <a href="#bat">bat</a>
+            </nav>
+          </div>
+          <div class="sidebar-group">
+            <span class="sidebar-label">Other</span>
+            <nav class="sidebar-nav">
+              <a href="#testing">Testing</a>
+            </nav>
+          </div>
+        </aside>
+
+        <!-- Content -->
+        <article class="docs-content">
+
+          <section id="requirements">
+            <h2>Requirements</h2>
+            <p>Dots is built for macOS and tested on Apple Silicon. Intel Macs are supported but not the primary target.</p>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Requirement</th>
+                    <th>Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>macOS</td><td>12.0 (Monterey) or newer</td></tr>
+                  <tr><td>Architecture</td><td>Apple Silicon preferred, Intel supported</td></tr>
+                  <tr><td>Shell</td><td>Zsh (default since macOS 10.15)</td></tr>
+                  <tr><td>Internet</td><td>Required for initial setup</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="installation">
+            <h2>Installation</h2>
+            <p>Run this in your terminal to set up dots on a new machine:</p>
+            <pre><code>/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/CtrlUserKnown/dots/refs/heads/main/setup.sh)"</code></pre>
+
+            <p>Or clone and run manually:</p>
+            <pre><code>git clone https://github.com/CtrlUserKnown/dots ~/.dots
+~/.dots/setup.sh</code></pre>
+
+            <h3>What the setup script does</h3>
+            <ol>
+              <li>Checks your macOS version</li>
+              <li>Installs Homebrew and Gum if missing (with timeouts and fallbacks)</li>
+              <li>Prompts to install Ghostty, Neovim, optional tools, and dev packages</li>
+              <li>Installs required dependencies: eza, bat, fzf, fastfetch, zoxide</li>
+              <li>Creates all symlinks via <code>dots.py --repair-symlinks</code></li>
+            </ol>
+
+            <p>Each package install has a 120-second timeout so a single hanging dep won't block everything else.</p>
+          </section>
+
+          <section id="project-structure">
+            <h2>Project structure</h2>
+            <p>Configs live in <code>src/</code> organized by tool. The setup script symlinks them to the right locations.</p>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Path</th>
+                    <th>Contents</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td><code>src/zsh/</code></td><td>Zsh config, charModel theme, aliases, functions, dots.py, update-check</td></tr>
+                  <tr><td><code>src/ghostty/</code></td><td>Ghostty config and custom themes</td></tr>
+                  <tr><td><code>src/bat/</code></td><td>bat config and KnewPines color schemes</td></tr>
+                  <tr><td><code>src/fastfetch/</code></td><td>System info display config with crab ASCII art</td></tr>
+                  <tr><td><code>src/herdr/</code></td><td>herdr config with <code>allow_nested = true</code></td></tr>
+                  <tr><td><code>src/opencode/</code></td><td>opencode AI coding assistant config</td></tr>
+                  <tr><td><code>src/git/</code></td><td>Git config</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="dots-command">
+            <h2>dots command</h2>
+            <p><code>dots</code> opens the curses TUI. It's the main interface for managing the dotfiles install.</p>
+            <pre><code>dots          # open the TUI
+dots -v       # show version
+dots --health # run health check from the CLI</code></pre>
+
+            <h3>TUI menu items</h3>
+            <p>Menu items have numbered shortcuts (<code>1</code> through <code>9</code>). The available items depend on whether developer mode is active.</p>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>View</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>Health</td><td>Shows which tools are installed. Press Enter on a broken item to repair or install it in place.</td></tr>
+                  <tr><td>Theme</td><td>Pick from 200+ built-in Ghostty themes. Changes apply immediately.</td></tr>
+                  <tr><td>Settings</td><td>Toggle auto-updates, configure update frequency, trigger a manual update check.</td></tr>
+                  <tr><td>Aliases</td><td>Browse all aliases with section headers. Press Enter to copy the alias value to clipboard.</td></tr>
+                  <tr><td>Profile</td><td>Generate or import a personal config file with your settings, theme, and installed packages.</td></tr>
+                  <tr><td>Edit Configs <span class="badge badge-purple">dev</span></td><td>Open config files in your editor directly.</td></tr>
+                  <tr><td>Add Alias <span class="badge badge-purple">dev</span></td><td>Add a new alias interactively.</td></tr>
+                  <tr><td>Git <span class="badge badge-purple">dev</span></td><td>Run git operations on the dotfiles repo.</td></tr>
+                  <tr><td>View Logs <span class="badge badge-purple">dev</span></td><td>Browse update and install logs.</td></tr>
+                  <tr><td>Reset <span class="badge badge-purple">dev</span></td><td>Re-run the full setup or reset specific parts.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>CLI flags</h3>
+            <pre><code>dots --repair-symlinks    # re-create all symlinks
+dots --install-deps       # install required packages
+dots --install-optional   # install optional packages
+dots --install-dev        # install dev packages
+dots --set key=value      # update a setting from the CLI</code></pre>
+
+            <h3>Settings via --set</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Key</th>
+                    <th>Values</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td><code>update_check</code></td><td><code>true</code> / <code>false</code></td></tr>
+                  <tr><td><code>update_frequency</code></td><td>Minutes (60, 1440, 10080, etc.)</td></tr>
+                  <tr><td><code>greeting</code></td><td><code>true</code> / <code>false</code></td></tr>
+                  <tr><td><code>theme</code></td><td>Any Ghostty theme name</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="ssm">
+            <h2>SSM</h2>
+            <p>SSM is a TUI SSH session manager. Sessions are stored in <code>~/.dots/src/herdr/session.json</code>.</p>
+            <pre><code>ssm    # open the session manager</code></pre>
+
+            <h3>Keybindings</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Key</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td><code>Enter</code></td><td>Connect to the selected session</td></tr>
+                  <tr><td><code>/</code></td><td>Incremental search by name or host</td></tr>
+                  <tr><td><code>D</code></td><td>Duplicate the selected session (auto-names with <code>-copy</code>)</td></tr>
+                  <tr><td><code>y</code></td><td>Yank the session host to clipboard</td></tr>
+                  <tr><td><code>u</code></td><td>Update view: fetch and pull dotfiles from the remote host</td></tr>
+                  <tr><td><code>?</code></td><td>Full keybinding reference overlay</td></tr>
+                  <tr><td><code>q</code></td><td>Quit</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="aliases">
+            <h2>Aliases</h2>
+            <p>Aliases are defined in <code>src/zsh/zsh/.aliases</code>. Use <code>dots</code> Aliases view to browse them, or <code>commands custom</code> in the shell to see them parsed live.</p>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Alias</th>
+                    <th>Command</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td><code>ls</code>, <code>la</code>, <code>ll</code>, <code>lla</code></td><td><code>eza</code></td><td>File listings with icons and colors</td></tr>
+                  <tr><td><code>cls</code></td><td><code>clear</code></td><td>Clear terminal</td></tr>
+                  <tr><td><code>reload</code></td><td><code>source ~/.zshrc</code></td><td>Reload Zsh config</td></tr>
+                  <tr><td><code>y</code></td><td><code>yazi</code></td><td>Terminal file manager</td></tr>
+                  <tr><td><code>f</code></td><td><code>fzf</code></td><td>Fuzzy finder</td></tr>
+                  <tr><td><code>b</code></td><td><code>btop</code></td><td>Resource monitor</td></tr>
+                  <tr><td><code>mux</code>, <code>attach</code></td><td><code>herdr</code></td><td>Terminal multiplexer</td></tr>
+                  <tr><td><code>opc</code></td><td><code>opencode</code></td><td>AI coding assistant</td></tr>
+                  <tr><td><code>llama</code></td><td><code>ollama</code></td><td>Local LLM runner</td></tr>
+                  <tr><td><code>dots</code></td><td><code>dots.py</code></td><td>Open the dots manager TUI</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p>Suffix aliases for <code>.md</code>, <code>.rs</code>, <code>.swift</code>, <code>.py</code>, <code>.c</code>, and <code>.cr</code> open files directly in <code>$EDITOR</code>.</p>
+          </section>
+
+          <section id="functions">
+            <h2>Functions</h2>
+            <p>Shell functions are defined in <code>src/zsh/zsh/.functions</code>.</p>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Function</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td><code>commands</code></td><td>Lists system commands via fzf with man page preview. <code>commands custom</code> shows aliases parsed live from <code>.aliases</code>.</td></tr>
+                  <tr><td><code>create &lt;lang&gt; &lt;name&gt;</code></td><td>Scaffolds new Swift, Java/Maven, Rust/Cargo, Crystal, or Git projects.</td></tr>
+                  <tr><td><code>duplicate</code></td><td>Safely clones files or folders with an optional rename.</td></tr>
+                  <tr><td><code>download &lt;url&gt;</code></td><td>Downloads URLs via <code>curl</code> or <code>wget</code>.</td></tr>
+                  <tr><td><code>ssm</code></td><td>Opens the SSH session manager TUI.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="packages">
+            <h2>Package tiers</h2>
+            <p>Dependencies are organized into three tiers. Required packages always install. Optional and dev packages are prompted during setup and can be installed later.</p>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Tier</th>
+                    <th>When installed</th>
+                    <th>Examples</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><span class="badge badge-blue">Required</span></td>
+                    <td>Always</td>
+                    <td>eza, bat, fzf, fastfetch, zoxide</td>
+                  </tr>
+                  <tr>
+                    <td><span class="badge badge-yellow">Optional</span></td>
+                    <td>Prompted during setup</td>
+                    <td>nvim, herdr, btop, lazygit, yazi, carapace</td>
+                  </tr>
+                  <tr>
+                    <td><span class="badge badge-purple">Dev</span></td>
+                    <td>Prompted during setup</td>
+                    <td>go, java, crystal, lua, docker, gh, cmake, gcc, ffmpeg</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout tip">
+              <p>Neovim is optional. The editor fallback chain is <code>nvim</code> then <code>vim</code> then <code>nano</code>, so things work even if you skip it.</p>
+            </div>
+
+            <h3>Install tiers manually</h3>
+            <pre><code>python3 ~/.dots/src/zsh/zsh/dots.py --install-deps
+python3 ~/.dots/src/zsh/zsh/dots.py --install-optional
+python3 ~/.dots/src/zsh/zsh/dots.py --install-dev</code></pre>
+
+            <h3>Symlinks</h3>
+            <p>Symlinks are conditional based on what's installed. Tool-specific symlinks (Ghostty, herdr) are only created when the binary is present.</p>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Target</th>
+                    <th>Source</th>
+                    <th>Condition</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td><code>~/.config/zsh/</code></td><td><code>src/zsh/zsh/</code></td><td>Always</td></tr>
+                  <tr><td><code>~/.zshrc</code></td><td><code>src/zsh/.zshrc</code></td><td>Always</td></tr>
+                  <tr><td><code>~/.config/bat/</code></td><td><code>src/bat/</code></td><td>Always</td></tr>
+                  <tr><td><code>~/.config/fastfetch/</code></td><td><code>src/fastfetch/</code></td><td>Always</td></tr>
+                  <tr><td><code>~/.config/ghostty/</code></td><td><code>src/ghostty/</code></td><td>Ghostty installed</td></tr>
+                  <tr><td><code>~/.config/herdr/</code></td><td><code>src/herdr/</code></td><td>herdr installed</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="zsh-config">
+            <h2>Zsh config</h2>
+            <p>The Zsh config is split across two files to keep <code>.zshrc</code> stable even when switching branches in the dots repo.</p>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>File</th>
+                    <th>Role</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>src/zsh/.zshrc</code></td>
+                    <td>Minimal bootstrapper (~15 lines). Sets <code>DOTFILES_VERSION</code>, checks the <code>~/.config/zsh</code> symlink, then sources <code>rc.zsh</code>.</td>
+                  </tr>
+                  <tr>
+                    <td><code>src/zsh/zsh/rc.zsh</code></td>
+                    <td>All actual config: Homebrew, PATH, editor, plugins, completions, aliases, functions, theme, keybindings. This is where you make changes.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <h3>Plugins</h3>
+            <ul>
+              <li><code>zsh-syntax-highlighting</code> via Homebrew</li>
+              <li><code>zsh-autosuggestions</code> via Homebrew</li>
+              <li><code>zsh-history-substring-search</code> via Homebrew</li>
+              <li><code>fzf-tab</code> from GitHub, for fuzzy tab completions</li>
+              <li><code>carapace</code> for extended completions (optional)</li>
+            </ul>
+            <h3>Auto-LS hook</h3>
+            <p>Entering <code>~/.config</code> or <code>~/development</code> automatically lists directory contents.</p>
+          </section>
+
+          <section id="themes">
+            <h2>Themes</h2>
+            <h3>Ghostty</h3>
+            <p>Two custom themes ship with the repo. Use <code>dots</code> Theme to pick from any of the 200+ built-in Ghostty themes or apply a custom one.</p>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Theme</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td><code>noir-cat</code></td><td>Dark theme based on Catppuccin Mocha with a neutral gray background instead of the purple-tinted default.</td></tr>
+                  <tr><td><code>knew-pines</code></td><td>Custom theme in the Rose Pine family.</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <h3>Zsh prompt</h3>
+            <p>The <code>charModel</code> prompt is minimal and fast. It shows an <code>∧</code> indicator when connected over SSH. Config lives at <code>src/zsh/zsh/themes/charModel</code>.</p>
+            <h3>bat</h3>
+            <p>bat is configured to use the <strong>Rose Pine</strong> theme. KnewPines, KnewPines Moon, and KnewPines Dawn color scheme files are included at <code>src/bat/themes/</code>.</p>
+          </section>
+
+          <section id="auto-update">
+            <h2>Auto-update</h2>
+            <p>An <code>update-check.zsh</code> script runs in the background on interactive shell start. Behavior is controlled by <code>~/.dots/.settings</code>.</p>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Setting</th>
+                    <th>Default</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td><code>update_check</code></td><td><code>true</code></td><td>Enable or disable background checks entirely</td></tr>
+                  <tr><td><code>update_frequency</code></td><td><code>1440</code> (daily)</td><td>Minutes between checks. Supports 60 (hourly) to 10080 (weekly).</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p>When new commits are found upstream, you get a prompt to pull and re-symlink. Version comparison uses <code>sort -V</code> so semver bumps are detected correctly.</p>
+            <h3>Manual update check</h3>
+            <ul>
+              <li>From dots TUI: Settings then "Check for updates"</li>
+              <li>From SSM TUI: press <code>u</code> in the session list</li>
+            </ul>
+          </section>
+
+          <section id="developer-mode">
+            <h2>Developer mode</h2>
+            <p>Developer mode unlocks advanced TUI items and changes update behavior to track commits instead of release tags.</p>
+            <pre><code>touch ~/.dots/.developer   # enable
+rm ~/.dots/.developer      # disable</code></pre>
+            <p>When active:</p>
+            <ul>
+              <li>Update prompts show commit count and short SHA instead of version numbers</li>
+              <li>Skips version-stamp writes and upgrade notices on shell start</li>
+              <li>Unlocks: Edit Configs, Add Alias, Personal Pkgs, Git, View Logs, Reset in the TUI</li>
+            </ul>
+          </section>
+
+          <section id="fzf">
+            <h2>fzf</h2>
+            <p>fzf is integrated throughout the shell for file search, history, and completions.</p>
+            <h3>Default command</h3>
+            <pre><code>fd --type f --hidden --follow --exclude .git</code></pre>
+            <h3>Keybindings</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Binding</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td><code>Ctrl-T</code></td><td>Insert file path into command line</td></tr>
+                  <tr><td><code>Alt-C</code></td><td>cd into selected directory</td></tr>
+                  <tr><td><code>Ctrl-R</code></td><td>Search shell history</td></tr>
+                  <tr><td><code>Alt-Enter</code></td><td>Open selected file in Neovim</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <h3>fzf-tab</h3>
+            <p>Replaces standard Zsh tab completion with fzf-powered fuzzy selection. <code>&lt;</code> and <code>&gt;</code> switch between completion groups. Previews are powered by bat (files) and eza (directories).</p>
+          </section>
+
+          <section id="bat">
+            <h2>bat</h2>
+            <p><code>bat</code> is configured as the primary file previewer for fzf. It's set to use Rose Pine theme and is available directly for viewing files with syntax highlighting.</p>
+            <pre><code>bat somefile.py      # view with highlighting
+bat --list-themes    # see available themes</code></pre>
+            <p>The <code>BAT_THEME</code> environment variable is managed in <code>rc.zsh</code>.</p>
+          </section>
+
+          <section id="testing">
+            <h2>Testing</h2>
+            <p>A test suite in <code>tests/</code> verifies the install process against an isolated home directory so nothing in your actual <code>~</code> is touched.</p>
+            <pre><code>cd tests
+./test_setup.sh</code></pre>
+            <p>GitHub Actions runs the test suite and ShellCheck linting on every push. Python syntax is also checked in CI.</p>
+          </section>
+
+        </article>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer" role="contentinfo">
+    <div class="container">
+      <div class="footer__inner">
+        <div class="footer__brand">
+          <img src="img/svg/dots_icon_color.svg" alt="" aria-hidden="true" width="18" height="18">
+          <span class="footer__copy">dots by CtrlUserKnown</span>
+        </div>
+        <nav class="footer__nav" aria-label="Footer navigation">
+          <a href="about.html">About</a>
+          <a href="docs.html">Docs</a>
+          <a href="changelog.html">Changelog</a>
+          <a href="https://github.com/CtrlUserKnown/dots" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </nav>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/nav.js"></script>
+  <script src="js/docs.js"></script>
+
+</body>
+</html>
