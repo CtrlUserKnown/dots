@@ -1,4 +1,4 @@
-name: Test Setup Script
+name: CI
 
 on:
   push:
@@ -27,9 +27,9 @@ jobs:
           sudo apt-get update && sudo apt-get install -y zsh
 
           echo "Checking Zsh syntax..."
-          # Check all .zsh files in src/zsh
+          # Check all named .zsh files (rc.zsh, update-check.zsh, brew-sync.zsh, ...)
           find src/zsh -type f -name "*.zsh" -exec zsh -n {} +
-          # Check hidden files (.zshrc, .aliases, .functions) directly
+          # Check hidden/extension-less files (.zshrc, .aliases, .functions, charModel)
           for f in src/zsh/.zshrc src/zsh/zsh/.aliases src/zsh/zsh/.functions src/zsh/zsh/themes/charModel; do
             [ -f "$f" ] && zsh -n "$f" && echo "  $f: OK"
           done

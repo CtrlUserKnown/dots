@@ -60,7 +60,7 @@ DEPS: list[Dep] = [
     Dep("fzf",       "fzf",       "fzf",       "fzf",       "fuzzy finder",                        "required"),
     Dep("fastfetch", "fastfetch", "fastfetch", "fastfetch", "system info at shell start",          "required"),
     Dep("zoxide",    "zoxide",    "zoxide",    "zoxide",    "smarter cd",                          "required"),
-    Dep("nvim",      "neovim",    "neovim",    "neovim",    "text editor ($EDITOR)",               "required"),
+    Dep("nvim",      "neovim",    "neovim",    "neovim",    "text editor ($EDITOR)",               "optional"),
     # ── optional ────────────────────────────────────────────────────────────
     Dep("herdr",     "herdr",     "",          "",          "terminal multiplexer (mux alias)",    "optional", "charmbracelet/tap"),
     Dep("btop",      "btop",      "btop",      "btop",      "system monitor (b alias)",            "optional"),
@@ -95,15 +95,19 @@ DEPS: list[Dep] = [
     Dep("gemini",    "gemini-cli","",          "",          "Google Gemini CLI",                   "dev"),
 ]
 
-# Symlinks required for the config to work
-SYMLINKS = [
-    (Path.home() / ".config/bat",       DOTS_DIR / "src/bat"),
-    (Path.home() / ".config/fastfetch", DOTS_DIR / "src/fastfetch"),
-    (Path.home() / ".config/ghostty",   DOTS_DIR / "src/ghostty"),
-    (Path.home() / ".config/herdr",     DOTS_DIR / "src/herdr"),
-    (Path.home() / ".config/zsh",       DOTS_DIR / "src/zsh/zsh"),
-    (Path.home() / ".zshrc",            DOTS_DIR / "src/zsh/.zshrc"),
-]
+def get_symlinks() -> list[tuple]:
+    """Core symlinks always required, plus tool-conditional ones."""
+    links = [
+        (Path.home() / ".config/bat",       DOTS_DIR / "src/bat"),
+        (Path.home() / ".config/fastfetch", DOTS_DIR / "src/fastfetch"),
+        (Path.home() / ".config/zsh",       DOTS_DIR / "src/zsh/zsh"),
+        (Path.home() / ".zshrc",            DOTS_DIR / "src/zsh/.zshrc"),
+    ]
+    if shutil.which("ghostty"):
+        links.append((Path.home() / ".config/ghostty", DOTS_DIR / "src/ghostty"))
+    if shutil.which("herdr"):
+        links.append((Path.home() / ".config/herdr", DOTS_DIR / "src/herdr"))
+    return links
 
 # Shell plugins checked by file/dir existence
 PLUGINS = [
@@ -139,6 +143,7 @@ RELOAD_ACTION   = "__reload__"
 LOGS_ACTION     = "__logs__"
 RESET_ACTION    = "__reset__"
 SSM_ACTION      = "__ssm__"
+PROFILE_ACTION  = "__profile__"
 SEPARATOR       = "__sep__"
 
 SSM_CONFIG_FILE = Path.home() / ".config" / "ssm" / "config.json"
@@ -207,6 +212,7 @@ def build_menu(dev: bool) -> list[tuple]:
         ("Theme",        THEME_ACTION,    "pick a terminal color theme"),
         ("Aliases",      ALIASES_ACTION,  "view custom shell aliases"),
         ("SSM",          SSM_ACTION,      "SSH session manager — install & configure herdr"),
+        ("Profile",      PROFILE_ACTION,  "generate or import a personal config file"),
         ("Settings",     SETTINGS_ACTION, "configure dots preferences"),
         ("Developer",    DEV_ACTION,      "enable developer mode for advanced options"),
     ]
@@ -228,6 +234,7 @@ def build_menu(dev: bool) -> list[tuple]:
         ("Theme",    THEME_ACTION,    "pick a terminal color theme"),
         ("Aliases",  ALIASES_ACTION,  "view custom shell aliases"),
         ("SSM",      SSM_ACTION,      "SSH session manager — install & configure herdr"),
+        ("Profile",  PROFILE_ACTION,  "generate or import a personal config file"),
         ("Settings", SETTINGS_ACTION, "configure dots preferences"),
     ] + dev_items
 
@@ -362,7 +369,7 @@ def repair_symlink(link: Path, target: Path) -> bool:
 
 def repair_all() -> None:
     ok = repaired = skipped = 0
-    for link, target in SYMLINKS:
+    for link, target in get_symlinks():
         status = check_symlink(link, target)
         label  = "~/" + str(link.relative_to(Path.home()))
         if status == "OK":
@@ -558,10 +565,11 @@ def run_health_view(stdscr) -> None:
 
         # Build flat display list: ("section"|"item", label, ok, desc)
         display: list[tuple] = []
-        nav_descs: list[str] = []  # description for each navigable item
+        nav_descs: list[str] = []
+        nav_types: list[tuple] = []  # ("symlink", link, target) | ("dep", dep) | ("plugin", paths)
 
         display.append(("section", "symlinks", True, ""))
-        for link, target in SYMLINKS:
+        for link, target in get_symlinks():
             ok     = check_symlink(link, target) == "OK"
             label  = "~/" + str(link.relative_to(Path.home()))
             try:
@@ -570,6 +578,7 @@ def run_health_view(stdscr) -> None:
                 tstr = str(target)
             display.append(("item", label, ok, f"→ {tstr}"))
             nav_descs.append(f"→ {tstr}")
+            nav_types.append(("symlink", link, target))
 
         display.append(("section", "tools", True, ""))
         for dep in DEPS:
@@ -579,12 +588,14 @@ def run_health_view(stdscr) -> None:
             tag = f"[{dep.category[:3]}]"
             display.append(("item", f"{dep.bin or dep.brew:<14} {tag}", ok, dep.desc))
             nav_descs.append(dep.desc)
+            nav_types.append(("dep", dep))
 
         display.append(("section", "plugins", True, ""))
         for name, desc, paths in PLUGINS:
             ok = check_plugin(paths)
             display.append(("item", name, ok, desc))
             nav_descs.append(desc)
+            nav_types.append(("plugin", paths))
 
         # Count navigable items
         nav_total = sum(1 for kind, *_ in display if kind == "item")
@@ -632,15 +643,27 @@ def run_health_view(stdscr) -> None:
         desc_text = nav_descs[idx] if nav_descs else ""
         draw_desc(stdscr, desc_text, flash)
 
-        any_broken = any(check_symlink(l, t) != "OK" for l, t in SYMLINKS)
+        any_broken = any(check_symlink(l, t) != "OK" for l, t in get_symlinks())
         any_missing_tools = any(
             not check_dep(d) for d in DEPS if d.category in ("required", "optional")
         )
+
+        # determine whether the selected item can be fixed with enter
+        curr_type = nav_types[idx] if idx < len(nav_types) else None
+        can_enter_fix = False
+        if curr_type:
+            if curr_type[0] == "symlink":
+                can_enter_fix = check_symlink(curr_type[1], curr_type[2]) != "OK"
+            elif curr_type[0] == "dep":
+                can_enter_fix = not check_dep(curr_type[1])
+
         hints = []
+        if can_enter_fix:
+            hints.append("enter fix")
         if any_broken:
-            hints.append("r repair symlinks")
+            hints.append("r repair all")
         if any_missing_tools:
-            hints.append("i install missing tools")
+            hints.append("i install all")
         hints.append("q back")
         draw_footer(stdscr, " j/k navigate  " + "  ".join(hints))
         stdscr.refresh()
@@ -653,9 +676,25 @@ def run_health_view(stdscr) -> None:
             idx = min(idx + 1, nav_total - 1)
         elif key in (ord("k"), curses.KEY_UP):
             idx = max(0, idx - 1)
+        elif key in (curses.KEY_ENTER, 10, 13) and curr_type:
+            if curr_type[0] == "symlink":
+                link, target = curr_type[1], curr_type[2]
+                if check_symlink(link, target) != "OK":
+                    ok = repair_symlink(link, target)
+                    flash = ("  ✓ Repaired" if ok else "  ✗ Repair failed", COLOR_SELECT if ok else COLOR_ERROR)
+                else:
+                    flash = ("  already OK", COLOR_DIM)
+            elif curr_type[0] == "dep":
+                dep = curr_type[1]
+                if not check_dep(dep):
+                    return ("install", [dep])
+                else:
+                    flash = ("  already installed", COLOR_DIM)
+            elif curr_type[0] == "plugin":
+                flash = ("  install plugin manually — see docs", COLOR_DIM)
         elif key == ord("r") and any_broken:
             rep = skp = 0
-            for link, target in SYMLINKS:
+            for link, target in get_symlinks():
                 if check_symlink(link, target) != "OK":
                     if repair_symlink(link, target): rep += 1
                     else: skp += 1
@@ -1110,10 +1149,88 @@ def run_logs_view(stdscr) -> None:
     show_output(stdscr, " logs ", "\n".join(lines))
 
 
+# ── personal config ───────────────────────────────────────────────────────────
+
+PERSONAL_CONFIG_FILE    = Path.home() / ".config" / "dots" / "personal.json"
+_PERSONAL_CONFIG_VERSION = "1"
+
+
+def _collect_personal_config() -> dict:
+    s     = load_settings()
+    theme = get_current_theme()
+    opt   = [d.brew or d.bin for d in DEPS if d.category == "optional" and check_dep(d)]
+    dev   = [d.brew or d.bin for d in DEPS if d.category == "dev"      and check_dep(d)]
+    return {
+        "version":      _PERSONAL_CONFIG_VERSION,
+        "generated":    datetime.datetime.now().isoformat(timespec="seconds"),
+        "dots_version": VERSION or "unknown",
+        "settings":     {k: v for k, v in s.items() if k in _DEFAULT_SETTINGS},
+        "theme":        theme,
+        "packages":     {"optional": opt, "dev": dev},
+    }
+
+
+def generate_personal_config(dest: Optional[Path] = None) -> Path:
+    dest = dest or PERSONAL_CONFIG_FILE
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(json.dumps(_collect_personal_config(), indent=2))
+    return dest
+
+
+def _validate_personal_config(data: dict) -> Optional[str]:
+    if not isinstance(data, dict):
+        return "not a JSON object"
+    if data.get("version") != _PERSONAL_CONFIG_VERSION:
+        return f"unsupported version '{data.get('version')}' (expected '{_PERSONAL_CONFIG_VERSION}')"
+    pkgs = data.get("packages", {})
+    if not isinstance(pkgs, dict):
+        return "'packages' must be an object"
+    for cat in ("optional", "dev"):
+        if not isinstance(pkgs.get(cat, []), list):
+            return f"'packages.{cat}' must be a list"
+    return None
+
+
+def apply_personal_config(data: dict) -> list:
+    current  = load_settings()
+    incoming = data.get("settings", {})
+    for k in _DEFAULT_SETTINGS:
+        if k in incoming:
+            current[k] = incoming[k]
+    save_settings(current)
+
+    theme = data.get("theme", "")
+    if theme:
+        set_ghostty_theme(theme)
+
+    pkg_map: dict[str, Dep] = {(d.brew or d.bin): d for d in DEPS}
+    pkgs = data.get("packages", {})
+    return [
+        pkg_map[name] for name in pkgs.get("optional", []) + pkgs.get("dev", [])
+        if name in pkg_map and not check_dep(pkg_map[name])
+    ]
+
+
+def _fetch_github_raw(spec: str) -> str:
+    import urllib.request
+    parts = spec.split("/", 2)
+    if len(parts) < 3:
+        raise ValueError(f"expected user/repo/path, got '{spec}'")
+    user, repo, path = parts
+    for branch in ("main", "master"):
+        url = f"https://raw.githubusercontent.com/{user}/{repo}/{branch}/{path}"
+        try:
+            with urllib.request.urlopen(url, timeout=10) as r:  # noqa: S310
+                return r.read().decode()
+        except Exception:
+            continue
+    raise ValueError(f"could not fetch '{spec}' from GitHub (tried main and master)")
+
+
 # ── aliases view ─────────────────────────────────────────────────────────────
 
 def parse_aliases() -> list[tuple]:
-    """Returns list of ("section", name) or ("alias", name, desc) tuples."""
+    """Returns list of ("section", name) or ("alias", name, desc, value) tuples."""
     aliases_path = DOTS_DIR / "src/zsh/zsh/.aliases"
     result: list[tuple] = []
     try:
@@ -1122,17 +1239,29 @@ def parse_aliases() -> list[tuple]:
             if m:
                 result.append(("section", m.group(1)))
                 continue
-            m = re.match(r'^alias\s+([a-zA-Z0-9_-]+)=.+#\s*(.+)', line)
-            if m:
-                result.append(("alias", m.group(1), m.group(2).strip()))
+            m = re.match(r'^alias\s+([a-zA-Z0-9_-]+)=(.+?)(?:\s{2,}#\s*(.+))?$', line)
+            if m and (m.group(2) or m.group(3)):
+                name  = m.group(1)
+                val   = (m.group(2) or "").strip().strip('"').strip("'")
+                desc  = (m.group(3) or "").strip()
+                result.append(("alias", name, desc, val))
     except Exception:
         pass
     return result
 
 
+def _yank_text(text: str) -> bool:
+    try:
+        subprocess.run(["pbcopy"], input=text.encode(), check=True, timeout=3)
+        return True
+    except Exception:
+        return False
+
+
 def run_aliases_view(stdscr) -> None:
-    display  = parse_aliases()
-    nav_items = [(i, d[1], d[2]) for i, d in enumerate(display) if d[0] == "alias"]
+    display   = parse_aliases()
+    # nav_items: (display_index, name, desc, value)
+    nav_items = [(i, d[1], d[2], d[3] if len(d) > 3 else "") for i, d in enumerate(display) if d[0] == "alias"]
 
     if not nav_items:
         show_message(stdscr, " aliases ", ["  No aliases found or .aliases file missing."])
@@ -1140,6 +1269,7 @@ def run_aliases_view(stdscr) -> None:
 
     idx    = 0
     offset = 0
+    flash: tuple | None = None
 
     while True:
         stdscr.erase()
@@ -1165,7 +1295,7 @@ def run_aliases_view(stdscr) -> None:
                 safe_addstr(stdscr, row, 2, item[1],
                             curses.color_pair(COLOR_DIM) | curses.A_BOLD)
             elif item[0] == "alias":
-                _, name, desc = item
+                name, desc = item[1], item[2]
                 is_sel = nav_i == idx
                 safe_addstr(stdscr, row, 0, "▶" if is_sel else " ",
                             curses.color_pair(COLOR_SELECT) | curses.A_BOLD if is_sel else 0)
@@ -1174,8 +1304,10 @@ def run_aliases_view(stdscr) -> None:
                 safe_addstr(stdscr, row, 16, desc,
                             curses.A_BOLD if is_sel else 0)
 
-        draw_desc(stdscr, nav_items[idx][2])
-        draw_footer(stdscr, " j/k navigate  q back ")
+        val = nav_items[idx][3]
+        draw_desc(stdscr, nav_items[idx][2], flash)
+        flash = None
+        draw_footer(stdscr, " j/k navigate  enter copy  q back ")
         stdscr.refresh()
 
         key = stdscr.getch()
@@ -1185,6 +1317,12 @@ def run_aliases_view(stdscr) -> None:
             idx = min(idx + 1, len(nav_items) - 1)
         elif key in (ord("k"), curses.KEY_UP):
             idx = max(0, idx - 1)
+        elif key in (curses.KEY_ENTER, 10, 13):
+            val = nav_items[idx][3]
+            if val and _yank_text(val):
+                flash = (f"  ✓ Copied: {val[:40]}", COLOR_SELECT)
+            else:
+                flash = ("  ✗ pbcopy not available", COLOR_ERROR)
 
 
 # ── ssm view ─────────────────────────────────────────────────────────────────
@@ -1255,6 +1393,141 @@ def run_ssm_view(stdscr):
             return ("launch_ssm", None)
 
 
+# ── profile view ─────────────────────────────────────────────────────────────
+
+def _prompt_line(stdscr, row: int, prompt: str, initial: str = "") -> Optional[str]:
+    """Inline single-line text input. Returns stripped string or None on esc."""
+    curses.curs_set(1)
+    value = initial
+    _, w = stdscr.getmaxyx()
+    while True:
+        safe_addstr(stdscr, row, 0, " " * max(0, w - 1))
+        line = f"  {prompt}: {value}"
+        safe_addstr(stdscr, row, 0, line, curses.A_BOLD)
+        try:
+            stdscr.move(row, min(len(line), w - 1))
+        except curses.error:
+            pass
+        stdscr.refresh()
+        key = stdscr.getch()
+        if key == 27:
+            curses.curs_set(0)
+            return None
+        elif key in (curses.KEY_ENTER, 10, 13):
+            curses.curs_set(0)
+            return value.strip()
+        elif key in (curses.KEY_BACKSPACE, 127, 8):
+            value = value[:-1]
+        elif 32 <= key <= 126:
+            value += chr(key)
+
+
+def run_profile_view(stdscr):
+    flash: tuple | None = None
+
+    while True:
+        exists = PERSONAL_CONFIG_FILE.exists()
+        stdscr.erase()
+        h, w = stdscr.getmaxyx()
+        draw_header(stdscr, " profile ")
+
+        sym  = "✓" if exists else "✗"
+        sc   = COLOR_SELECT if exists else COLOR_DIM
+        safe_addstr(stdscr, 2, 2, sym, curses.color_pair(sc) | curses.A_BOLD)
+        cfg_label = str(PERSONAL_CONFIG_FILE).replace(str(Path.home()), "~")
+        safe_addstr(stdscr, 2, 4, cfg_label, curses.color_pair(COLOR_DIM))
+
+        if exists:
+            try:
+                data = json.loads(PERSONAL_CONFIG_FILE.read_text())
+                gen  = data.get("generated", "")[:19]
+                dver = data.get("dots_version", "?")
+                pkgs = data.get("packages", {})
+                n    = len(pkgs.get("optional", [])) + len(pkgs.get("dev", []))
+                safe_addstr(stdscr, 3, 6,
+                            f"generated {gen}  ·  {n} packages  ·  dots {dver}",
+                            curses.color_pair(COLOR_DIM))
+            except Exception:
+                safe_addstr(stdscr, 3, 6, "(unreadable)", curses.color_pair(COLOR_ERROR))
+
+        safe_addstr(stdscr, 5, 2,
+                    "g  generate / update config from current system",
+                    curses.color_pair(COLOR_DIM))
+        safe_addstr(stdscr, 6, 2,
+                    "i  import from a local file",
+                    curses.color_pair(COLOR_DIM))
+        safe_addstr(stdscr, 7, 2,
+                    "G  import from GitHub  (user/repo/path/to/file.json)",
+                    curses.color_pair(COLOR_DIM))
+
+        draw_desc(stdscr, "", flash)
+        flash = None
+        draw_footer(stdscr, "  g generate  i import file  G import GitHub  q back")
+        stdscr.refresh()
+
+        key = stdscr.getch()
+        if key in (ord("q"), ord("Q"), 27):
+            return None
+
+        elif key == ord("g"):
+            path = generate_personal_config()
+            flash = (f"  ✓ Saved to {str(path).replace(str(Path.home()), '~')}", COLOR_SELECT)
+
+        elif key == ord("i"):
+            stdscr.erase()
+            draw_header(stdscr, " import file ")
+            safe_addstr(stdscr, 2, 2, "Path to personal.json:", curses.color_pair(COLOR_DIM))
+            draw_footer(stdscr, "  enter confirm  esc cancel")
+            stdscr.refresh()
+            default = str(PERSONAL_CONFIG_FILE).replace(str(Path.home()), "~")
+            path_str = _prompt_line(stdscr, 4, "path", default)
+            if path_str:
+                path_str = path_str.replace("~", str(Path.home()), 1)
+                try:
+                    data = json.loads(Path(path_str).read_text())
+                    err  = _validate_personal_config(data)
+                    if err:
+                        flash = (f"  ✗ {err}", COLOR_ERROR)
+                    else:
+                        to_install = apply_personal_config(data)
+                        if to_install:
+                            return ("install", to_install)
+                        flash = ("  ✓ Config applied", COLOR_SELECT)
+                except FileNotFoundError:
+                    flash = (f"  ✗ File not found: {path_str}", COLOR_ERROR)
+                except json.JSONDecodeError as e:
+                    flash = (f"  ✗ JSON error: {e}", COLOR_ERROR)
+
+        elif key == ord("G"):
+            stdscr.erase()
+            draw_header(stdscr, " import from GitHub ")
+            safe_addstr(stdscr, 2, 2, "Format: user/repo/path/to/file.json",
+                        curses.color_pair(COLOR_DIM))
+            draw_footer(stdscr, "  enter confirm  esc cancel")
+            stdscr.refresh()
+            spec = _prompt_line(stdscr, 4, "spec")
+            if spec:
+                stdscr.erase()
+                draw_header(stdscr, " import from GitHub ")
+                safe_addstr(stdscr, 3, 2, f"Fetching {spec}…", curses.color_pair(COLOR_DIM))
+                stdscr.refresh()
+                try:
+                    raw  = _fetch_github_raw(spec)
+                    data = json.loads(raw)
+                    err  = _validate_personal_config(data)
+                    if err:
+                        flash = (f"  ✗ {err}", COLOR_ERROR)
+                    else:
+                        to_install = apply_personal_config(data)
+                        if to_install:
+                            return ("install", to_install)
+                        flash = ("  ✓ Config applied from GitHub", COLOR_SELECT)
+                except ValueError as e:
+                    flash = (f"  ✗ {e}", COLOR_ERROR)
+                except json.JSONDecodeError as e:
+                    flash = (f"  ✗ JSON error: {e}", COLOR_ERROR)
+
+
 # ── main TUI ──────────────────────────────────────────────────────────────────
 
 def run_tui(stdscr):
@@ -1285,27 +1558,30 @@ def run_tui(stdscr):
         draw_header(stdscr, " dots ")
 
         label_w = max(len(label) for label, *_ in menu) + 2
+        nav_num = 0
         for i, (label, path, _desc) in enumerate(menu):
             y = 2 + i
             if path == SEPARATOR:
                 safe_addstr(stdscr, y, 2, "─" * min(20, w - 4),
                             curses.color_pair(COLOR_DIM))
                 continue
+            nav_num += 1
+            num_str = str(nav_num) if nav_num <= 9 else " "
             if i == idx:
                 safe_addstr(stdscr, y, 0, "▶",
                             curses.color_pair(COLOR_SELECT) | curses.A_BOLD)
-                safe_addstr(stdscr, y, 2, f" {label:<{label_w}}", curses.A_BOLD)
+                safe_addstr(stdscr, y, 2, f"{num_str} {label:<{label_w}}", curses.A_BOLD)
                 if dev and label == "Developer":
-                    safe_addstr(stdscr, y, 2 + label_w + 2, "[dev mode ON]",
+                    safe_addstr(stdscr, y, 4 + label_w + 2, "[dev mode ON]",
                                 curses.color_pair(COLOR_SELECT))
             else:
-                safe_addstr(stdscr, y, 0, f"   {label:<{label_w}}")
+                safe_addstr(stdscr, y, 0, f"  {num_str} {label:<{label_w}}")
                 if dev and label == "Developer":
-                    safe_addstr(stdscr, y, 3 + label_w + 2, "[dev mode ON]",
+                    safe_addstr(stdscr, y, 4 + label_w + 2, "[dev mode ON]",
                                 curses.color_pair(COLOR_DIM))
 
         draw_desc(stdscr, menu[idx][2])
-        draw_footer(stdscr, " j/k navigate  enter select  q quit")
+        draw_footer(stdscr, " 1-9 jump  j/k navigate  enter select  q quit")
         stdscr.refresh()
 
         key = stdscr.getch()
@@ -1313,7 +1589,11 @@ def run_tui(stdscr):
             return None
 
         pos_in_nav = nav_indices.index(idx) if idx in nav_indices else 0
-        if key in (ord("j"), curses.KEY_DOWN):
+        if ord("1") <= key <= ord("9"):
+            n = key - ord("1")  # 0-based
+            if n < len(nav_indices):
+                idx = nav_indices[n]
+        elif key in (ord("j"), curses.KEY_DOWN):
             idx = nav_indices[(pos_in_nav + 1) % len(nav_indices)]
         elif key in (ord("k"), curses.KEY_UP):
             idx = nav_indices[(pos_in_nav - 1) % len(nav_indices)]
@@ -1330,6 +1610,10 @@ def run_tui(stdscr):
                 run_aliases_view(stdscr)
             elif path == SSM_ACTION:
                 result = run_ssm_view(stdscr)
+                if result is not None:
+                    return result
+            elif path == PROFILE_ACTION:
+                result = run_profile_view(stdscr)
                 if result is not None:
                     return result
             elif path == SETTINGS_ACTION:
@@ -1478,5 +1762,56 @@ if __name__ == "__main__":
             else:
                 print("  Failed to update ghostty config", file=sys.stderr)
                 sys.exit(1)
+    elif "--setting-file-generate" in sys.argv or "-SFG" in sys.argv:
+        args   = sys.argv[1:]
+        flag_i = next((i for i, a in enumerate(args) if a in ("--setting-file-generate", "-SFG")), -1)
+        dest   = None
+        if flag_i >= 0 and flag_i + 1 < len(args) and not args[flag_i + 1].startswith("-"):
+            dest = Path(args[flag_i + 1]).expanduser()
+        path = generate_personal_config(dest)
+        print(f"  ✓ Personal config saved to {path}")
+    elif "--import" in sys.argv or "-i" in sys.argv:
+        args   = sys.argv[1:]
+        flag_i = next((i for i, a in enumerate(args) if a in ("--import", "-i")), -1)
+        is_git = any(a in ("--git", "-g") for a in args)
+        if is_git:
+            git_i = next(i for i, a in enumerate(args) if a in ("--git", "-g"))
+            if git_i + 1 >= len(args):
+                print("error: --git requires user/repo/path/to/file.json", file=sys.stderr)
+                sys.exit(1)
+            spec = args[git_i + 1]
+            print(f"  Fetching {spec}…")
+            try:
+                raw  = _fetch_github_raw(spec)
+                data = json.loads(raw)
+            except (ValueError, json.JSONDecodeError) as e:
+                print(f"  ✗ {e}", file=sys.stderr)
+                sys.exit(1)
+        else:
+            if flag_i < 0 or flag_i + 1 >= len(args):
+                print("error: --import requires a path or --git spec", file=sys.stderr)
+                sys.exit(1)
+            path_str = args[flag_i + 1]
+            try:
+                data = json.loads(Path(path_str).expanduser().read_text())
+            except FileNotFoundError:
+                print(f"  ✗ File not found: {path_str}", file=sys.stderr)
+                sys.exit(1)
+            except json.JSONDecodeError as e:
+                print(f"  ✗ JSON error: {e}", file=sys.stderr)
+                sys.exit(1)
+        err = _validate_personal_config(data)
+        if err:
+            print(f"  ✗ Invalid config: {err}", file=sys.stderr)
+            sys.exit(1)
+        to_install = apply_personal_config(data)
+        print("  ✓ Settings and theme applied.")
+        if to_install:
+            names = ", ".join(d.brew or d.bin for d in to_install)
+            print(f"\n  Packages from profile not yet installed: {names}")
+            print()
+            install_deps_cli(to_install)
+        else:
+            print("  ✓ All profile packages already installed.")
     else:
         main()

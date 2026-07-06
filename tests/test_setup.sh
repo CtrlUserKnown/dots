@@ -98,6 +98,11 @@ EOF
 chmod +x "$mock_bin/git" "$mock_bin/timeout" "$mock_bin/brew" "$mock_bin/gum" "$mock_bin/curl"
 export PATH="$mock_bin:$PATH"
 
+# Pre-populate $HOME/.dots so setup.sh skips the git clone and
+# relink_and_verify has a real dots.py + src/ to work with.
+mkdir -p "$MOCK_HOME/.dots"
+cp -rp "$MOCK_DOTS/." "$MOCK_HOME/.dots/" 2>/dev/null || true
+
 # run the script
 export CI=1
 # run with output to a file to debug if fails
@@ -120,6 +125,7 @@ assert_exists "$MOCK_HOME/.dots"
 
 # check symlinks
 assert_link "$MOCK_HOME/.config/bat"
+assert_link "$MOCK_HOME/.config/zsh"
 assert_link "$MOCK_HOME/.zshrc"
 
 echo ""

@@ -368,6 +368,125 @@ def run_form(stdscr, existing: dict | None = None) -> dict | None:
 
 # ── main TUI ──────────────────────────────────────────────────────────────────
 
+def run_help_view(stdscr) -> None:
+    """Full-screen keybinding reference."""
+    lines = [
+        ("navigation",   ""),
+        ("j / k  ↑↓",   "move up / down"),
+        ("gg",           "jump to top"),
+        ("G",            "jump to bottom"),
+        ("^d / ^u",      "half-page down / up"),
+        ("^f / ^b",      "full-page down / up"),
+        ("[n]j / [n]G",  "jump n rows down / to row n"),
+        ("",             ""),
+        ("actions",      ""),
+        ("enter",        "connect to selected session"),
+        ("a",            "add new session"),
+        ("e",            "edit selected session"),
+        ("D",            "duplicate selected session"),
+        ("d",            "delete selected session"),
+        ("y",            "copy connection string to clipboard"),
+        ("",             ""),
+        ("other",        ""),
+        ("h",            "toggle herdr mode on / off"),
+        ("u",            "check for dotfiles updates"),
+        ("?",            "show this help screen"),
+        ("q  esc",       "quit / go back"),
+    ]
+
+    while True:
+        stdscr.erase()
+        h, w = stdscr.getmaxyx()
+        draw_header(stdscr, " help ")
+
+        row = 2
+        for key_str, desc in lines:
+            if row >= h - 3:
+                break
+            if not key_str and not desc:
+                row += 1
+                continue
+            if not desc:
+                safe_addstr(stdscr, row, 2, key_str,
+                            curses.color_pair(COLOR_DIM) | curses.A_BOLD)
+            else:
+                safe_addstr(stdscr, row, 4, f"{key_str:<14}",
+                            curses.color_pair(COLOR_HEADER) | curses.A_BOLD)
+                safe_addstr(stdscr, row, 18, desc)
+            row += 1
+
+        draw_footer(stdscr, " q back ")
+        stdscr.refresh()
+        if stdscr.getch() != curses.KEY_RESIZE:
+            return
+
+
+def run_search(stdscr, sessions: list) -> list:
+    """Incremental search — returns filtered session list (preserves original indices)."""
+    curses.curs_set(1)
+    query = ""
+
+    while True:
+        matches = [s for s in sessions
+                   if query.lower() in s.get("name", "").lower()
+                   or query.lower() in s.get("host", "").lower()]
+
+        stdscr.erase()
+        h, w = stdscr.getmaxyx()
+        draw_header(stdscr, " search ")
+
+        prompt = f"  / {query}"
+        safe_addstr(stdscr, 2, 0, prompt, curses.A_BOLD)
+
+        list_top = 4
+        list_h   = h - 7
+        safe_addstr(stdscr, 3, 0,
+                    f"  {'NAME':<20} {'HOST/IP':<24} {'USER':<12} PORT",
+                    curses.color_pair(COLOR_DIM) | curses.A_BOLD)
+
+        if not matches:
+            safe_addstr(stdscr, list_top + 1, 4, "no matches",
+                        curses.color_pair(COLOR_DIM))
+        else:
+            for i, sess in enumerate(matches[:list_h]):
+                name = sess.get("name", "")[:19]
+                host = sess.get("host", "")[:23]
+                user = sess.get("user", "root")[:11]
+                port = str(sess.get("port", 22))[:5]
+                safe_addstr(stdscr, list_top + i, 0,
+                            f"  {name:<20} {host:<24} {user:<12} {port}")
+
+        count_str = f"{len(matches)} match{'es' if len(matches) != 1 else ''}"
+        draw_desc(stdscr, count_str)
+        draw_footer(stdscr, " type to filter  enter confirm  esc cancel ")
+        try:
+            stdscr.move(2, min(len(prompt), w - 1))
+        except curses.error:
+            pass
+        stdscr.refresh()
+
+        key = stdscr.getch()
+        if key == 27:
+            curses.curs_set(0)
+            return []
+        elif key in (curses.KEY_ENTER, 10, 13):
+            curses.curs_set(0)
+            return matches
+        elif key in (curses.KEY_BACKSPACE, 127, 8):
+            query = query[:-1]
+        elif 32 <= key <= 126:
+            query += chr(key)
+
+
+def _yank(text: str) -> bool:
+    """Copy text to system clipboard. Returns True on success."""
+    try:
+        subprocess.run(["pbcopy"], input=text.encode(), check=True, timeout=3)
+        return True
+    except Exception:
+        return False
+
+
 def run_tui(stdscr) -> tuple | None:
     """Main list view. Returns ('connect', session) or None."""
     init_colors()
@@ -381,6 +500,11 @@ def run_tui(stdscr) -> tuple | None:
     flash: tuple[str, int] | None = None
     count_buf  = ""
     pending_g  = False
+    filter_active = False  # True when showing search-filtered subset
+    visible: list = []     # filtered view; empty means show all
+
+    def active_sessions() -> list:
+        return visible if filter_active else sessions
 
     while True:
         # autoreload when sessions.json is modified externally
@@ -388,8 +512,13 @@ def run_tui(stdscr) -> tuple | None:
         if mt != last_mtime:
             sessions   = load_sessions()
             last_mtime = mt
-            idx        = clamp(idx, 0, max(0, len(sessions) - 1))
-            flash      = ("  ↺ Sessions reloaded", COLOR_SELECT)
+            if filter_active:
+                filter_active = False
+                visible       = []
+            idx   = clamp(idx, 0, max(0, len(active_sessions()) - 1))
+            flash = ("  ↺ Sessions reloaded", COLOR_SELECT)
+
+        cur = active_sessions()
 
         stdscr.erase()
         h, w = stdscr.getmaxyx()
@@ -397,7 +526,8 @@ def run_tui(stdscr) -> tuple | None:
         herdr_label = "[herdr ON]" if cfg.get("use_herdr", True) else "[herdr OFF]"
         herdr_attr  = curses.color_pair(COLOR_SELECT) if cfg.get("use_herdr", True) \
                       else curses.color_pair(COLOR_ERROR)
-        draw_header(stdscr, " ssh sessions ")
+        title = " ssh sessions [filtered] " if filter_active else " ssh sessions "
+        draw_header(stdscr, title)
         _, w = stdscr.getmaxyx()
         safe_addstr(stdscr, 0, w - len(herdr_label) - 2, herdr_label, herdr_attr | curses.A_BOLD)
 
@@ -408,16 +538,17 @@ def run_tui(stdscr) -> tuple | None:
                     curses.color_pair(COLOR_DIM))
 
         list_top = 4
-        list_h   = h - 8   # leaves room for desc (h-4), sep (h-3), hint (h-2)
+        list_h   = h - 8
 
-        if not sessions:
-            msg = "No sessions — press 'a' to add one"
+        if not cur:
+            msg = "No sessions — press 'a' to add one" if not filter_active \
+                  else "No matches — press esc or / to search again"
             safe_addstr(stdscr, list_top + 2, max(0, (w - len(msg)) // 2), msg,
                         curses.color_pair(COLOR_DIM))
         else:
-            idx    = clamp(idx, 0, len(sessions) - 1)
+            idx    = clamp(idx, 0, len(cur) - 1)
             scroll = max(0, idx - list_h + 1)
-            for i, sess in enumerate(sessions[scroll: scroll + list_h]):
+            for i, sess in enumerate(cur[scroll: scroll + list_h]):
                 real_i = i + scroll
                 y      = list_top + i
                 name   = sess.get("name", "")[:19]
@@ -439,8 +570,8 @@ def run_tui(stdscr) -> tuple | None:
             draw_desc(stdscr, "g…")
         elif count_buf:
             draw_desc(stdscr, f"[{count_buf}]")
-        elif sessions:
-            sel  = sessions[idx]
+        elif cur:
+            sel  = cur[idx]
             desc = f"{sel.get('user','root')}@{sel['host']}:{sel.get('port',22)}"
             draw_desc(stdscr, desc)
         else:
@@ -448,7 +579,8 @@ def run_tui(stdscr) -> tuple | None:
 
         draw_footer(stdscr,
                     " j/k↑↓ nav  gg/G top/bot  ^d/^u/^f/^b scroll"
-                    "  enter connect  a add  e edit  d del  h herdr  u update  q quit")
+                    "  enter connect  a add  e edit  D dup  d del"
+                    "  y yank  / search  h herdr  u update  ? help  q quit")
         stdscr.refresh()
         flash = None
 
@@ -474,40 +606,55 @@ def run_tui(stdscr) -> tuple | None:
         pending_g = False
 
         if key in (ord("q"), ord("Q"), 27):
-            return None
+            if filter_active:
+                filter_active = False
+                visible       = []
+                idx           = 0
+            else:
+                return None
+
+        elif key == ord("/"):
+            result = run_search(stdscr, sessions)
+            if result:
+                visible       = result
+                filter_active = True
+                idx           = 0
+            elif filter_active:
+                filter_active = False
+                visible       = []
 
         elif key in (ord("j"), curses.KEY_DOWN):
-            if sessions:
-                idx = clamp(idx + count, 0, len(sessions) - 1)
+            if cur:
+                idx = clamp(idx + count, 0, len(cur) - 1)
 
         elif key in (ord("k"), curses.KEY_UP):
-            if sessions:
-                idx = clamp(idx - count, 0, len(sessions) - 1)
+            if cur:
+                idx = clamp(idx - count, 0, len(cur) - 1)
 
         elif key == ord("G"):
-            if sessions:
-                idx = clamp(count - 1 if had_count else len(sessions) - 1,
-                            0, len(sessions) - 1)
+            if cur:
+                idx = clamp(count - 1 if had_count else len(cur) - 1,
+                            0, len(cur) - 1)
 
         elif key == 4:    # Ctrl+d — half page down
-            if sessions:
-                idx = clamp(idx + max(1, list_h // 2), 0, len(sessions) - 1)
+            if cur:
+                idx = clamp(idx + max(1, list_h // 2), 0, len(cur) - 1)
 
         elif key == 21:   # Ctrl+u — half page up
-            if sessions:
-                idx = clamp(idx - max(1, list_h // 2), 0, len(sessions) - 1)
+            if cur:
+                idx = clamp(idx - max(1, list_h // 2), 0, len(cur) - 1)
 
         elif key == 6:    # Ctrl+f — full page down
-            if sessions:
-                idx = clamp(idx + list_h, 0, len(sessions) - 1)
+            if cur:
+                idx = clamp(idx + list_h, 0, len(cur) - 1)
 
         elif key == 2:    # Ctrl+b — full page up
-            if sessions:
-                idx = clamp(idx - list_h, 0, len(sessions) - 1)
+            if cur:
+                idx = clamp(idx - list_h, 0, len(cur) - 1)
 
         elif key in (curses.KEY_ENTER, 10, 13):
-            if sessions:
-                return ("connect", sessions[idx], cfg)
+            if cur:
+                return ("connect", cur[idx], cfg)
 
         elif key == ord("a"):
             result = run_form(stdscr)
@@ -519,30 +666,57 @@ def run_tui(stdscr) -> tuple | None:
                     save_sessions(sessions)
                     last_mtime = sessions_mtime()
                     idx        = len(sessions) - 1
+                    filter_active = False
+                    visible       = []
                     flash      = (f"  ✓ Added '{result['name']}'", COLOR_SELECT)
 
         elif key == ord("e"):
-            if sessions:
-                old_name = sessions[idx].get("name", "")
-                result = run_form(stdscr, sessions[idx])
+            if cur:
+                old_name = cur[idx].get("name", "")
+                real_idx = sessions.index(cur[idx]) if cur[idx] in sessions else -1
+                result = run_form(stdscr, cur[idx])
                 if result:
                     dup = any(
-                        s["name"] == result["name"] and i != idx
-                        for i, s in enumerate(sessions)
+                        s["name"] == result["name"] and s is not cur[idx]
+                        for s in sessions
                     )
                     if dup:
                         flash = (f"  ✗ Name '{result['name']}' already exists", COLOR_ERROR)
                     else:
                         if old_name and old_name != result["name"]:
                             _kr_delete(old_name)
-                        sessions[idx] = result
+                        if real_idx >= 0:
+                            sessions[real_idx] = result
+                        if filter_active:
+                            visible[idx] = result
                         save_sessions(sessions)
-                        last_mtime    = sessions_mtime()
-                        flash         = (f"  ✓ Updated '{result['name']}'", COLOR_SELECT)
+                        last_mtime = sessions_mtime()
+                        flash      = (f"  ✓ Updated '{result['name']}'", COLOR_SELECT)
+
+        elif key == ord("D"):
+            if cur:
+                src  = cur[idx]
+                base = src.get("name", "copy")
+                new_name = base + "-copy"
+                n = 2
+                while any(s["name"] == new_name for s in sessions):
+                    new_name = f"{base}-copy{n}"
+                    n += 1
+                dup = dict(src)
+                dup["name"] = new_name
+                sessions.append(dup)
+                if _KEYRING and src.get("password"):
+                    _kr_store(new_name, src["password"])
+                save_sessions(sessions)
+                last_mtime    = sessions_mtime()
+                filter_active = False
+                visible       = []
+                idx           = len(sessions) - 1
+                flash         = (f"  ✓ Duplicated as '{new_name}'", COLOR_SELECT)
 
         elif key == ord("d"):
-            if sessions:
-                name    = sessions[idx].get("name", "session")
+            if cur:
+                name    = cur[idx].get("name", "session")
                 h2, w2  = stdscr.getmaxyx()
                 safe_addstr(stdscr, h2 - 4, 2,
                             f"  Delete '{name}'? (y/n) "[:w2 - 4],
@@ -551,16 +725,32 @@ def run_tui(stdscr) -> tuple | None:
                 c = stdscr.getch()
                 if c in (ord("y"), ord("Y")):
                     _kr_delete(name)
-                    sessions.pop(idx)
-                    idx        = clamp(idx, 0, max(0, len(sessions) - 1))
+                    real_sess = cur[idx]
+                    if real_sess in sessions:
+                        sessions.remove(real_sess)
+                    if filter_active and real_sess in visible:
+                        visible.remove(real_sess)
+                    idx        = clamp(idx, 0, max(0, len(active_sessions()) - 1))
                     save_sessions(sessions)
                     last_mtime = sessions_mtime()
                     flash      = (f"  ✓ Deleted '{name}'", COLOR_SELECT)
+
+        elif key == ord("y"):
+            if cur:
+                sel   = cur[idx]
+                text  = f"{sel.get('user','root')}@{sel['host']}:{sel.get('port',22)}"
+                if _yank(text):
+                    flash = (f"  ✓ Copied {text}", COLOR_SELECT)
+                else:
+                    flash = ("  ✗ pbcopy not available", COLOR_ERROR)
 
         elif key == ord("h"):
             cfg   = toggle_herdr(cfg)
             state = "ON" if cfg.get("use_herdr", True) else "OFF"
             flash = (f"  herdr {state}", COLOR_SELECT if cfg["use_herdr"] else COLOR_ERROR)
+
+        elif key == ord("?"):
+            run_help_view(stdscr)
 
         elif key == ord("u"):
             run_update_view(stdscr)

@@ -271,6 +271,204 @@ else:
     fail("shared.py missing dev or normal mode fetch path")
 
 
+# ── dots.py: get_symlinks() ───────────────────────────────────────────────────
+
+section("dots.py: get_symlinks() core + conditional links")
+
+import shutil as _shutil
+from dots import get_symlinks, DOTS_DIR as _DOTS_DIR
+
+_links = get_symlinks()
+_link_targets = [str(s[1]) for s in _links]
+
+_core = [
+    _DOTS_DIR / "src/bat",
+    _DOTS_DIR / "src/fastfetch",
+    _DOTS_DIR / "src/zsh/zsh",
+    _DOTS_DIR / "src/zsh/.zshrc",
+]
+for _t in _core:
+    if str(_t) in _link_targets:
+        ok(f"core symlink present: src/{_t.relative_to(_DOTS_DIR / 'src')}")
+    else:
+        fail(f"core symlink missing: {_t}")
+
+if _shutil.which("ghostty"):
+    if any("ghostty" in t for t in _link_targets):
+        ok("ghostty symlink present when ghostty installed")
+    else:
+        fail("ghostty binary found but symlink absent from get_symlinks()")
+else:
+    if all("ghostty" not in t for t in _link_targets):
+        ok("ghostty symlink absent when ghostty not installed")
+    else:
+        fail("ghostty symlink present but binary not found")
+
+if _shutil.which("herdr"):
+    if any("herdr" in t for t in _link_targets):
+        ok("herdr symlink present when herdr installed")
+    else:
+        fail("herdr binary found but symlink absent from get_symlinks()")
+else:
+    if all("herdr" not in t for t in _link_targets):
+        ok("herdr symlink absent when herdr not installed")
+    else:
+        fail("herdr symlink present but binary not found")
+
+
+# ── dots.py: parse_aliases() format ──────────────────────────────────────────
+
+section("dots.py: parse_aliases() tuple format")
+
+from dots import parse_aliases as _parse_aliases
+
+_entries = _parse_aliases()
+if _entries:
+    ok(f"parse_aliases() returns {len(_entries)} entries")
+else:
+    fail("parse_aliases() returned empty list — .aliases file missing?")
+
+_alias_entries   = [e for e in _entries if e[0] == "alias"]
+_section_entries = [e for e in _entries if e[0] == "section"]
+
+if _alias_entries:
+    ok(f"found {len(_alias_entries)} alias entries")
+else:
+    fail("no alias entries found")
+
+if _section_entries:
+    ok(f"found {len(_section_entries)} section headers")
+else:
+    fail("no section headers found")
+
+if all(len(e) == 4 for e in _alias_entries):
+    ok("all alias entries are 4-tuples (tag, name, desc, value)")
+else:
+    fail("some alias entries are not 4-tuples",
+         f"first bad: {next(e for e in _alias_entries if len(e) != 4)!r}")
+
+if all(len(e) == 2 for e in _section_entries):
+    ok("all section entries are 2-tuples (tag, name)")
+else:
+    fail("some section entries are not 2-tuples")
+
+
+# ── dots.py: personal config generate / validate / apply ─────────────────────
+
+section("dots.py: personal config generate / validate / apply")
+
+from dots import (
+    generate_personal_config as _gen_cfg,
+    _validate_personal_config as _val_cfg,
+    apply_personal_config as _apply_cfg,
+    _PERSONAL_CONFIG_VERSION as _CFG_VER,
+    load_settings as _load_settings,
+    SETTINGS_FILE as _SETTINGS_FILE,
+)
+
+_settings_backup = _SETTINGS_FILE.read_text() if _SETTINGS_FILE.exists() else None
+try:
+    with tempfile.TemporaryDirectory() as _td:
+        _dest = Path(_td) / "personal.json"
+        _out  = _gen_cfg(_dest)
+        if _out == _dest and _dest.exists():
+            ok("generate_personal_config writes to specified path")
+        else:
+            fail("generate_personal_config failed", f"out={_out!r}, exists={_dest.exists()}")
+
+        _data = json.loads(_dest.read_text())
+
+        if _data.get("version") == _CFG_VER:
+            ok("generated config has correct version field")
+        else:
+            fail("generated config version mismatch", f"got {_data.get('version')!r}")
+
+        for _key in ("settings", "packages", "generated", "dots_version"):
+            if _key in _data:
+                ok(f"generated config has '{_key}' field")
+            else:
+                fail(f"generated config missing '{_key}' field")
+
+        _pkgs = _data.get("packages", {})
+        if isinstance(_pkgs.get("optional"), list) and isinstance(_pkgs.get("dev"), list):
+            ok("packages.optional and packages.dev are lists")
+        else:
+            fail("packages fields have wrong types")
+
+    # _validate_personal_config
+    _valid = {"version": _CFG_VER, "packages": {"optional": [], "dev": []}}
+    _err = _val_cfg(_valid)
+    if _err is None:
+        ok("_validate_personal_config accepts valid config")
+    else:
+        fail("_validate_personal_config rejected valid config", _err)
+
+    _err = _val_cfg({**_valid, "version": "99"})
+    if _err and "unsupported version" in _err:
+        ok("_validate_personal_config rejects unknown version")
+    else:
+        fail("should reject bad version", f"err={_err!r}")
+
+    _err = _val_cfg({**_valid, "packages": "not-a-dict"})
+    if _err and "packages" in _err:
+        ok("_validate_personal_config rejects non-dict packages")
+    else:
+        fail("should reject non-dict packages", f"err={_err!r}")
+
+    _err = _val_cfg("not-a-dict")
+    if _err and "not a JSON object" in _err:
+        ok("_validate_personal_config rejects non-dict top-level")
+    else:
+        fail("should reject non-dict top-level", f"err={_err!r}")
+
+    # apply_personal_config: settings merge
+    _cfg = {
+        "version": _CFG_VER,
+        "settings": {"greeting": False, "update_frequency": 999},
+        "theme": "",
+        "packages": {"optional": [], "dev": []},
+    }
+    _apply_cfg(_cfg)
+    _s = _load_settings()
+    if _s.get("greeting") is False and _s.get("update_frequency") == 999:
+        ok("apply_personal_config merges settings correctly")
+    else:
+        fail("apply_personal_config settings merge wrong", f"settings={_s}")
+
+finally:
+    if _settings_backup is not None:
+        _SETTINGS_FILE.write_text(_settings_backup)
+    else:
+        _SETTINGS_FILE.unlink(missing_ok=True)
+
+
+# ── zsh config files: rc.zsh and .zshrc ──────────────────────────────────────
+
+section("zsh: rc.zsh and .zshrc structure")
+
+_rc_zsh = REPO_ROOT / "src/zsh/zsh/rc.zsh"
+if _rc_zsh.exists():
+    ok("src/zsh/zsh/rc.zsh exists")
+else:
+    fail("src/zsh/zsh/rc.zsh is missing")
+
+_zshrc = REPO_ROOT / "src/zsh/.zshrc"
+if _zshrc.exists():
+    ok("src/zsh/.zshrc exists")
+else:
+    fail("src/zsh/.zshrc is missing")
+
+if _zshrc.exists() and "rc.zsh" in _zshrc.read_text():
+    ok(".zshrc sources rc.zsh")
+else:
+    fail(".zshrc does not reference rc.zsh")
+
+if _zshrc.exists() and len(_zshrc.read_text().splitlines()) <= 20:
+    ok(".zshrc is a slim bootstrapper (≤20 lines)")
+else:
+    fail(".zshrc has grown too large — config should live in rc.zsh")
+
+
 # ── summary ───────────────────────────────────────────────────────────────────
 
 print(f"\n{'─' * 55}")

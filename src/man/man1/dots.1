@@ -91,6 +91,43 @@ The state is stored in
 .BI \-\-set " key" = value
 Write a key-value pair directly to the dots settings file
 .RI ( ~/.dots/.settings ).
+Valid keys:
+.RS
+.TP
+.B update_check
+Boolean
+.RB ( true | false ).
+Enable or disable the background update checker.
+Default:
+.BR true .
+.TP
+.B update_frequency
+Integer (minutes).
+How often the update checker runs.
+Default:
+.B 1440
+(24 hours).
+.TP
+.B greeting
+Boolean
+.RB ( true | false ).
+Show or hide the
+.BR fastfetch (1)
+system-info block when a new shell opens.
+Default:
+.BR true .
+.TP
+.B theme
+String.
+Ghostty theme name (equivalent to
+.BR "dots \-\-theme" ).
+.RE
+.PP
+Boolean values accept
+.BR true , false , 1 ,
+and
+.BR 0 .
+Numeric strings are stored as integers; all other values are stored as strings.
 .TP
 .BI \-\-theme " name"
 Set the Ghostty terminal theme without opening the TUI.
