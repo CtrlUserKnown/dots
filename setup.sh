@@ -513,6 +513,74 @@ install_charvim() {
     echo "✅ Linked: $charvim_dir/nvim → $nvim_link"
 }
 
+# --- setup:SSM ---
+setup_ssm() {
+    echo "🔧 Setting up SSM..."
+
+    # Find or generate an SSH key
+    local key_file=""
+    if [ -f "$HOME/.ssh/id_ed25519" ]; then
+        key_file="$HOME/.ssh/id_ed25519"
+        echo "✅ Found existing SSH key: ~/.ssh/id_ed25519"
+    elif [ -f "$HOME/.ssh/id_rsa" ]; then
+        key_file="$HOME/.ssh/id_rsa"
+        echo "✅ Found existing SSH key: ~/.ssh/id_rsa"
+    fi
+
+    if [ "$SETUP_SSH_KEY" = true ]; then
+        if [ -z "$key_file" ]; then
+            echo "🔑 No SSH key found — generating ed25519 key..."
+            mkdir -p "$HOME/.ssh"
+            chmod 700 "$HOME/.ssh"
+            ssh-keygen -t ed25519 -C "$(whoami)@$(hostname)" \
+                -f "$HOME/.ssh/id_ed25519" -N "" && \
+                echo "✅ SSH key generated at ~/.ssh/id_ed25519" || \
+                echo "⚠️ ssh-keygen failed"
+            key_file="$HOME/.ssh/id_ed25519"
+        fi
+
+        # Load key into agent (macOS: persist to Keychain)
+        if [ -n "$key_file" ]; then
+            if [[ "$CURRENT_OS" == "Darwin" ]]; then
+                ssh-add --apple-use-keychain "$key_file" 2>/dev/null && \
+                    echo "✅ SSH key added to macOS Keychain" || \
+                    echo "⚠️ Could not add to Keychain (may already be present)"
+            else
+                ssh-add "$key_file" 2>/dev/null && \
+                    echo "✅ SSH key added to agent" || \
+                    echo "⚠️ Could not add key to agent (is ssh-agent running?)"
+            fi
+        fi
+
+        # Optionally copy public key to a remote server
+        local copy_key=false
+        if command -v gum &> /dev/null; then
+            gum confirm "  Copy your public key to a remote server now?" \
+                --default=false && copy_key=true
+        else
+            read -p "  Copy your public key to a remote server now? (y/N) " -n 1 -r; echo
+            [[ $REPLY =~ ^[Yy]$ ]] && copy_key=true
+        fi
+
+        if [ "$copy_key" = true ]; then
+            local remote_host=""
+            if command -v gum &> /dev/null; then
+                remote_host=$(gum input --placeholder "user@host  (e.g. userknown@192.168.12.38)")
+            else
+                read -p "  Remote host (user@host): " remote_host
+            fi
+            if [ -n "$remote_host" ]; then
+                echo "🔧 Copying public key to $remote_host..."
+                ssh-copy-id "$remote_host" && \
+                    echo "✅ Public key copied to $remote_host" || \
+                    echo "⚠️ Could not copy key — run manually: ssh-copy-id $remote_host"
+            fi
+        fi
+    fi
+
+    echo "✅ SSM setup complete — run 'ssm' to manage your SSH sessions."
+}
+
 # --- install ---
 do_install() {
     # --- script:Banner ---
@@ -577,6 +645,8 @@ EOF
     INSTALL_CHARVIM=false
     INSTALL_OPTIONAL=false
     INSTALL_DEV=false
+    INSTALL_SSM=false
+    SETUP_SSH_KEY=false
     PERSONAL_PKG_FILE=""
 
     if [ -z "$CI" ]; then
@@ -600,6 +670,12 @@ EOF
                 --default=false     && INSTALL_OPTIONAL=true
             gum confirm "Install developer tools? (gh, java, go, cmake, gcc, docker...)" \
                 --default=false     && INSTALL_DEV=true
+            gum confirm "Set up SSM (SSH Session Manager with herdr --remote)?" \
+                --default=false     && INSTALL_SSM=true
+            if [ "$INSTALL_SSM" = true ]; then
+                gum confirm "  ↳ Generate/configure SSH key for passwordless auth?" \
+                    --default=true  && SETUP_SSH_KEY=true
+            fi
             if gum confirm "Import a personal packages file?" --default=false; then
                 PERSONAL_PKG_FILE=$(gum input --placeholder "Path to file (e.g. ~/system-packages/packages.personal)")
                 PERSONAL_PKG_FILE="${PERSONAL_PKG_FILE/#\~/$HOME}"
@@ -623,6 +699,12 @@ EOF
             [[ $REPLY =~ ^[Yy]$ ]] && INSTALL_OPTIONAL=true
             read -p "Install developer tools? (gh, java, go, cmake, gcc, docker...) (y/N) " -n 1 -r; echo
             [[ $REPLY =~ ^[Yy]$ ]] && INSTALL_DEV=true
+            read -p "Set up SSM (SSH Session Manager with herdr --remote)? (y/N) " -n 1 -r; echo
+            [[ $REPLY =~ ^[Yy]$ ]] && INSTALL_SSM=true
+            if [ "$INSTALL_SSM" = true ]; then
+                read -p "  Generate/configure SSH key for passwordless auth? (Y/n) " -n 1 -r; echo
+                [[ ! $REPLY =~ ^[Nn]$ ]] && SETUP_SSH_KEY=true
+            fi
             read -p "Personal packages file path (press Enter to skip): " PERSONAL_PKG_FILE
             PERSONAL_PKG_FILE="${PERSONAL_PKG_FILE/#\~/$HOME}"
         fi
@@ -739,6 +821,11 @@ EOF
         fi
     elif [ -n "$PERSONAL_PKG_FILE" ]; then
         echo "⚠️ Personal packages file not found at: $PERSONAL_PKG_FILE"
+    fi
+
+    # --- configuration:SSM ---
+    if [ "$INSTALL_SSM" = true ]; then
+        setup_ssm
     fi
 
     # --- configuration:Links & Verify ---

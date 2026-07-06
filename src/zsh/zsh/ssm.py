@@ -10,10 +10,35 @@ import sys
 from pathlib import Path
 
 SESSIONS_FILE = Path.home() / ".config" / "ssm" / "sessions.json"
+CONFIG_FILE   = Path.home() / ".config" / "ssm" / "config.json"
 DOTS_DIR      = Path(__file__).resolve().parents[3]
 VERSION       = os.environ.get("DOTS_VERSION", "")
 
 # TODO: passwords are stored in plaintext in sessions.json — could be an issue
+
+
+# ── config ────────────────────────────────────────────────────────────────────
+
+def load_config() -> dict:
+    if not CONFIG_FILE.exists():
+        return {"use_herdr": True}
+    try:
+        with open(CONFIG_FILE) as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return {"use_herdr": True}
+
+
+def save_config(cfg: dict) -> None:
+    CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(CONFIG_FILE, "w") as f:
+        json.dump(cfg, f, indent=2)
+
+
+def toggle_herdr(cfg: dict) -> dict:
+    cfg["use_herdr"] = not cfg.get("use_herdr", True)
+    save_config(cfg)
+    return cfg
 
 
 # ── storage ───────────────────────────────────────────────────────────────────
@@ -364,6 +389,7 @@ def run_tui(stdscr) -> tuple | None:
     stdscr.keypad(True)
 
     sessions   = load_sessions()
+    cfg        = load_config()
     last_mtime = sessions_mtime()
     idx        = 0
     flash: tuple[str, int] | None = None
@@ -382,7 +408,12 @@ def run_tui(stdscr) -> tuple | None:
         stdscr.erase()
         h, w = stdscr.getmaxyx()
 
+        herdr_label = "[herdr ON]" if cfg.get("use_herdr", True) else "[herdr OFF]"
+        herdr_attr  = curses.color_pair(COLOR_SELECT) if cfg.get("use_herdr", True) \
+                      else curses.color_pair(COLOR_ERROR)
         draw_header(stdscr, " ssh sessions ")
+        _, w = stdscr.getmaxyx()
+        safe_addstr(stdscr, 0, w - len(herdr_label) - 2, herdr_label, herdr_attr | curses.A_BOLD)
 
         safe_addstr(stdscr, 2, 0,
                     f"  {'NAME':<20} {'HOST/IP':<24} {'USER':<12} PORT",
@@ -431,7 +462,7 @@ def run_tui(stdscr) -> tuple | None:
 
         draw_footer(stdscr,
                     " j/k↑↓ nav  gg/G top/bot  ^d/^u/^f/^b scroll"
-                    "  enter connect  a add  e edit  d del  u update  q quit")
+                    "  enter connect  a add  e edit  d del  h herdr  u update  q quit")
         stdscr.refresh()
         flash = None
 
@@ -490,7 +521,7 @@ def run_tui(stdscr) -> tuple | None:
 
         elif key in (curses.KEY_ENTER, 10, 13):
             if sessions:
-                return ("connect", sessions[idx])
+                return ("connect", sessions[idx], cfg)
 
         elif key == ord("a"):
             result = run_form(stdscr)
@@ -536,45 +567,55 @@ def run_tui(stdscr) -> tuple | None:
                     last_mtime = sessions_mtime()
                     flash      = (f"  ✓ Deleted '{name}'", COLOR_SELECT)
 
+        elif key == ord("h"):
+            cfg   = toggle_herdr(cfg)
+            state = "ON" if cfg.get("use_herdr", True) else "OFF"
+            flash = (f"  herdr {state}", COLOR_SELECT if cfg["use_herdr"] else COLOR_ERROR)
+
         elif key == ord("u"):
             run_update_view(stdscr)
 
 
 # ── connect ───────────────────────────────────────────────────────────────────
 
-def do_connect(session: dict) -> None:
-    host     = session["host"]
-    user     = session.get("user", "root")
-    port     = str(session.get("port", 22))
-    password = session.get("password", "")
-
-    # TODO: skipping host key verification could be an issue on untrusted networks
-    ssh_opts   = [
-        "-p", port,
-        "-o", "StrictHostKeyChecking=no",
-        "-o", "UserKnownHostsFile=/dev/null",
-        "-o", "ConnectTimeout=5",
-    ]
-    ssh_target = [f"{user}@{host}"]
-
-    env = os.environ.copy()
-    if password:
-        pw_opts = ["-o", "PubkeyAuthentication=no", "-o", "PreferredAuthentications=password"]
-        if shutil.which("sshpass"):
-            cmd            = ["sshpass", "-e", "herdr", "ssh"] + ssh_opts + pw_opts + ssh_target
-            env["SSHPASS"] = password
-        else:
-            print(
-                "Tip: install sshpass (`brew install hudochenkov/sshpass/sshpass`) "
-                "to use stored passwords automatically."
-            )
-            cmd = ["herdr", "ssh"] + ssh_opts + pw_opts + ssh_target
-    else:
-        cmd = ["herdr", "ssh"] + ssh_opts + ssh_target
+def do_connect(session: dict, cfg: dict) -> None:
+    host      = session["host"]
+    user      = session.get("user", "root")
+    port      = int(session.get("port", 22))
+    password  = session.get("password", "")
+    use_herdr = cfg.get("use_herdr", True)
 
     print(f"→ connecting to {user}@{host}:{port}")
     try:
-        result = subprocess.run(cmd, env=env)
+        if use_herdr:
+            # herdr --remote handles its own SSH transport; key auth required
+            url = f"ssh://{user}@{host}" if port == 22 else f"ssh://{user}@{host}:{port}"
+            result = subprocess.run(["herdr", "--remote", url])
+        else:
+            # TODO: skipping host key verification could be an issue on untrusted networks
+            ssh_opts   = [
+                "-p", str(port),
+                "-o", "StrictHostKeyChecking=no",
+                "-o", "UserKnownHostsFile=/dev/null",
+                "-o", "ConnectTimeout=5",
+            ]
+            ssh_target = [f"{user}@{host}"]
+            env = os.environ.copy()
+            if password:
+                pw_opts = ["-o", "PubkeyAuthentication=no",
+                           "-o", "PreferredAuthentications=password"]
+                if shutil.which("sshpass"):
+                    env["SSHPASS"] = password
+                    result = subprocess.run(
+                        ["sshpass", "-e", "ssh"] + ssh_opts + pw_opts + ssh_target, env=env)
+                else:
+                    print(
+                        "Tip: install sshpass (`brew install hudochenkov/sshpass/sshpass`) "
+                        "to use stored passwords automatically."
+                    )
+                    result = subprocess.run(["ssh"] + ssh_opts + pw_opts + ssh_target)
+            else:
+                result = subprocess.run(["ssh"] + ssh_opts + ssh_target)
     except KeyboardInterrupt:
         return
     if result.returncode != 0:
@@ -593,7 +634,7 @@ def main() -> None:
         if not result or result[0] != "connect":
             break
 
-        do_connect(result[1])
+        do_connect(result[1], result[2])
 
 
 if __name__ == "__main__":
