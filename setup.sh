@@ -6,6 +6,21 @@ set -euo pipefail
 DOTS_DIR="$HOME/.dots"
 DOTS_REPO="https://github.com/CtrlUserKnown/dots"
 DOTS_BIN="$DOTS_DIR/bin/dots"
+DOTS_BRANCH="main"
+
+# Parse flags
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --branch)
+            DOTS_BRANCH="$2"
+            shift 2
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            exit 1
+            ;;
+    esac
+done
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -64,7 +79,7 @@ if [ -d "$DOTS_DIR/.git" ]; then
     fi
 else
     info "Cloning dots…"
-    git clone "$DOTS_REPO" "$DOTS_DIR"
+    git clone --branch "$DOTS_BRANCH" "$DOTS_REPO" "$DOTS_DIR"
 fi
 ok "Repository ready"
 
