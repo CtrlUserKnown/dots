@@ -1,9 +1,6 @@
 # developer mode marker — create this file to disable update prompts
 .developer
 
-# prompts for ai rewrite
-# ./rewrite-dots-prompts
-
 # user settings — not committed (theme, update prefs)
 /.settings
 
@@ -33,3 +30,6 @@ CLAUDE.md
 
 # logs
 *.log
+
+# Rust build artifacts
+dots-rs/target/
