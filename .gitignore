@@ -2,7 +2,7 @@
 .developer
 
 # prompts for ai rewrite
-./rewrite-dots-prompts
+# ./rewrite-dots-prompts
 
 # user settings — not committed (theme, update prefs)
 /.settings
