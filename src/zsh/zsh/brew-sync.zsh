@@ -13,11 +13,13 @@ _brew_sync() {
     local has_neovim=false
 
     # brew bundle dump doesn't track go or cargo installs — re-append them manually
-    while IFS= read -r line || [ -n "$line" ]; do
-        [[ "$line" =~ ^go\ \"(.*)\"$ ]] && go_entries+=("$line")
-        [[ "$line" =~ ^cargo\ \"(.*)\"$ ]] && cargo_entries+=("$line")
-        [[ "$line" =~ ^brew\ \"neovim\"$ ]] && has_neovim=true
-    done < "$brewfile"
+    if [[ -f "$brewfile" ]]; then
+        while IFS= read -r line || [ -n "$line" ]; do
+            [[ "$line" =~ ^go\ \"(.*)\"$ ]] && go_entries+=("$line")
+            [[ "$line" =~ ^cargo\ \"(.*)\"$ ]] && cargo_entries+=("$line")
+            [[ "$line" =~ ^brew\ \"neovim\"$ ]] && has_neovim=true
+        done < "$brewfile"
+    fi
 
     command brew bundle dump --force --file="$brewfile" 2>/dev/null
 

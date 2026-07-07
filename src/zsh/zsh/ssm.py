@@ -768,6 +768,11 @@ def do_connect(session: dict, cfg: dict) -> None:
     print(f"→ connecting to {user}@{host}:{port}")
     try:
         if use_herdr:
+            if not shutil.which("herdr"):
+                print("Error: 'herdr' is not installed or not in PATH.")
+                print("Tip: install herdr or toggle off herdr mode (press 'h' in main menu).")
+                input("\nPress Enter to return…")
+                return
             # herdr --remote handles its own SSH transport; key auth required
             url = f"ssh://{user}@{host}" if port == 22 else f"ssh://{user}@{host}:{port}"
             result = subprocess.run(["herdr", "--remote", url])
@@ -797,6 +802,15 @@ def do_connect(session: dict, cfg: dict) -> None:
             else:
                 result = subprocess.run(["ssh"] + ssh_opts + ssh_target)
     except KeyboardInterrupt:
+        return
+    except EOFError:
+        return
+    except Exception as e:
+        print(f"\nError running SSH connection command: {e}")
+        try:
+            input("\nPress Enter to return…")
+        except EOFError:
+            pass
         return
     if result.returncode != 0:
         input(f"\nConnection failed (exit {result.returncode}). Press Enter to return…")

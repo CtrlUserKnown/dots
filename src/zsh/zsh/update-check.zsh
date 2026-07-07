@@ -43,7 +43,7 @@ if [[ -d ~/.dots/.git && $- == *i* ]]; then
         last_check=0
         [[ -f "$stamp" ]] && last_check=$(<"$stamp")
 
-        if (( now - last_check > _dots_freq )); then
+        if (( now - last_check > _dots_freq * 60 )); then
             echo "$now" > "$stamp"
             if [[ -n "$DEVELOPER_MODE" ]]; then
                 # ── dev mode: track commits, not releases ───────────────────

@@ -80,13 +80,21 @@ function duplicate() {
 
     if [ -z "$destination" ]; then
         local basename="${source%/}"
-        local extension="${basename##*.}"
-        local name="${basename%.*}"
+        local parent_dir="${basename%/*}"
+        local filename="${basename##*/}"
 
-        if [ "$basename" = "$extension" ]; then
-            destination="${basename} copy"
+        if [[ "$parent_dir" == "$basename" ]]; then
+            parent_dir=""
         else
-            destination="${name} copy.${extension}"
+            parent_dir="${parent_dir}/"
+        fi
+
+        if [[ "$filename" =~ ^\.[^.]+$ || "$filename" != *.* ]]; then
+            destination="${parent_dir}${filename} copy"
+        else
+            local extension="${filename##*.}"
+            local name="${filename%.*}"
+            destination="${parent_dir}${name} copy.${extension}"
         fi
     fi
 
