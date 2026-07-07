@@ -336,19 +336,51 @@ pre code {
   margin-right: auto;
 }
 
+.hero__install {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem 0.85rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+  text-align: left;
+}
+
+.hero__install-prompt {
+  color: var(--green);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.82rem;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.hero__install code {
+  background: none;
+  color: var(--fg);
+  padding: 0;
+  font-size: 0.8rem;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .hero__install-copy {
   background: none;
-  border: 1px solid #333;
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  color: #555;
+  color: var(--fg-muted);
   cursor: pointer;
-  padding: 0.2rem 0.55rem;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.7rem;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.75rem;
   transition: color var(--transition), border-color var(--transition);
   white-space: nowrap;
   flex-shrink: 0;
-  letter-spacing: 0.02em;
 }
 
 .hero__install-copy:hover {
@@ -361,6 +393,65 @@ pre code {
   gap: 0.75rem;
   justify-content: center;
   flex-wrap: wrap;
+}
+
+/* ============================================================
+   Terminal window
+   ============================================================ */
+.term-window {
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+}
+
+.term-bar {
+  background: #252525;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.35);
+  padding: 0.6rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  position: relative;
+}
+
+.term-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.term-dot--red    { background: #ff5f57; }
+.term-dot--yellow { background: #ffbd2e; }
+.term-dot--green  { background: #28c941; }
+
+.term-title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: #606060;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* Hero terminal */
+.hero__term {
+  background: #0e0e0e;
+  max-width: 640px;
+  margin: 0 auto 2rem;
+}
+
+.hero__term .term-body {
+  padding: 2.5rem 2.5rem 2rem;
+}
+
+.hero__term .hero__install {
+  margin-bottom: 0;
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.07);
 }
 
 /* ============================================================
@@ -943,228 +1034,6 @@ tr:hover td {
 }
 
 /* ============================================================
-   Terminal Window
-   ============================================================ */
-.term-window {
-  background: #0d0d0d;
-  border: 1px solid #2a2a2a;
-  border-radius: 10px;
-  overflow: hidden;
-  text-align: left;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
-}
-
-.term-bar {
-  background: #1c1c1c;
-  border-bottom: 1px solid #252525;
-  padding: 0.6rem 1rem;
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  position: relative;
-  flex-shrink: 0;
-}
-
-.term-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.term-dot--red    { background: #ff5f57; }
-.term-dot--yellow { background: #ffbd2e; }
-.term-dot--green  { background: #28c941; }
-
-.term-title {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.7rem;
-  color: #555;
-  pointer-events: none;
-  white-space: nowrap;
-}
-
-.term-body {
-  padding: 1.1rem 1.25rem 1.25rem;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.8rem;
-  line-height: 1.85;
-}
-
-.term-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.term-ps {
-  color: var(--green);
-  flex-shrink: 0;
-  font-weight: 500;
-  user-select: none;
-}
-
-.term-body code {
-  background: none;
-  color: var(--fg);
-  padding: 0;
-  font-size: inherit;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Output lines — animated */
-.term-out-line {
-  display: flex;
-  align-items: baseline;
-  gap: 0.75rem;
-  opacity: 0;
-  animation: term-line-in 0.15s ease forwards;
-}
-
-@keyframes term-line-in {
-  from { opacity: 0; transform: translateX(-3px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-
-.term-out-line--1  { animation-delay: 0.3s; }
-.term-out-line--2  { animation-delay: 0.55s; }
-.term-out-line--3  { animation-delay: 0.65s; }
-.term-out-line--4  { animation-delay: 1.0s; }
-.term-out-line--5  { animation-delay: 1.2s; }
-.term-out-line--6  { animation-delay: 1.4s; }
-.term-out-line--7  { animation-delay: 1.6s; }
-.term-out-line--8  { animation-delay: 1.8s; }
-.term-out-line--9  { animation-delay: 2.05s; }
-.term-out-line--10 { animation-delay: 2.25s; }
-
-.term-blank { width: 1rem; flex-shrink: 0; }
-
-.term-banner {
-  color: var(--accent);
-  font-weight: 500;
-  letter-spacing: 0.02em;
-}
-
-.term-divider-line { color: #333; }
-
-.term-check {
-  color: var(--green);
-  width: 1rem;
-  flex-shrink: 0;
-  text-align: center;
-}
-
-.term-item {
-  color: var(--fg-muted);
-  min-width: 90px;
-  flex-shrink: 0;
-}
-
-.term-item-val { color: var(--green); }
-
-.term-msg { color: var(--fg-muted); }
-
-.term-inline-cmd {
-  color: var(--cyan);
-  font-weight: 500;
-}
-
-.term-typed-cmd { color: var(--fg); }
-
-/* Blinking cursor */
-@keyframes term-cursor-blink {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0; }
-}
-
-.term-cursor {
-  display: inline-block;
-  width: 8px;
-  height: 0.85em;
-  background: var(--green);
-  vertical-align: middle;
-  animation: term-cursor-blink 1s step-end infinite;
-}
-
-/* Hero terminal window sizing */
-.hero .term-window {
-  max-width: 620px;
-  margin: 0 auto 2rem;
-}
-
-/* Stack terminal window */
-.stack-win {
-  max-width: 720px;
-  margin: 0 auto;
-}
-
-.term-output {
-  padding: 0.25rem 0;
-}
-
-.stack-row {
-  display: flex;
-  align-items: baseline;
-  gap: 1rem;
-  padding: 0.15rem 0;
-}
-
-.stack-name {
-  color: var(--accent);
-  min-width: 100px;
-  flex-shrink: 0;
-}
-
-.stack-desc {
-  color: var(--fg-muted);
-  font-family: 'Inter', sans-serif;
-  font-size: 0.8rem;
-}
-
-/* Feature card terminal tags */
-.card__term-tag {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.85rem;
-}
-
-.card__indicator {
-  font-size: 0.75rem;
-  line-height: 1;
-  flex-shrink: 0;
-}
-
-.card__indicator--blue   { color: var(--blue); }
-.card__indicator--purple { color: var(--purple); }
-.card__indicator--green  { color: var(--green); }
-.card__indicator--yellow { color: var(--yellow); }
-.card__indicator--red    { color: var(--red); }
-.card__indicator--cyan   { color: var(--cyan); }
-
-.card__label {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.7rem;
-  color: var(--fg-subtle);
-  letter-spacing: 0.04em;
-}
-
-/* Reduced motion */
-@media (prefers-reduced-motion: reduce) {
-  .term-out-line {
-    opacity: 1;
-    animation: none;
-  }
-  .term-cursor { animation: none; }
-}
-
-/* ============================================================
    Divider
    ============================================================ */
 .divider {
@@ -1264,13 +1133,22 @@ tr:hover td {
     grid-template-columns: 1fr;
   }
 
-  /* Hero terminal window */
-  .hero .term-window { max-width: 100%; }
+  /* Hero */
+  .hero__term { max-width: 100%; }
 
-  .term-body code {
+  .hero__term .term-body { padding: 1.75rem 1.25rem 1.5rem; }
+
+  .hero__install {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 1rem;
+  }
+
+  .hero__install code {
     white-space: normal;
     word-break: break-all;
-    font-size: 0.75rem;
+    font-size: 0.775rem;
   }
 
   /* CTA */
@@ -1283,7 +1161,12 @@ tr:hover td {
   .section { padding: 3.5rem 0; }
 }
 
+@media (max-width: 720px) {
+  .hero__logo { height: 80px; }
+}
+
 @media (max-width: 480px) {
+  .hero__logo { height: 62px; }
   .hero__actions { flex-direction: column; align-items: center; }
   .hero__actions .btn { width: 100%; justify-content: center; max-width: 260px; }
   h1 { font-size: 1.65rem; }
