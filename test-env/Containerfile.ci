@@ -17,18 +17,16 @@ FROM ubuntu:24.04 AS base-ubuntu
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        curl build-essential pkg-config libssl-dev libdbus-1-dev git which openssh-client && \
+        ca-certificates curl build-essential pkg-config libssl-dev libdbus-1-dev git which openssh-client && \
     apt-get clean
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --no-modify-path
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 # ── select base ────────────────────────────────────────────────────────────────
 FROM base-${BASE}
 
 # clippy + rustfmt (on Fedora via dnf already; on Ubuntu via rustup)
-RUN if command -v rustup 2>/dev/null; then \
-        rustup component add clippy rustfmt; \
-    fi
+RUN sh -c 'command -v rustup >/dev/null 2>&1 && rustup component add clippy rustfmt || true'
 
 WORKDIR /src
 

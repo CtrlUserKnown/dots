@@ -20,18 +20,16 @@ FROM ubuntu:24.04 AS base-ubuntu
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        curl build-essential pkg-config libssl-dev libdbus-1-dev git which \
+        ca-certificates curl build-essential pkg-config libssl-dev libdbus-1-dev git which \
         openssh-server sudo zsh && \
     apt-get clean
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --no-modify-path
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 # ── select base ────────────────────────────────────────────────────────────────
 FROM base-${BASE}
 
-RUN if command -v rustup 2>/dev/null; then \
-        rustup component add clippy rustfmt; \
-    fi
+RUN sh -c 'command -v rustup >/dev/null 2>&1 && rustup component add clippy rustfmt || true'
 
 # create testuser with password 'dots'
 RUN useradd -m -s /bin/zsh testuser && \
@@ -39,7 +37,8 @@ RUN useradd -m -s /bin/zsh testuser && \
     echo 'testuser ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 
 # set up SSH (only ed25519 key — fast, no entropy waiting)
-RUN ssh-keygen -t ed25519 -f /etc/ssh/ssh_host_ed25519_key -N "" && \
+RUN rm -f /etc/ssh/ssh_host_* && \
+    ssh-keygen -q -t ed25519 -f /etc/ssh/ssh_host_ed25519_key -N "" && \
     mkdir -p /run/sshd && \
     sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config && \
     sed -i 's/#PermitEmptyPasswords no/PermitEmptyPasswords no/' /etc/ssh/sshd_config && \
@@ -55,6 +54,15 @@ COPY --chown=testuser:testuser \
     setup.sh \
     uninstall.sh \
     /home/testuser/dots/
+
+# Pre-build the dots binary so setup.sh skips compilation at runtime
+RUN mkdir -p /tmp/build/dots-rs
+COPY --chown=root:root dots-rs /tmp/build/dots-rs
+RUN mkdir -p /home/testuser/.dots/bin && \
+    cargo build --release --manifest-path /tmp/build/dots-rs/Cargo.toml && \
+    cp /tmp/build/dots-rs/target/release/dots /home/testuser/.dots/bin/dots && \
+    rm -rf /tmp/build && \
+    chown -R testuser:testuser /home/testuser/.dots
 
 EXPOSE 22
 CMD ["/usr/sbin/sshd", "-D", "-o", "ListenAddress=0.0.0.0"]

@@ -87,8 +87,8 @@ ok "Repository ready"
 
 DOTS_VERSION=$(git -C "$DOTS_DIR" describe --tags --abbrev=0 2>/dev/null || echo "dev")
 
-if [ -x "$DOTS_BIN" ] && [ "$("$DOTS_BIN" --version 2>/dev/null || echo '')" = "dots $DOTS_VERSION" ]; then
-    ok "Binary already up to date ($DOTS_VERSION)"
+if [ -x "$DOTS_BIN" ] && "$DOTS_BIN" --version &>/dev/null; then
+    ok "Binary ready ($("$DOTS_BIN" --version))"
 elif command -v cargo >/dev/null 2>&1; then
     info "Building dots from source ($DOTS_VERSION)…"
     if ! cargo build --manifest-path "$DOTS_DIR/dots-rs/Cargo.toml" --release; then
