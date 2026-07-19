@@ -1,3 +1,10 @@
+//! Shared TUI primitives for the `dots` and `ssm` tools.
+//!
+//! Both binaries render with ratatui and share the same chrome (header/footer/
+//! description bars), color theme, and flash-message model. Keeping them here
+//! means a fix in one place lands in both tools. The lazygit-style panel/focus
+//! framework will grow in this crate too.
+
 use ratatui::{
     Frame,
     layout::Rect,
@@ -6,15 +13,9 @@ use ratatui::{
     widgets::Paragraph,
 };
 
-pub mod aliases;
-pub mod app;
-pub mod health;
-pub mod profile;
-pub mod settings;
 pub mod theme;
-pub mod update;
 
-use theme::{style_dim, style_error, style_header, style_select};
+use theme::{style_dim, style_header, style_select, style_error};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum FlashKind {
@@ -112,12 +113,10 @@ mod tests {
 
     #[test]
     fn small_terminal_shows_guard_message() {
-        // With a very small terminal, draw_header/footer should not panic.
         let backend = TestBackend::new(30, 8);
         let mut terminal = Terminal::new(backend).unwrap();
         terminal.draw(|f| {
             let area = f.area();
-            // size guard: render a plain message instead of the normal UI
             if area.width < 50 || area.height < 14 {
                 let msg = "Terminal too small — need at least 50×14";
                 f.render_widget(

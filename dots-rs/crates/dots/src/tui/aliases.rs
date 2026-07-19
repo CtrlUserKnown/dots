@@ -157,7 +157,7 @@ fn render_list(f: &mut Frame, area: Rect, view: &AliasView) {
         }
     };
     draw_desc(f, area, &desc, view.flash.as_ref());
-    draw_footer(f, area, " j/k navigate  a add  e edit  d delete (user)  / search  q back ");
+    draw_footer(f, area, " j/k navigate  a add  e edit  d delete (user)  / search  esc back  q quit ");
 }
 
 fn render_form(
@@ -206,7 +206,8 @@ pub fn handle_alias_key(app: &mut App, view: &mut AliasView, key: KeyEvent) {
 fn handle_list(app: &mut App, view: &mut AliasView, key: KeyEvent) {
     let n = view.visible.len();
     match key.code {
-        KeyCode::Char('q') | KeyCode::Esc => { app.screen = Screen::Main; app.flash = None; }
+        KeyCode::Esc => { app.screen = Screen::Main; app.flash = None; }
+        KeyCode::Char('q') => app.should_quit = true,
         KeyCode::Char('j') | KeyCode::Down => {
             if view.cursor + 1 < n { view.cursor += 1; }
         }

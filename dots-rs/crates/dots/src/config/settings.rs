@@ -24,24 +24,10 @@ impl Default for DotsSettings {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
-pub struct SsmSettings {
-    pub use_herdr: bool,
-}
-
-impl Default for SsmSettings {
-    fn default() -> Self {
-        Self { use_herdr: true }
-    }
-}
-
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Settings {
     #[serde(default)]
     pub dots: DotsSettings,
-    #[serde(default)]
-    pub ssm: SsmSettings,
 }
 
 pub fn dots_dir() -> PathBuf {
@@ -103,9 +89,6 @@ pub fn merge(base: Settings, overlay: Settings) -> Settings {
                 overlay.dots.theme
             },
         },
-        ssm: SsmSettings {
-            use_herdr: overlay.ssm.use_herdr,
-        },
     }
 }
 
@@ -122,7 +105,6 @@ mod tests {
         let mut s = Settings::default();
         s.dots.greeting = false;
         s.dots.update_frequency = 360;
-        s.ssm.use_herdr = false;
 
         let text = toml::to_string_pretty(&s).unwrap();
         std::fs::write(&path, &text).unwrap();
@@ -130,7 +112,6 @@ mod tests {
         let loaded: Settings = toml::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         assert!(!loaded.dots.greeting);
         assert_eq!(loaded.dots.update_frequency, 360);
-        assert!(!loaded.ssm.use_herdr);
     }
 
     #[test]
@@ -141,7 +122,6 @@ mod tests {
         assert_eq!(loaded.dots.greeting, defaults.dots.greeting);
         assert_eq!(loaded.dots.update_check, defaults.dots.update_check);
         assert_eq!(loaded.dots.update_frequency, defaults.dots.update_frequency);
-        assert_eq!(loaded.ssm.use_herdr, defaults.ssm.use_herdr);
     }
 
     #[test]

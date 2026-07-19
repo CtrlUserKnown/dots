@@ -1,48 +1,27 @@
-[package]
-name = "dots"
+[workspace]
+resolver = "2"
+members = ["crates/tui-core", "crates/dots"]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2021"
-description = "dots dotfiles manager"
 
-[[bin]]
-name = "dots"
-path = "src/main.rs"
+[workspace.dependencies]
+ratatui    = "0.29"
+crossterm  = "0.28"
+clap       = { version = "4", features = ["derive"] }
+serde      = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml       = "0.8"
+anyhow     = "1"
+dirs       = "5"
 
-[lib]
-name = "dots"
-path = "src/lib.rs"
-
-[dependencies]
-# TUI
-ratatui     = "0.29"
-crossterm   = "0.28"
-
-# CLI
-clap        = { version = "4", features = ["derive"] }
-
-# Serialization
-serde       = { version = "1", features = ["derive"] }
-serde_json  = "1"
-toml        = "0.8"
-
-# OS keychain (macOS: Security framework, Linux: secret-service)
-keyring     = { version = "3", features = ["apple-native", "sync-secret-service"] }
-
-# HTTP — GitHub release checks
-ureq        = { version = "2", features = ["json"] }
-
-# Error handling
-anyhow      = "1"
-
-# Platform dirs (~/.config, ~/ etc.)
-dirs        = "5"
-
-[dev-dependencies]
+# dev
 tempfile   = "3"
 assert_cmd = "2"
 predicates = "3"
 
 [profile.release]
-opt-level   = "z"    # minimize binary size
-lto         = true
-strip       = true
+opt-level = "z"    # minimize binary size
+lto       = true
+strip     = true

@@ -46,7 +46,6 @@ enum FieldKey {
     Greeting,
     Theme,
     DeveloperMode,
-    HerdrMode,
 }
 
 fn field_label(k: FieldKey) -> &'static str {
@@ -57,7 +56,6 @@ fn field_label(k: FieldKey) -> &'static str {
         FieldKey::Greeting      => "Shell greeting",
         FieldKey::Theme         => "Theme",
         FieldKey::DeveloperMode => "Developer mode",
-        FieldKey::HerdrMode     => "herdr mode",
     }
 }
 
@@ -69,13 +67,7 @@ fn field_desc(k: FieldKey) -> &'static str {
         FieldKey::Greeting      => "show fastfetch system info when opening a terminal",
         FieldKey::Theme         => "pick a terminal color theme",
         FieldKey::DeveloperMode => "track commits instead of releases",
-        FieldKey::HerdrMode     => "route SSH connections through herdr --remote",
     }
-}
-
-fn herdr_installed() -> bool {
-    std::process::Command::new("which").arg("herdr")
-        .output().map(|o| o.status.success()).unwrap_or(false)
 }
 
 // ── settings view ─────────────────────────────────────────────────────────────
@@ -109,9 +101,6 @@ impl SettingsView {
             FieldKey::Theme,
             FieldKey::DeveloperMode,
         ];
-        if herdr_installed() {
-            self.fields.push(FieldKey::HerdrMode);
-        }
     }
 
     fn value_str(&self, k: FieldKey) -> (String, bool) {
@@ -121,7 +110,6 @@ impl SettingsView {
             FieldKey::CheckInterval => (freq_label(self.settings.dots.update_frequency).to_string(), true),
             FieldKey::Greeting      => bool_display(self.settings.dots.greeting),
             FieldKey::DeveloperMode => bool_display(self.settings.dots.developer_mode),
-            FieldKey::HerdrMode     => bool_display(self.settings.ssm.use_herdr),
             FieldKey::CheckUpdates | FieldKey::Theme => (String::new(), true),
         }
     }
@@ -131,7 +119,6 @@ impl SettingsView {
             FieldKey::AutoUpdates   => { self.settings.dots.update_check    ^= true; SettingsAction::None }
             FieldKey::Greeting      => { self.settings.dots.greeting         ^= true; SettingsAction::None }
             FieldKey::DeveloperMode => { self.settings.dots.developer_mode   ^= true; SettingsAction::None }
-            FieldKey::HerdrMode     => { self.settings.ssm.use_herdr         ^= true; SettingsAction::None }
             FieldKey::CheckInterval => {
                 self.settings.dots.update_frequency = next_freq(self.settings.dots.update_frequency);
                 SettingsAction::None
@@ -184,12 +171,13 @@ pub fn render_settings(f: &mut Frame, area: Rect, _app: &App, view: &SettingsVie
 
     let desc = view.fields.get(view.cursor).copied().map(field_desc).unwrap_or("");
     draw_desc(f, area, desc, view.flash.as_ref());
-    draw_footer(f, area, " j/k navigate  space/enter activate  q save & back ");
+    draw_footer(f, area, " j/k navigate  space/enter activate  esc save & back  q save & quit ");
 }
 
 pub fn handle_settings_key(app: &mut App, view: &mut SettingsView, theme: &mut ThemeView, key: KeyEvent) {
     match key.code {
-        KeyCode::Char('q') | KeyCode::Esc => save_and_exit(app, view),
+        KeyCode::Esc => save_and_exit(app, view),
+        KeyCode::Char('q') => save_and_quit(app, view),
         KeyCode::Char('j') | KeyCode::Down => {
             if !view.fields.is_empty() {
                 view.cursor = (view.cursor + 1) % view.fields.len();
@@ -233,6 +221,19 @@ fn save_and_exit(app: &mut App, view: &SettingsView) {
     }
 }
 
+/// Persist settings then quit the whole app (q from the settings screen).
+fn save_and_quit(app: &mut App, view: &SettingsView) {
+    match settings::save(&view.settings) {
+        Ok(()) => {
+            app.settings     = view.settings.clone();
+            app.should_quit  = true;
+        }
+        Err(e) => {
+            app.flash = Some((format!("✗ Save failed: {e}"), FlashKind::Error));
+        }
+    }
+}
+
 // ── theme picker ──────────────────────────────────────────────────────────────
 
 pub struct ThemeView {
@@ -266,11 +267,11 @@ pub fn render_theme(f: &mut Frame, area: Rect, _app: &App, view: &ThemeView) {
         f.render_widget(
             Paragraph::new(vec![
                 Line::from("Ghostty is not installed — theme picker requires Ghostty."),
-                Line::from(Span::styled("Press q to go back.", style_dim())),
+                Line::from(Span::styled("Press esc to go back.", style_dim())),
             ]),
             rect,
         );
-        draw_footer(f, area, " q back ");
+        draw_footer(f, area, " esc back  q quit ");
         return;
     }
 
@@ -304,16 +305,17 @@ pub fn render_theme(f: &mut Frame, area: Rect, _app: &App, view: &ThemeView) {
 
     let desc = format!("enter to apply  current: {}", view.current);
     draw_desc(f, area, &desc, view.flash.as_ref());
-    draw_footer(f, area, " j/k navigate  enter apply  q back ");
+    draw_footer(f, area, " j/k navigate  enter apply  esc back  q quit ");
 }
 
 pub fn handle_theme_key(app: &mut App, view: &mut ThemeView, key: KeyEvent) {
     let n = view.themes.len();
     match key.code {
-        KeyCode::Char('q') | KeyCode::Esc => {
+        KeyCode::Esc => {
             app.screen = Screen::Settings;
             app.flash  = None;
         }
+        KeyCode::Char('q') => app.should_quit = true,
         KeyCode::Char('j') | KeyCode::Down => {
             if n > 0 {
                 view.cursor = (view.cursor + 1).min(n - 1);

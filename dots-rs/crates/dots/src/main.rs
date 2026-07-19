@@ -8,8 +8,6 @@ use crossterm::{
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
 
-use dots::ssm::connect::ConnectConfig;
-
 #[derive(Parser)]
 #[command(name = "dots", version, about = "dots dotfiles manager")]
 struct Cli {
@@ -27,13 +25,6 @@ enum Command {
     },
     /// Check for and apply updates
     Update,
-    /// SSH session manager
-    Ssm {
-        #[arg(short = 'c', help = "Connect directly: user@host[:port]")]
-        connect: Option<String>,
-        #[arg(short = 'l', long, help = "List saved sessions")]
-        list: bool,
-    },
     /// Manage shell aliases
     Aliases {
         #[command(subcommand)]
@@ -108,13 +99,6 @@ fn main() -> anyhow::Result<()> {
             let report = dots::symlinks::repair_all()?;
             println!("  {} OK, {} repaired, {} skipped", report.ok, report.repaired, report.skipped);
         }
-        Some(Command::Ssm { connect: Some(spec), .. }) => {
-            dots::ssm::connect::connect_direct(&spec)?;
-        }
-        Some(Command::Ssm { list: true, .. }) => {
-            dots::ssm::connect::cli_list()?;
-        }
-        Some(Command::Ssm { .. }) => run_ssm()?,
         Some(Command::Aliases { action }) => cli_aliases(action)?,
         Some(Command::Install { name, all, optional }) => cli_install(name, all, optional)?,
         Some(Command::Premade { action }) => cli_premade(action)?,
@@ -308,45 +292,6 @@ fn run_tui(start: dots::tui::app::Screen) -> anyhow::Result<()> {
     }
     let _guard = Guard;
 
-    let open_ssm = dots::tui::app::run(&mut term, start, &settings)?;
-    if open_ssm {
-        let cfg = ConnectConfig { use_herdr: settings.ssm.use_herdr };
-        dots::ssm::tui::run_ssm(&mut term, cfg)?;
-    }
+    dots::tui::app::run(&mut term, start, &settings)?;
     Ok(())
-}
-
-fn run_ssm() -> anyhow::Result<()> {
-    let settings = dots::config::settings::load().unwrap_or_default();
-
-    if !dots::ssm::storage::keychain_available() {
-        eprintln!("SSM requires a keychain/secret-service backend.");
-        eprintln!("On Linux, ensure a secret-service daemon (e.g. gnome-keyring or kwallet) is running.");
-        return Ok(());
-    }
-
-    let prev_hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(move |info| {
-        let _ = disable_raw_mode();
-        let _ = execute!(io::stdout(), LeaveAlternateScreen);
-        prev_hook(info);
-    }));
-
-    enable_raw_mode().context("could not enter raw mode")?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)?;
-    let backend  = CrosstermBackend::new(stdout);
-    let mut term = Terminal::new(backend)?;
-
-    struct Guard;
-    impl Drop for Guard {
-        fn drop(&mut self) {
-            let _ = disable_raw_mode();
-            let _ = execute!(io::stdout(), LeaveAlternateScreen);
-        }
-    }
-    let _guard = Guard;
-
-    let cfg = ConnectConfig { use_herdr: settings.ssm.use_herdr };
-    dots::ssm::tui::run_ssm(&mut term, cfg)
 }

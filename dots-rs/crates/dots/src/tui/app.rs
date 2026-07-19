@@ -6,14 +6,13 @@ use ratatui::{
     Frame,
     backend::CrosstermBackend,
     layout::Rect,
-    style::Modifier,
     text::{Line, Span},
     widgets::Paragraph,
     Terminal,
 };
 
 use crate::config::settings::{dots_dir, Settings};
-use crate::tui::theme::{style_dim, style_error, style_select};
+use crate::tui::theme::style_error;
 use crate::tui::{draw_desc, draw_footer, draw_header, FlashKind};
 use crate::update::{
     check_upstream, record_check, should_check, UpdateMode, UpdateStatus,
@@ -38,17 +37,16 @@ pub enum Screen {
     Theme,
     Settings,
     Update,
-    Ssm,
 }
 
 // ── app state ─────────────────────────────────────────────────────────────────
 
 pub struct App {
     pub should_quit:   bool,
-    pub open_ssm:      bool,
     pub screen:        Screen,
     pub flash:         Option<(String, FlashKind)>,
     pub menu_idx:      usize,
+    pub dash_focus:    usize,
     pub update_status: Option<UpdateStatus>,
     pub update_error:  Option<String>,
     pub settings:      Settings,
@@ -58,10 +56,10 @@ impl App {
     pub fn new(start: Screen, settings: Settings) -> Self {
         Self {
             should_quit:   false,
-            open_ssm:      false,
             screen:        start,
             flash:         None,
             menu_idx:      0,
+            dash_focus:    0,
             update_status: None,
             update_error:  None,
             settings,
@@ -71,30 +69,22 @@ impl App {
 
 // ── main menu ─────────────────────────────────────────────────────────────────
 
-struct MenuItem {
-    label:  &'static str,
-    screen: Screen,
-    desc:   &'static str,
-}
-
-const MAIN_MENU: &[MenuItem] = &[
-    MenuItem { label: "Health",   screen: Screen::Health,   desc: "check symlinks, tools & plugins" },
-    MenuItem { label: "Aliases",  screen: Screen::Aliases,  desc: "view and manage shell aliases" },
-    MenuItem { label: "Profile",  screen: Screen::Profile,  desc: "export / import personal config" },
-    MenuItem { label: "Theme",    screen: Screen::Theme,    desc: "pick a terminal color theme" },
-    MenuItem { label: "SSM",      screen: Screen::Ssm,      desc: "SSH session manager" },
-    MenuItem { label: "Settings", screen: Screen::Settings, desc: "configure dots preferences" },
-    MenuItem { label: "Update",   screen: Screen::Update,   desc: "check for updates" },
+/// Screens reachable by number key from the dashboard (1 = first). Health and
+/// Update are omitted here because they are opened by drilling into their panes.
+const MAIN_MENU: &[Screen] = &[
+    Screen::Aliases,
+    Screen::Profile,
+    Screen::Theme,
+    Screen::Settings,
 ];
 
 // ── event loop ────────────────────────────────────────────────────────────────
 
-/// Returns true if the SSM TUI should be opened after this returns.
 pub fn run(
     terminal:  &mut Terminal<CrosstermBackend<Stdout>>,
     start:     Screen,
     settings:  &Settings,
-) -> anyhow::Result<bool> {
+) -> anyhow::Result<()> {
     let mut app           = App::new(start, settings.clone());
     let mut health_view   = HealthView::new();
     let mut alias_view    = AliasView::new();
@@ -178,7 +168,7 @@ pub fn run(
         if app.should_quit { break; }
     }
 
-    Ok(app.open_ssm)
+    Ok(())
 }
 
 // ── rendering dispatch ────────────────────────────────────────────────────────
@@ -207,49 +197,31 @@ fn render(
         Screen::Update   => super::update::render(f, area, app, update),
         Screen::Settings => render_settings(f, area, app, settings),
         Screen::Theme    => render_theme(f, area, app, theme),
-        Screen::Ssm      => render_ssm_redirect(f, area, app),
     }
 }
 
 fn render_main(f: &mut Frame, area: Rect, app: &App) {
+    use super::overview::{self, PANES};
+
     draw_header(f, area, " dots ", VERSION);
 
-    let content_y = area.y + 2;
-    for (i, item) in MAIN_MENU.iter().enumerate() {
-        let y = content_y + i as u16;
-        if y + 3 >= area.y + area.height { break; }
-        let rect = Rect { x: area.x + 2, y, width: area.width.saturating_sub(4), height: 1 };
-        let (num_style, label_style) = if i == app.menu_idx {
-            (style_select().add_modifier(Modifier::BOLD), style_select().add_modifier(Modifier::BOLD))
-        } else {
-            (style_dim(), ratatui::style::Style::default())
-        };
-        let cursor = if i == app.menu_idx { "▶ " } else { "  " };
-        f.render_widget(
-            Paragraph::new(Line::from(vec![
-                Span::styled(cursor, num_style),
-                Span::styled(format!("{:<2}", i + 1), num_style),
-                Span::raw("  "),
-                Span::styled(item.label, label_style),
-            ])),
-            rect,
-        );
-    }
+    // Content region sits below the header line and above the desc/footer bars.
+    let top    = area.y + 1;
+    let bottom = area.y + area.height - 4; // desc bar lives at height-4
+    let grid = Rect {
+        x:      area.x + 1,
+        y:      top,
+        width:  area.width.saturating_sub(2),
+        height: bottom.saturating_sub(top),
+    };
+    overview::render_grid(f, grid, app, app.dash_focus);
 
-    let desc = MAIN_MENU.get(app.menu_idx).map(|m| m.desc).unwrap_or("");
-    draw_desc(f, area, desc, app.flash.as_ref());
-    draw_footer(f, area, " j/k navigate  1-9 jump  enter select  q quit ");
-}
-
-fn render_ssm_redirect(f: &mut Frame, area: Rect, app: &App) {
-    draw_header(f, area, " ssm ", VERSION);
-    let rect = Rect { x: area.x + 2, y: area.y + 2, width: area.width.saturating_sub(4), height: 1 };
-    f.render_widget(
-        Paragraph::new(Line::from(Span::styled("Opening SSH session manager…", style_dim()))),
-        rect,
-    );
-    draw_desc(f, area, "", app.flash.as_ref());
-    draw_footer(f, area, " q cancel ");
+    let hint = PANES
+        .get(app.dash_focus)
+        .map(|p| overview::pane_hint(*p, app))
+        .unwrap_or_default();
+    draw_desc(f, area, &hint, app.flash.as_ref());
+    draw_footer(f, area, " hjkl/↑↓←→ move  enter open  1 aliases 2 profile 3 theme 4 settings  q quit ");
 }
 
 fn render_too_small(f: &mut Frame, area: Rect) {
@@ -286,10 +258,6 @@ fn handle_key(
         Screen::Update   => super::update::handle_key(app, update, key),
         Screen::Settings => handle_settings_key(app, settings, theme, key),
         Screen::Theme    => handle_theme_key(app, theme, key),
-        Screen::Ssm      => match key.code {
-            KeyCode::Char('q') | KeyCode::Esc => { app.screen = Screen::Main; app.flash = None; }
-            _ => {}
-        },
     }
 }
 
@@ -304,24 +272,28 @@ fn handle_main_key(
     theme:    &mut ThemeView,
     key:      KeyEvent,
 ) {
+    use super::overview::{self, Dir, PANES};
+
     match key.code {
-        KeyCode::Char('q') | KeyCode::Esc => app.should_quit = true,
-        KeyCode::Char('j') | KeyCode::Down => {
-            app.menu_idx = (app.menu_idx + 1).min(MAIN_MENU.len() - 1);
-        }
-        KeyCode::Char('k') | KeyCode::Up => {
-            app.menu_idx = app.menu_idx.saturating_sub(1);
-        }
+        KeyCode::Char('q') => app.should_quit = true,
+        KeyCode::Char('h') | KeyCode::Left  => app.dash_focus = overview::move_focus(app.dash_focus, Dir::Left),
+        KeyCode::Char('l') | KeyCode::Right => app.dash_focus = overview::move_focus(app.dash_focus, Dir::Right),
+        KeyCode::Char('j') | KeyCode::Down  => app.dash_focus = overview::move_focus(app.dash_focus, Dir::Down),
+        KeyCode::Char('k') | KeyCode::Up    => app.dash_focus = overview::move_focus(app.dash_focus, Dir::Up),
         KeyCode::Char(c) if ('1'..='9').contains(&c) => {
             let idx = (c as u8 - b'1') as usize;
             if idx < MAIN_MENU.len() {
                 app.menu_idx = idx;
-                navigate_to(app, health, aliases, profile, update, settings, theme, MAIN_MENU[idx].screen);
+                navigate_to(app, health, aliases, profile, update, settings, theme, MAIN_MENU[idx]);
             }
         }
         KeyCode::Enter => {
-            let screen = MAIN_MENU[app.menu_idx].screen;
-            navigate_to(app, health, aliases, profile, update, settings, theme, screen);
+            if let Some(&pane) = PANES.get(app.dash_focus) {
+                navigate_to(app, health, aliases, profile, update, settings, theme, pane.target());
+                if let Some(section) = pane.section() {
+                    health.focus_section(section);
+                }
+            }
         }
         _ => {}
     }
@@ -368,10 +340,6 @@ fn navigate_to(
             theme.load();
             app.screen = Screen::Theme;
             app.flash  = None;
-        }
-        Screen::Ssm => {
-            app.open_ssm    = true;
-            app.should_quit = true;
         }
         other => {
             app.screen = other;

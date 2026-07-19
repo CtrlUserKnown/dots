@@ -110,7 +110,7 @@ pub fn render_profile(f: &mut Frame, area: Rect, _app: &App, view: &ProfileView)
         }
         ProfileMode::Normal => {
             draw_desc(f, area, "", view.flash.as_ref());
-            draw_footer(f, area, " g generate  i import file  G import GitHub  q back ");
+            draw_footer(f, area, " g generate  i import file  G import GitHub  esc back  q quit ");
         }
     }
 }
@@ -156,7 +156,8 @@ pub fn handle_profile_key(app: &mut App, view: &mut ProfileView, key: KeyEvent) 
 
 fn handle_normal(app: &mut App, view: &mut ProfileView, key: KeyEvent) {
     match key.code {
-        KeyCode::Char('q') | KeyCode::Esc => { app.screen = Screen::Main; app.flash = None; }
+        KeyCode::Esc => { app.screen = Screen::Main; app.flash = None; }
+        KeyCode::Char('q') => app.should_quit = true,
         KeyCode::Char('g') => {
             let path = personal_config_path();
             match generate_personal_config(&path) {

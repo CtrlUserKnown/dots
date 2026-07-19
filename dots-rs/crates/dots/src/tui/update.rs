@@ -120,8 +120,8 @@ pub fn render(f: &mut Frame, area: Rect, _app: &App, screen: &UpdateScreen) {
     f.render_widget(Paragraph::new(line), body_rect);
 
     let hint_str = match screen.state {
-        UpdateState::Available { .. } => " y update  q back ",
-        _ => " q back ",
+        UpdateState::Available { .. } => " y update  esc back  q quit ",
+        _ => " esc back  q quit ",
     };
     draw_desc(f, area, desc, None);
     draw_footer(f, area, hint_str);
@@ -131,10 +131,11 @@ pub fn render(f: &mut Frame, area: Rect, _app: &App, screen: &UpdateScreen) {
 
 pub fn handle_key(app: &mut App, screen: &mut UpdateScreen, key: KeyEvent) {
     match key.code {
-        KeyCode::Char('q') | KeyCode::Esc => {
+        KeyCode::Esc => {
             app.screen = Screen::Main;
             app.flash  = None;
         }
+        KeyCode::Char('q') => app.should_quit = true,
         KeyCode::Char('y') => {
             if matches!(screen.state, UpdateState::Available { .. }) {
                 start_pull(screen);

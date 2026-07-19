@@ -2,7 +2,6 @@ mod common;
 
 use assert_cmd::Command;
 use predicates::str as pstr;
-use tempfile::tempdir;
 
 // ── binary basics ─────────────────────────────────────────────────────────────
 
@@ -42,19 +41,6 @@ fn update_check_with_local_repo() {
         Ok(status) => assert_eq!(status.behind, 1, "local should be 1 commit behind"),
         Err(e)     => eprintln!("update_check_with_local_repo skipped: {e}"),
     }
-}
-
-// ── SSM CLI ───────────────────────────────────────────────────────────────────
-
-#[test]
-fn ssm_list_empty() {
-    let tmp = tempdir().unwrap();
-    Command::cargo_bin("dots").unwrap()
-        .env("DOTS_SSM_DIR", tmp.path())
-        .args(["ssm", "--list"])
-        .assert()
-        .success()
-        .stdout(pstr::contains("No saved sessions"));
 }
 
 // ── alias CLI ─────────────────────────────────────────────────────────────────

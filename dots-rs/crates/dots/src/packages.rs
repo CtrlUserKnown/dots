@@ -147,7 +147,7 @@ mod tests {
         let fake = Dep {
             bin: "dots-definitely-not-a-real-binary-xyz",
             brew: "", dnf: "", apt: "", desc: "",
-            category: Category::Required, tap: "", cask: false,
+            category: Category::Required, tap: "", cask: false, script: "",
         };
         assert!(!check_dep(&fake));
     }

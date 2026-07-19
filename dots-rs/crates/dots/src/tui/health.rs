@@ -130,6 +130,21 @@ impl HealthView {
         self.pending = None;
     }
 
+    /// Move the cursor to the first item under the named section and scroll it
+    /// to the top of the list. Used by the dashboard's drill-in.
+    pub fn focus_section(&mut self, label: &str) {
+        let Some(sec_di) = self.rows.iter().position(
+            |r| matches!(r, DisplayRow::Section(l) if *l == label),
+        ) else { return };
+        self.scroll = sec_di;
+        for di in (sec_di + 1)..self.rows.len() {
+            if let Some(nav) = self.nav_indices[di] {
+                self.cursor = nav;
+                break;
+            }
+        }
+    }
+
     fn cursor_display_row(&self) -> usize {
         self.nav_indices.iter()
             .position(|&n| n == Some(self.cursor))
@@ -278,7 +293,8 @@ pub fn render(f: &mut Frame, area: Rect, _app: &App, view: &HealthView) {
     if can_fix    { hints.push("enter fix/apply"); }
     if any_broken { hints.push("r repair all"); }
     if any_missing{ hints.push("i install all"); }
-    hints.push("q back");
+    hints.push("esc back");
+    hints.push("q quit");
     draw_footer(f, area, &format!(" j/k navigate  {}  ", hints.join("  ")));
 }
 
@@ -327,10 +343,11 @@ pub fn handle_key(app: &mut App, view: &mut HealthView, key: KeyEvent) {
     let visible = view.nav_count;
 
     match key.code {
-        KeyCode::Char('q') | KeyCode::Esc => {
+        KeyCode::Esc => {
             app.screen = Screen::Main;
             app.flash  = None;
         }
+        KeyCode::Char('q') => app.should_quit = true,
         KeyCode::Char('j') | KeyCode::Down => {
             if view.cursor + 1 < view.nav_count {
                 view.cursor += 1;
