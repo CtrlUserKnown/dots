@@ -2,7 +2,7 @@
 # Integration test: setup.sh must be idempotent (no duplicate PATH entries)
 set -euo pipefail
 
-DOTS_DIR="$(cd "$(dirname "$0")/../../../" && pwd)"
+DOTS_DIR="$(cd "$(dirname "$0")/../../" && pwd)"
 SETUP_SCRIPT="$DOTS_DIR/setup.sh"
 TEST_ZSHRC=$(mktemp)
 

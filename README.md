@@ -2,94 +2,107 @@
   <img src="img/svg/dots_logo_color_title.svg" alt="dots" width="180" />
 </p>
 
-A professional, performance-oriented macOS development environment. This repository automates the setup of a modern terminal workflow using Homebrew, Zsh, and Ghostty.
+**dots** is a fast, cross-platform dotfiles manager with an interactive TUI, written in Rust. It installs your tools, wires up symlinks GNU Stow–style, applies premade app configs, and keeps everything healthy — on macOS (Homebrew) and Linux (apt/dnf) alike.
 
-> [!TIP]
-> [Test Setup Script](https://github.com/CtrlUserKnown/dotfiles/actions/workflows/main.yml/badge.svg)
+> This repository is the **`dots` tool** itself. Your actual dotfiles/configs live in a separate repo (e.g. [`dotfiles-CUK`](https://github.com/CtrlUserKnown/dotfiles)); `dots` manages the symlinks between them and your `$HOME`.
 
 ## Features
 
-- **Automated Setup:** A robust `setup.sh` script that handles Homebrew, dependencies, and symlinking.
-- **Resilient Installation:** Built-in timeout logic and shallow clone fallbacks to prevent hanging on slow connections.
-- **Modern Stack:** Optimized configurations for:
-  - **Terminal:** [Ghostty](https://ghostty.org/) (macOS 12.0+) with multiple themes and built-in theme picker
-  - **Shell:** Zsh with custom `charModel` prompt theme
-  - **Utilities:** `eza`, `bat`, `fastfetch`, `fzf`, `zoxide`
-- **`dots` Command:** Interactive TUI for checking health, picking themes, managing settings, editing configs, and more.
-- **Auto-Update:** Built-in update checker (polls every 10 minutes) to stay current with the latest dotfiles.
-- **Quality Assured:** Includes a dedicated automated test suite and GitHub Actions CI.
+- **Interactive TUI** — run `dots` for a dashboard covering symlink health, installed tools, shell plugins, app configs, and updates.
+- **Cross-platform installs** — one dependency list, resolved per platform via Homebrew, `apt`, or `dnf`.
+- **Symlink management** — declare your own links (`dots link add`), then create/repair them idempotently. Adopts existing files with automatic backups.
+- **Premade configs** — bundled starter configs for Ghostty, Neovim, and opencode, applied on demand (existing files are backed up).
+- **Portable profiles** — export your setup to `personal.json` and re-import it on another machine, locally or straight from GitHub.
+- **Self-updating** — built-in update checker and one-command upgrade.
+- **Single static binary** — no runtime dependencies (pure-Rust TLS, no OpenSSL/keychain), optimized for size.
 
-## System Requirements
+## Install
 
-- **OS:** macOS 12.0 (Monterey) or newer (optimized for modern macOS).
-- **Arch:** Apple Silicon (M1/M2/M3/M4) preferred; Intel supported.
-- **Shell:** Zsh (standard on macOS 10.15+).
-
-## Quick Start
-
-You can install these dotfiles with a single command:
-
-```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/CrtlUserKnown/dotfiles/refs/heads/main/setup.sh)"
+```sh
+curl -fsSL https://raw.githubusercontent.com/CtrlUserKnown/dots/main/install.sh | sh
 ```
 
-Or clone the repository manually:
+The installer clones the repo to `~/.dots`, downloads a prebuilt binary for your OS/arch (or builds from source with `cargo` if no release matches), puts `dots` on your `PATH`, and initializes config.
 
-```bash
-git clone https://github.com/CtrlUserKnown/dotfiles ~/.dots && ~/.dots/setup.sh
+```
+install.sh [--branch <name>] [--version <tag>] [--dir <path>]
 ```
 
-The script will:
-1. Check your macOS version.
-2. Install [Homebrew](https://brew.sh/) and [Gum](https://github.com/charmbracelet/gum) if missing (includes timeout/fallback logic).
-3. Prompt you to install Ghostty, Neovim, optional tools, and personal packages.
-4. Install required dependencies (eza, bat, fzf, fastfetch, zoxide, neovim).
-5. Create symlinks for all configurations via `dots.py --repair-symlinks`.
+Prefer to build it yourself? See [`BUILD_MACOS.md`](BUILD_MACOS.md), or from a clone:
 
-## Project Structure
+```sh
+cargo build --release        # binary at target/release/dots
+```
 
-- [`src/zsh/`](src/zsh/) — Zsh configuration, custom `charModel` theme, aliases, functions, and utilities (`dots.py`, `update-check.zsh`).
-- [`src/ghostty/`](src/ghostty/) — Configuration and themes for the Ghostty terminal.
-- [`src/bat/`](src/bat/) — Themes and config for the `bat` utility.
-- [`src/fastfetch/`](src/fastfetch/) — System information display config.
-- [`src/opencode/`](src/opencode/) — Configuration for [opencode](https://opencode.ai) AI coding assistant.
-- [`src/git/`](src/git/) — Git configuration.
-- [`src/zsh/zsh/dots.py`](src/zsh/zsh/dots.py) — Dotfiles manager TUI and CLI (symlinks, deps, themes, settings, git).
+To remove it: [`uninstall.sh`](uninstall.sh).
 
 ## Usage
 
-Run `dots` in your terminal to open the interactive TUI:
+Run `dots` with no arguments to open the TUI. The dashboard's panes — **Symlinks**, **Tools**, **Plugins**, **Configs**, **Update** — drill into full-screen views for health checks, aliases, profile, theme, and settings.
 
+Everything is also scriptable via subcommands:
+
+| Command | What it does |
+|---|---|
+| `dots health [--fix]` | Check and repair all declared symlinks, tools, and plugins |
+| `dots update` | Check for and apply updates |
+| `dots install <name>` | Install a single dependency |
+| `dots install --all` | Install all missing **required** dependencies |
+| `dots install --optional` | Install all missing **optional** dependencies |
+| `dots aliases list \| add <name> <value> \| remove <name>` | Manage shell aliases |
+| `dots premade list \| apply <app>` | List/apply bundled app configs (ghostty, neovim, opencode) |
+| `dots link add <source> <target>` | Adopt a file/dir and symlink it (recorded in `links.toml`) |
+| `dots link list \| apply \| remove <target>` | Inspect, create/repair, or remove declared links |
+| `dots profile generate [path]` | Export your setup to `personal.json` |
+| `dots profile import <path>` | Import a `personal.json` from a local file |
+| `dots profile import-git <user/repo/path.json>` | Import a `personal.json` from GitHub |
+| `dots init [--quiet]` | Initialize config (idempotent; run automatically by the installer) |
+| `dots --version` | Print the version |
+
+### Dependencies
+
+The dependency list is defined in [`crates/dots/src/packages.rs`](crates/dots/src/packages.rs) in three tiers, each mapped to its `brew` / `dnf` / `apt` package name:
+
+| Category | When installed | Examples |
+|---|---|---|
+| **Required** | `dots install --all` | git, eza, bat, fd, fzf, fastfetch, zoxide |
+| **Optional** | `dots install --optional` | neovim, herdr, btop, lazygit, yazi, carapace |
+| **Dev** | `dots install <name>` | go, lua, cmake, gcc, ripgrep, gh, docker, ffmpeg, … |
+
+## Configuration
+
+- `~/.dots/` — the tool's home (repo checkout + `bin/dots`).
+- `~/.dots/settings.toml` — tool settings, under a `[dots]` table:
+
+  | Key | Default | Meaning |
+  |---|---|---|
+  | `update_check` | `true` | Check for updates periodically |
+  | `update_frequency` | `1440` | Minutes between update checks |
+  | `greeting` | `true` | Show the greeting banner |
+  | `developer_mode` | `false` | Enable developer features |
+  | `theme` | *(empty)* | Selected theme |
+
+- `~/.personal/` — your personal, machine-local layer: `aliases.zsh` (sourced after the built-in aliases), `apps/`, and an optional `config.toml` that overrides `settings.toml`.
+
+## Project Structure
+
+A Cargo workspace with two crates:
+
+- [`crates/dots/`](crates/dots/) — the `dots` binary: CLI, TUI screens, installer, symlink/link engine, config, and bundled premade `assets/`.
+- [`crates/tui-core/`](crates/tui-core/) — shared TUI chrome (header/footer/description bars, color theme, flash model) used by the `dots` screens.
+
+## Development
+
+```sh
+cargo test --all                     # unit + integration tests
+cargo clippy --all -- -D warnings    # lints
+cargo fmt --all -- --check           # formatting
+
+bash tests/integration/test_setup.sh # shell integration test (matches CI)
 ```
-dots          # open the dots manager menu
-dots -v       # show version
-dots --health # check installed tools from the command line
-```
 
-### Package Categories
+An isolated container test environment lives in [`test-env/`](test-env/) (see [`test-env/manage.sh`](test-env/manage.sh)); the manual QA checklist is in [`docs/manual-test-checklist.md`](docs/manual-test-checklist.md). CI runs on Linux and macOS via [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
-Dependencies are declared in `dots.py` in three tiers:
+## License
 
-| Category   | Included | Examples |
-|------------|----------|---------|
-| **Required** | Always installed | eza, bat, fzf, fastfetch, zoxide, neovim |
-| **Optional** | Prompted during setup | herdr, btop, lazygit, yazi, carapace |
-| **Personal** | Prompted during setup | go, rust, docker, ffmpeg, rectangle, maccy, blender |
-
-## Testing
-
-This project includes a safe, isolated test suite to verify the installation process without affecting your actual home directory.
-
-```bash
-cd tests
-./test_setup.sh
-```
-
-## Themes
-
-- **Char Model:** A clean, minimal Zsh prompt with SSH connection awareness (shows `∧` in remote sessions). [View Config](src/zsh/zsh/themes/charModel)
-- **Ghostty Themes:** Use `dots` → Theme to pick from 200+ built-in Ghostty themes; [noir-cat](src/ghostty/themes/noir-cat) and [knew-pines](src/ghostty/themes/knew-pines) included.
-- **KnewPines:** KnewPines, KnewPines Moon, and KnewPines Dawn color schemes for `bat`. See [`src/bat/themes/`](src/bat/themes/).
-
----
-*Neovim configuration has been migrated to its own repository: [Charvim](https://github.com/CtrlUserKnown/Charvim)*
+See [`LICENSE`](LICENSE).
