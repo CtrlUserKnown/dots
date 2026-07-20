@@ -3,6 +3,7 @@ use std::io;
 use anyhow::Context;
 use clap::{Parser, Subcommand};
 use crossterm::{
+    event::{DisableMouseCapture, EnableMouseCapture},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -339,13 +340,13 @@ fn run_tui(start: dots::tui::app::Screen) -> anyhow::Result<()> {
     let prev_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         let _ = disable_raw_mode();
-        let _ = execute!(io::stdout(), LeaveAlternateScreen);
+        let _ = execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture);
         prev_hook(info);
     }));
 
     enable_raw_mode().context("could not enter raw mode")?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)?;
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend  = CrosstermBackend::new(stdout);
     let mut term = Terminal::new(backend)?;
 
@@ -353,7 +354,7 @@ fn run_tui(start: dots::tui::app::Screen) -> anyhow::Result<()> {
     impl Drop for Guard {
         fn drop(&mut self) {
             let _ = disable_raw_mode();
-            let _ = execute!(io::stdout(), LeaveAlternateScreen);
+            let _ = execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture);
         }
     }
     let _guard = Guard;

@@ -1,7 +1,9 @@
 use std::io::Stdout;
 use std::time::Duration;
 
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{
+    self, Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
 use ratatui::{
     Frame,
     backend::CrosstermBackend,
@@ -49,6 +51,7 @@ pub struct App {
     pub dash_focus:    usize,
     pub update_status: Option<UpdateStatus>,
     pub update_error:  Option<String>,
+    pub network:       Option<crate::network::NetworkStatus>,
     pub settings:      Settings,
 }
 
@@ -62,6 +65,7 @@ impl App {
             dash_focus:    0,
             update_status: None,
             update_error:  None,
+            network:       None,
             settings,
         }
     }
@@ -111,9 +115,24 @@ pub fn run(
         });
     }
 
+    // Spawn the live network monitor: probe now, then refresh every few seconds.
+    // Sending fails once the receiver is dropped (app exit), which ends the loop.
+    let (net_tx, net_rx) = std::sync::mpsc::channel::<crate::network::NetworkStatus>();
+    std::thread::spawn(move || loop {
+        if net_tx.send(crate::network::probe()).is_err() {
+            break;
+        }
+        std::thread::sleep(Duration::from_secs(5));
+    });
+
     loop {
         update_screen.try_complete_pull();
         health_view.try_complete_install();
+
+        // Drain the latest network snapshot (keep only the freshest).
+        while let Ok(status) = net_rx.try_recv() {
+            app.network = Some(status);
+        }
 
         if let Ok(result) = update_rx.try_recv() {
             match result {
@@ -160,6 +179,20 @@ pub fn run(
                     &mut theme_view,
                     key,
                 ),
+                Event::Mouse(me) => {
+                    let area = terminal.size().map(|s| Rect::new(0, 0, s.width, s.height)).unwrap_or_default();
+                    handle_mouse(
+                        &mut app,
+                        &mut health_view,
+                        &mut alias_view,
+                        &mut profile_view,
+                        &mut update_screen,
+                        &mut settings_view,
+                        &mut theme_view,
+                        me,
+                        area,
+                    );
+                }
                 Event::Resize(..) => {}
                 _ => {}
             }
@@ -200,20 +233,26 @@ fn render(
     }
 }
 
+/// The dashboard pane-grid region within the full terminal `area`. Shared by
+/// rendering and mouse hit-testing so clicks land on what's drawn.
+fn dashboard_grid(area: Rect) -> Rect {
+    // Content region sits below the header line and above the desc/footer bars.
+    let top    = area.y + 1;
+    let bottom = area.y + area.height - 4; // desc bar lives at height-4
+    Rect {
+        x:      area.x + 1,
+        y:      top,
+        width:  area.width.saturating_sub(2),
+        height: bottom.saturating_sub(top),
+    }
+}
+
 fn render_main(f: &mut Frame, area: Rect, app: &App) {
     use super::overview::{self, PANES};
 
     draw_header(f, area, " dots ", VERSION);
 
-    // Content region sits below the header line and above the desc/footer bars.
-    let top    = area.y + 1;
-    let bottom = area.y + area.height - 4; // desc bar lives at height-4
-    let grid = Rect {
-        x:      area.x + 1,
-        y:      top,
-        width:  area.width.saturating_sub(2),
-        height: bottom.saturating_sub(top),
-    };
+    let grid = dashboard_grid(area);
     overview::render_grid(f, grid, app, app.dash_focus);
 
     let hint = PANES
@@ -292,6 +331,48 @@ fn handle_main_key(
                 navigate_to(app, health, aliases, profile, update, settings, theme, pane.target());
                 if let Some(section) = pane.section() {
                     health.focus_section(section);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn handle_mouse(
+    app:      &mut App,
+    health:   &mut HealthView,
+    aliases:  &mut AliasView,
+    profile:  &mut ProfileView,
+    update:   &mut UpdateScreen,
+    settings: &mut SettingsView,
+    theme:    &mut ThemeView,
+    me:       MouseEvent,
+    area:     Rect,
+) {
+    use super::overview::{self, PANES};
+
+    match me.kind {
+        // Wheel scroll drives vertical navigation on whatever screen is up,
+        // by reusing each screen's existing up/down key handling.
+        MouseEventKind::ScrollDown | MouseEventKind::ScrollUp => {
+            let code = if matches!(me.kind, MouseEventKind::ScrollDown) { KeyCode::Down } else { KeyCode::Up };
+            let key = KeyEvent::new(code, KeyModifiers::NONE);
+            handle_key(app, health, aliases, profile, update, settings, theme, key);
+        }
+        // Left-click on a dashboard pane focuses and opens it. The 50×14 guard
+        // matches the threshold below which the dashboard isn't drawn at all.
+        MouseEventKind::Down(MouseButton::Left)
+            if app.screen == Screen::Main && area.width >= 50 && area.height >= 14 =>
+        {
+            let grid = dashboard_grid(area);
+            if let Some(i) = overview::pane_at(grid, me.column, me.row) {
+                app.dash_focus = i;
+                if let Some(&pane) = PANES.get(i) {
+                    navigate_to(app, health, aliases, profile, update, settings, theme, pane.target());
+                    if let Some(section) = pane.section() {
+                        health.focus_section(section);
+                    }
                 }
             }
         }

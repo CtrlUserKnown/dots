@@ -1,6 +1,7 @@
 //! The dashboard shown on the main screen: a grid of summary panes giving an
-//! at-a-glance view of symlinks, tools, plugins, premade configs and updates.
-//! Each pane is a summary; pressing enter drills into the matching detail view.
+//! at-a-glance view of symlinks, tools, plugins, premade configs, updates and
+//! live network status. Each pane is a summary; pressing enter drills into the
+//! matching detail view where one exists.
 
 use ratatui::{
     Frame,
@@ -25,15 +26,20 @@ pub enum Pane {
     Plugins,
     Configs,
     Update,
+    Network,
 }
 
-/// Grid order. Rows of two, with Update spanning the final row.
-pub const PANES: [Pane; 5] = [
+/// Number of columns in the dashboard grid.
+const COLS: usize = 2;
+
+/// Grid order, laid out left-to-right, top-to-bottom in a 2-column grid.
+pub const PANES: [Pane; 6] = [
     Pane::Symlinks,
     Pane::Tools,
     Pane::Plugins,
     Pane::Configs,
     Pane::Update,
+    Pane::Network,
 ];
 
 impl Pane {
@@ -44,6 +50,7 @@ impl Pane {
             Pane::Plugins  => " Plugins ",
             Pane::Configs  => " Configs ",
             Pane::Update   => " Update ",
+            Pane::Network  => " Network ",
         }
     }
 
@@ -55,14 +62,17 @@ impl Pane {
             Pane::Plugins  => Some("plugins"),
             Pane::Configs  => Some("premade configs"),
             Pane::Update   => None,
+            Pane::Network  => None,
         }
     }
 
-    /// Screen this pane opens on enter.
+    /// Screen this pane opens on enter. Network is informational and stays on
+    /// the dashboard (it refreshes on its own).
     pub fn target(self) -> Screen {
         match self {
-            Pane::Update => Screen::Update,
-            _            => Screen::Health,
+            Pane::Update  => Screen::Update,
+            Pane::Network => Screen::Main,
+            _             => Screen::Health,
         }
     }
 }
@@ -71,13 +81,15 @@ impl Pane {
 
 pub enum Dir { Up, Down, Left, Right }
 
-/// Move focus within the 2-column grid. Update (index 4) spans the last row.
+/// Move focus within the 2-column grid.
 pub fn move_focus(focus: usize, dir: Dir) -> usize {
+    let last = PANES.len() - 1;
+    let in_left_col = focus.is_multiple_of(COLS);
     match dir {
-        Dir::Right => if focus < 4 && focus.is_multiple_of(2) { focus + 1 } else { focus },
-        Dir::Left  => if focus < 4 && !focus.is_multiple_of(2) { focus - 1 } else { focus },
-        Dir::Down  => (focus + 2).min(PANES.len() - 1),
-        Dir::Up    => focus.saturating_sub(2),
+        Dir::Right => if in_left_col { (focus + 1).min(last) } else { focus },
+        Dir::Left  => if in_left_col { focus } else { focus - 1 },
+        Dir::Down  => if focus + COLS <= last { focus + COLS } else { focus },
+        Dir::Up    => if focus >= COLS { focus - COLS } else { focus },
     }
 }
 
@@ -149,6 +161,17 @@ pub fn pane_hint(pane: Pane, app: &App) -> String {
             Some(st) if st.behind > 0 => format!("update available: v{} — enter to update", st.label),
             Some(_) => "up to date — enter for details".into(),
         },
+        Pane::Network => match &app.network {
+            None => "probing network…".into(),
+            Some(n) if !n.online => "offline — no connectivity".into(),
+            Some(n) => {
+                let net = n.name.as_deref().unwrap_or("network");
+                let lat = n.latency_ms.map(|ms| format!("{ms}ms")).unwrap_or_else(|| "—".into());
+                let dns = n.dns.first().map(String::as_str).unwrap_or("unknown");
+                let vpn = if n.vpn { "VPN on" } else { "VPN off" };
+                format!("{net} · {lat} · {vpn} · DNS {dns} — live")
+            }
+        },
     }
 }
 
@@ -156,36 +179,47 @@ pub fn pane_hint(pane: Pane, app: &App) -> String {
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// Whether `area` is large enough to draw the grid at all.
+fn grid_fits(area: Rect) -> bool {
+    area.height >= 6 && area.width >= 20
+}
+
+/// The on-screen rectangle of pane `i` within the grid `area`. Shared by both
+/// rendering and mouse hit-testing so the two never drift apart.
+fn pane_cell(area: Rect, i: usize) -> Rect {
+    // A uniform 2-column grid; one row per pair of panes.
+    let rows = PANES.len().div_ceil(COLS) as u16;
+    let band_h = area.height / rows;
+    let mid = area.width / 2;
+    let row = (i / COLS) as u16;
+    let right = i % COLS == 1;
+    // The final row absorbs any rounding remainder so it reaches the bottom.
+    let y = area.y + row * band_h;
+    let h = if row == rows - 1 { area.height - band_h * row } else { band_h };
+    Rect {
+        x:      if right { area.x + mid } else { area.x },
+        y,
+        width:  if right { area.width - mid } else { mid },
+        height: h,
+    }
+}
+
+/// Index into [`PANES`] of the pane covering point `(col, row)`, if any.
+pub fn pane_at(area: Rect, col: u16, row: u16) -> Option<usize> {
+    if !grid_fits(area) { return None; }
+    (0..PANES.len()).find(|&i| {
+        let r = pane_cell(area, i);
+        col >= r.x && col < r.x + r.width && row >= r.y && row < r.y + r.height
+    })
+}
+
 /// Renders the pane grid into `area` (the content region between header/footer).
 /// `focus` is the index into [`PANES`] of the currently selected pane.
 pub fn render_grid(f: &mut Frame, area: Rect, app: &App, focus: usize) {
-    if area.height < 6 || area.width < 20 { return; }
-
-    // Three row-bands: two 2-column rows, then a full-width Update row.
-    let band_h = area.height / 3;
-    let rows = [
-        Rect { x: area.x, y: area.y,                 width: area.width, height: band_h },
-        Rect { x: area.x, y: area.y + band_h,        width: area.width, height: band_h },
-        Rect { x: area.x, y: area.y + band_h * 2,    width: area.width, height: area.height - band_h * 2 },
-    ];
-    let mid = area.width / 2;
-    let cell = |r: Rect, right: bool| Rect {
-        x: if right { r.x + mid } else { r.x },
-        y: r.y,
-        width: if right { r.width - mid } else { mid },
-        height: r.height,
-    };
-
-    let rects = [
-        cell(rows[0], false), // Symlinks
-        cell(rows[0], true),  // Tools
-        cell(rows[1], false), // Plugins
-        cell(rows[1], true),  // Configs
-        rows[2],              // Update (full width)
-    ];
+    if !grid_fits(area) { return; }
 
     for (i, pane) in PANES.iter().enumerate() {
-        draw_pane(f, rects[i], *pane, app, i == focus);
+        draw_pane(f, pane_cell(area, i), *pane, app, i == focus);
     }
 }
 
@@ -224,6 +258,7 @@ fn pane_lines(pane: Pane, app: &App) -> Vec<Line<'static>> {
         Pane::Plugins  => count_lines(plugin_summary(),  "present", "missing", true),
         Pane::Configs  => count_lines(config_summary(),  "applied", "pending", false),
         Pane::Update   => update_lines(app),
+        Pane::Network  => network_lines(app),
     }
 }
 
@@ -264,6 +299,41 @@ fn update_lines(app: &App) -> Vec<Line<'static>> {
     }
 }
 
+/// Live network snapshot: reachability + latency, the network name, and DNS.
+fn network_lines(app: &App) -> Vec<Line<'static>> {
+    let Some(n) = &app.network else {
+        return vec![Line::from(Span::styled("probing…", style_dim()))];
+    };
+
+    if !n.online {
+        return vec![
+            Line::from(Span::styled("✗ offline", style_error().add_modifier(Modifier::BOLD))),
+            Line::from(Span::styled("no connectivity", style_dim())),
+        ];
+    }
+
+    let head = match (n.latency_ms, n.quality()) {
+        (Some(ms), Some(q)) => format!("✓ online · {ms}ms ({q})"),
+        _ => "✓ online".to_string(),
+    };
+
+    let name = n.name.clone().unwrap_or_else(|| "unknown network".into());
+    let dns = if n.dns.is_empty() { "DNS: unknown".to_string() } else { format!("DNS: {}", n.dns.join(", ")) };
+    let vpn = if n.vpn {
+        Line::from(Span::styled("🔒 VPN on", style_select()))
+    } else {
+        Line::from(Span::styled("○ VPN off", style_dim()))
+    };
+
+    // VPN comes before DNS so it survives first when a short pane clips lines.
+    vec![
+        Line::from(Span::styled(head, style_select().add_modifier(Modifier::BOLD))),
+        Line::from(Span::styled(format!("⌂ {name}"), style_header())),
+        vpn,
+        Line::from(Span::styled(dns, style_dim())),
+    ]
+}
+
 // ── tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -272,6 +342,7 @@ mod tests {
 
     #[test]
     fn focus_moves_within_grid() {
+        // 2-column grid: [0 1 / 2 3 / 4 5]
         assert_eq!(move_focus(0, Dir::Right), 1);
         assert_eq!(move_focus(1, Dir::Left), 0);
         assert_eq!(move_focus(0, Dir::Down), 2);
@@ -279,12 +350,14 @@ mod tests {
         assert_eq!(move_focus(4, Dir::Up), 2);
         // right on an already-right cell stays put
         assert_eq!(move_focus(1, Dir::Right), 1);
-        // update pane has no horizontal neighbour
-        assert_eq!(move_focus(4, Dir::Right), 4);
-        assert_eq!(move_focus(4, Dir::Left), 4);
+        // Update (4) and Network (5) are horizontal neighbours on the last row
+        assert_eq!(move_focus(4, Dir::Right), 5);
+        assert_eq!(move_focus(5, Dir::Left), 4);
         // clamped at edges
         assert_eq!(move_focus(0, Dir::Up), 0);
         assert_eq!(move_focus(4, Dir::Down), 4);
+        assert_eq!(move_focus(5, Dir::Down), 5);
+        assert_eq!(move_focus(5, Dir::Up), 3);
     }
 
     #[test]
@@ -293,5 +366,23 @@ mod tests {
             let _ = p.target();
             let _ = p.title();
         }
+    }
+
+    #[test]
+    fn pane_at_hit_tests_the_grid() {
+        // 80×18 grid → 2 cols × 3 rows, each cell 40×6.
+        let area = Rect::new(0, 0, 80, 18);
+        assert_eq!(pane_at(area, 5, 3), Some(0)); // top-left
+        assert_eq!(pane_at(area, 45, 3), Some(1)); // top-right
+        assert_eq!(pane_at(area, 5, 8), Some(2)); // mid-left
+        assert_eq!(pane_at(area, 45, 15), Some(5)); // bottom-right (Network)
+        assert_eq!(pane_at(area, 5, 12), Some(4)); // bottom-left (Update)
+        // Every cell maps back to itself.
+        for i in 0..PANES.len() {
+            let r = pane_cell(area, i);
+            assert_eq!(pane_at(area, r.x, r.y), Some(i));
+        }
+        // Too-small areas hit nothing.
+        assert_eq!(pane_at(Rect::new(0, 0, 10, 4), 1, 1), None);
     }
 }
