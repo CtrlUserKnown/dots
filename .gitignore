@@ -1,30 +1,20 @@
+# Rust build artifacts
+/target/
+
 # developer mode marker — create this file to disable update prompts
 .developer
 
 # user settings — not committed (theme, update prefs)
 /.settings
 
-# runtime stamps — not committed
-src/zsh/zsh/.update_stamp
-src/zsh/zsh/.version_stamp
-
-# editors
+# editors / OS junk
 .DS_Store
 **/.DS_Store
 # macOS AppleDouble / resource-fork files
 ._*
 **/._*
 
-# Ignore tmux plugin repos
-./src/tmux/plugins/
-src/tmux/plugins/
-
-# node modules
-*/node_modules
-**/node_modules
-
-# python
-./__pycache__
+# python (legacy)
 **/__pycache__
 
 # ai
@@ -33,6 +23,3 @@ CLAUDE.md
 
 # logs
 *.log
-
-# Rust build artifacts
-dots-rs/target/

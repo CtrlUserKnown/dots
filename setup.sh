@@ -55,11 +55,11 @@ _download_binary() {
 
     if command -v curl >/dev/null 2>&1; then
         if ! curl -fsSL "$url" | tar -xz -C "$DOTS_DIR/bin"; then
-            die "Download failed. Install Rust (https://rustup.rs) and run: cargo build --manifest-path $DOTS_DIR/dots-rs/Cargo.toml --release"
+            die "Download failed. Install Rust (https://rustup.rs) and run: cargo build --manifest-path $DOTS_DIR/Cargo.toml --release"
         fi
     elif command -v wget >/dev/null 2>&1; then
         if ! wget -q -O - "$url" | tar -xz -C "$DOTS_DIR/bin"; then
-            die "Download failed. Install Rust (https://rustup.rs) and run: cargo build --manifest-path $DOTS_DIR/dots-rs/Cargo.toml --release"
+            die "Download failed. Install Rust (https://rustup.rs) and run: cargo build --manifest-path $DOTS_DIR/Cargo.toml --release"
         fi
     else
         die "Neither curl nor wget found. Install one and retry."
@@ -91,11 +91,11 @@ if [ -x "$DOTS_BIN" ] && "$DOTS_BIN" --version &>/dev/null; then
     ok "Binary ready ($("$DOTS_BIN" --version))"
 elif command -v cargo >/dev/null 2>&1; then
     info "Building dots from source ($DOTS_VERSION)…"
-    if ! cargo build --manifest-path "$DOTS_DIR/dots-rs/Cargo.toml" --release; then
+    if ! cargo build --manifest-path "$DOTS_DIR/Cargo.toml" --release; then
         die "cargo build failed. Please file a bug at https://github.com/CtrlUserKnown/dots/issues"
     fi
     mkdir -p "$DOTS_DIR/bin"
-    cp "$DOTS_DIR/dots-rs/target/release/dots" "$DOTS_BIN"
+    cp "$DOTS_DIR/target/release/dots" "$DOTS_BIN"
     ok "Binary built and installed"
 else
     _download_binary "$DOTS_VERSION"

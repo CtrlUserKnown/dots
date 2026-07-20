@@ -1,0 +1,68 @@
+name: Release
+
+# Publishes prebuilt `dots` binaries whenever a version tag is pushed.
+# Asset names match what install.sh / setup.sh download:
+#   dots-<tag>-<os>-<arch>.tar.gz   (e.g. dots-v1.6.0-linux-x86_64.tar.gz)
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (e.g. v1.6.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.os }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest, target: x86_64-unknown-linux-gnu,  os: linux,  arch: x86_64,  cross: false }
+          - { runner: ubuntu-latest, target: aarch64-unknown-linux-gnu, os: linux,  arch: aarch64, cross: true  }
+          - { runner: macos-latest,  target: x86_64-apple-darwin,       os: darwin, arch: x86_64,  cross: false }
+          - { runner: macos-latest,  target: aarch64-apple-darwin,      os: darwin, arch: aarch64, cross: false }
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: .
+          key: ${{ matrix.target }}
+
+      # aarch64 Linux needs a cross-linker; rustls (ring) is pure Rust so no OpenSSL.
+      - name: Install cross linker
+        if: matrix.cross
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> "$GITHUB_ENV"
+
+      - name: Build
+        run: cargo build --release --locked --target ${{ matrix.target }} --manifest-path Cargo.toml
+
+      - name: Package
+        id: pkg
+        run: |
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          asset="dots-${tag}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz"
+          tar -czf "$asset" -C "target/${{ matrix.target }}/release" dots
+          sha256sum "$asset" > "$asset.sha256" 2>/dev/null || shasum -a 256 "$asset" > "$asset.sha256"
+          echo "asset=$asset" >> "$GITHUB_OUTPUT"
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          files: |
+            ${{ steps.pkg.outputs.asset }}
+            ${{ steps.pkg.outputs.asset }}.sha256

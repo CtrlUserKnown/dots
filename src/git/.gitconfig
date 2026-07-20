@@ -1,8 +1,0 @@
-[alias]
-        st = status
-        undo = reset HEAD~1 --mixed
-        lg = log --oneline --decorate --graph
-        ch = checkout
-[user]
-	email = Alvarez.christian46@gmail.com
-	name = Charlyder
