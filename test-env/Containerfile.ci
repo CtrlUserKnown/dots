@@ -1,0 +1,40 @@
+# syntax=docker/dockerfile:1
+# ── dots CI test container ─────────────────────────────────────────────────────
+# Build:  podman build -t dots-ci:fedora   --build-arg BASE=fedora -f test-env/Containerfile.ci .
+#         podman build -t dots-ci:ubuntu   --build-arg BASE=ubuntu -f test-env/Containerfile.ci .
+# Run:    podman run --rm -v "$PWD:/src:Z" dots-ci:fedora
+#         podman run --rm -v "$PWD:/src:Z" dots-ci:ubuntu
+
+ARG BASE=fedora
+
+# ── fedora ─────────────────────────────────────────────────────────────────────
+FROM fedora:latest AS base-fedora
+RUN dnf install -y rust cargo clippy rustfmt git which openssh-clients dbus-devel pkgconf-pkg-config && \
+    dnf clean all
+
+# ── ubuntu ─────────────────────────────────────────────────────────────────────
+FROM ubuntu:24.04 AS base-ubuntu
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates curl build-essential pkg-config libssl-dev libdbus-1-dev git which openssh-client && \
+    apt-get clean
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --no-modify-path
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# ── select base ────────────────────────────────────────────────────────────────
+FROM base-${BASE}
+
+# clippy + rustfmt (on Fedora via dnf already; on Ubuntu via rustup)
+RUN sh -c 'command -v rustup >/dev/null 2>&1 && rustup component add clippy rustfmt || true'
+
+WORKDIR /src
+
+# run CI pipeline (default command)
+CMD ["sh", "-c", "\
+    echo '=== cargo test ==='    && cargo test --manifest-path dots-rs/Cargo.toml --all;     echo 'EXIT: '$?  && \
+    echo '=== clippy ==='        && cargo clippy --manifest-path dots-rs/Cargo.toml 2>&1;    echo 'EXIT: '$?  && \
+    echo '=== fmt check ==='     && cargo fmt --manifest-path dots-rs/Cargo.toml -- --check; echo 'EXIT: '$?  && \
+    echo '=== shell test ==='    && bash dots-rs/tests/integration/test_setup.sh;            echo 'EXIT: '$?  && \
+    echo '=== ALL CI STEPS COMPLETE ===' \
+"]

@@ -1,1 +1,25 @@
-dots.bak/target/
+# Rust build artifacts
+/target/
+
+# developer mode marker — create this file to disable update prompts
+.developer
+
+# user settings — not committed (theme, update prefs)
+/.settings
+
+# editors / OS junk
+.DS_Store
+**/.DS_Store
+# macOS AppleDouble / resource-fork files
+._*
+**/._*
+
+# python (legacy)
+**/__pycache__
+
+# ai
+CLAUDE.md
+**/CLAUDE.md
+
+# logs
+*.log

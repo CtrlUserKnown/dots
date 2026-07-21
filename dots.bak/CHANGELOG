@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.0] - 2026-07-20
+
+Complete rewrite: `dots` is now a single, cross-platform Rust binary (CLI + TUI)
+that manages your dotfiles, rather than a Python/Zsh script bundled with configs.
+Your configuration files now live in a separate repo; `dots` manages the symlinks.
+
+### Added
+- **Rust rewrite** — `dots` is a single static binary (CLI + [ratatui](https://ratatui.rs) TUI) with no runtime dependencies (pure-Rust TLS, no OpenSSL/keychain). Organized as a Cargo workspace with `dots` and `tui-core` crates.
+- **Live Network pane** in the dashboard — reachability + round-trip latency, active network name (Wi-Fi SSID / connection), DNS servers (resolving the systemd-resolved stub to the real upstream), and VPN on/off detection (incl. Tailscale/WireGuard). Refreshes on a background thread.
+- **Mouse support** in the TUI — click a dashboard pane to open it; scroll-wheel navigation on every screen.
+- **GNU Stow–style symlink management** via `~/.dots/links.toml` — `dots link add/list/apply/remove`, with existing-file adoption and timestamped backups.
+- **Premade app configs** bundled in the binary (ghostty, neovim, opencode) — `dots premade list/apply`.
+- **Portable profiles** — `dots profile generate/import/import-git` to export/import `personal.json`, including directly from GitHub.
+- **Cross-platform dependency installer** — `dots install <name>|--all|--optional` across Homebrew, apt, and dnf, with Required/Optional/Dev tiers.
+- **Prebuilt release binaries** for linux/darwin × x86_64/aarch64 via GitHub Actions (`release.yml`), consumed by the new POSIX `install.sh` (downloads a binary or builds from source); added `uninstall.sh`.
+- **Build-time version injection** (`build.rs`) — the binary self-reports its version from the git tag (or an injected `DOTS_VERSION`) instead of a hard-coded constant.
+- Rust unit/integration test suite and a container-based test environment (`test-env/`); CI runs tests, clippy, and rustfmt on Linux and macOS.
+
+### Changed
+- **Configuration split** — tool settings live in `~/.dots/settings.toml`; a personal, machine-local layer lives in `~/.personal/` (aliases, apps, and overrides that win over the base settings).
+- `setup.sh` slimmed to bootstrap the Rust binary (build or download) instead of running Python.
+- Dotfiles/configs moved out of this repo — `dots` now manages symlinks to a separate config repo you control.
+
+### Removed
+- The Python implementation (`dots.py`, `shared.py`) and the bundled Zsh/Ghostty/bat/fastfetch config sources.
+- `ssm` (SSH session manager) — extracted into its own repository.
+- Legacy shell/Python test suites and the old `.github/workflows/main.yml` CI workflow.
+
 ## [1.5.5] - 2026-07-05
 
 ### Added

@@ -1,0 +1,18 @@
+# dots premade ghostty config
+# Catppuccin Mocha theme + sensible defaults
+
+theme = "Catppuccin Mocha"
+
+font-size = 14
+font-family = "JetBrains Mono"
+
+window-padding-x = 8
+window-padding-y = 8
+
+cursor-style = block
+cursor-style-blink = true
+
+scrollback-limit = 10000
+
+confirm-close-surface = false
+quit-after-last-window-closed = true
