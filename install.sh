@@ -14,16 +14,14 @@ REPO_URL="https://github.com/${OWNER}/${REPO}"
 DOTS_DIR="${DOTS_DIR:-$HOME/.dots}"
 BIN_DIR="$DOTS_DIR/bin"
 DOTS_BIN="$BIN_DIR/dots"
-BRANCH="main"
 VERSION=""   # optional pin, e.g. --version v1.6.0
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        --branch)  BRANCH="${2:?--branch needs a value}"; shift 2 ;;
         --version) VERSION="${2:?--version needs a value}"; shift 2 ;;
         --dir)     DOTS_DIR="${2:?--dir needs a value}"; BIN_DIR="$DOTS_DIR/bin"; DOTS_BIN="$BIN_DIR/dots"; shift 2 ;;
         -h|--help)
-            printf 'usage: install.sh [--branch <name>] [--version <tag>] [--dir <path>]\n'
+            printf 'usage: install.sh [--version <tag>] [--dir <path>]\n'
             exit 0 ;;
         *) printf 'unknown option: %s\n' "$1" >&2; exit 1 ;;
     esac
@@ -61,13 +59,12 @@ setup_repo() {
     have git || die "git is required. Install git and re-run."
     if [ -d "$DOTS_DIR/.git" ]; then
         info "Updating $DOTS_DIR…"
-        git -C "$DOTS_DIR" fetch --quiet origin "$BRANCH" || die "git fetch failed"
-        git -C "$DOTS_DIR" checkout --quiet "$BRANCH" 2>/dev/null || true
+        git -C "$DOTS_DIR" fetch --quiet origin || die "git fetch failed"
         git -C "$DOTS_DIR" pull --ff-only --quiet ||
             die "'git pull --ff-only' failed — you have local changes in $DOTS_DIR. Stash or commit them, then re-run."
     else
         info "Cloning $REPO…"
-        git clone --quiet --branch "$BRANCH" "$REPO_URL" "$DOTS_DIR" || die "git clone failed"
+        git clone --quiet "$REPO_URL" "$DOTS_DIR" || die "git clone failed"
     fi
     ok "Repository ready"
 }
