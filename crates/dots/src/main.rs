@@ -10,7 +10,7 @@ use crossterm::{
 use ratatui::{backend::CrosstermBackend, Terminal};
 
 #[derive(Parser)]
-#[command(name = "dots", version, about = "dots dotfiles manager")]
+#[command(name = "dots", version = env!("DOTS_VERSION"), about = "dots dotfiles manager")]
 struct Cli {
     #[command(subcommand)]
     command: Option<Command>,

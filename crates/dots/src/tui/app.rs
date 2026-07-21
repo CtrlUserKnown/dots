@@ -26,7 +26,7 @@ use super::profile::{handle_profile_key, render_profile, ProfileView};
 use super::settings::{handle_settings_key, render_settings, render_theme, handle_theme_key, SettingsView, ThemeView};
 use super::update::UpdateScreen;
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
+const VERSION: &str = env!("DOTS_VERSION");
 
 // ── screen enum ───────────────────────────────────────────────────────────────
 

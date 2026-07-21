@@ -177,7 +177,7 @@ pub fn pane_hint(pane: Pane, app: &App) -> String {
 
 // ── rendering ───────────────────────────────────────────────────────────────
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
+const VERSION: &str = env!("DOTS_VERSION");
 
 /// Whether `area` is large enough to draw the grid at all.
 fn grid_fits(area: Rect) -> bool {

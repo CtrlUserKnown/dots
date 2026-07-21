@@ -48,6 +48,10 @@ jobs:
           echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> "$GITHUB_ENV"
 
       - name: Build
+        env:
+          # Inject the exact tag so the binary self-reports it (build.rs bakes
+          # this in), independent of whether the checkout fetched git tags.
+          DOTS_VERSION: ${{ github.event.inputs.tag || github.ref_name }}
         run: cargo build --release --locked --target ${{ matrix.target }} --manifest-path Cargo.toml
 
       - name: Package

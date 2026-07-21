@@ -16,7 +16,7 @@ use crate::tui::{draw_desc, draw_footer, draw_header, FlashKind};
 use crate::tui::app::{App, Screen};
 use crate::tui::theme::{style_dim, style_error, style_select};
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
+const VERSION: &str = env!("DOTS_VERSION");
 
 // ── state ─────────────────────────────────────────────────────────────────────
 

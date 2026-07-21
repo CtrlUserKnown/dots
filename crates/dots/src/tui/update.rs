@@ -13,7 +13,7 @@ use crate::tui::app::{App, Screen};
 use crate::tui::theme::{style_dim, style_error, style_header, style_select};
 use crate::update as update_core;
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
+const VERSION: &str = env!("DOTS_VERSION");
 
 // ── state machine ─────────────────────────────────────────────────────────────
 

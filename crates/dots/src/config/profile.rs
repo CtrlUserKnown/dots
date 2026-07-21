@@ -93,7 +93,7 @@ pub fn collect_personal_config() -> PersonalConfig {
     PersonalConfig {
         version:      CURRENT_VERSION.to_string(),
         generated:    iso_now(),
-        dots_version: env!("CARGO_PKG_VERSION").to_string(),
+        dots_version: env!("DOTS_VERSION").to_string(),
         settings:     PersonalSettings {
             update_check:     sets.dots.update_check,
             greeting:         sets.dots.greeting,
