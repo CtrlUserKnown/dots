@@ -2,6 +2,45 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.0] - 2026-07-21
+
+### Added
+- Complete rewrite in Rust — single static binary with no runtime dependencies
+- Interactive TUI built on ratatui with 6-pane dashboard (symlinks, tools, plugins, configs, updates, network)
+- Live network monitor: connectivity, latency, network name, DNS servers, VPN detection (macOS + Linux)
+- Symlink engine: GNU Stow–style link management via `links.toml` with explicit links and stow-style folding
+- Cross-platform dependency management: Homebrew, apt, and dnf with per-platform package name resolution
+- Three dependency tiers: Required (7), Optional (6), Dev (12)
+- Premade app configs (Ghostty, Neovim, opencode) compiled into the binary
+- Portable profiles: export/import `personal.json` locally or from GitHub
+- Alias management: built-in + user aliases with TUI and CLI support
+- Ghostty theme picker from installed themes
+- Self-updating via `git pull --ff-only` with automatic symlink re-repair
+- Mouse support in TUI (scroll wheel, left-click on dashboard panes)
+- Keyboard shortcuts: number keys 1-4 for quick screen access
+- Settings via `~/.dots/settings.toml` with `~/.personal/config.toml` overlay
+- Shell installer script (POSIX sh) with prebuilt binary download fallback
+- Man page
+- Shared `tui-core` crate for reusable TUI chrome
+- Comprehensive test suite: unit tests, integration tests, shell integration test
+- CI on Linux and macOS via GitHub Actions
+
+### Changed
+- Project structure: Cargo workspace with `crates/dots` (binary) and `crates/tui-core` (library)
+- All configuration under `~/.dots/` and `~/.personal/`
+- Version detection: `DOTS_VERSION` env var > `git describe --tags` > `CARGO_PKG_VERSION`
+
+### Removed
+- Python-based `dots.py` TUI and CLI
+- SSM (SSH session manager) — moved to separate project
+- Shell-specific setup scripts (`setup.sh`)
+- Brewfile-based dependency management
+- Zsh-specific config files (`.zshrc`, `rc.zsh`, `.aliases`, `.functions`)
+- Custom Zsh prompt (`charModel`)
+- tmux configuration and plugins
+- `noir-cat` and `knew-pines` custom Ghostty themes from repo
+- Per-package install timeouts (replaced by Cargo build optimization)
+
 ## [1.5.5] - 2026-07-05
 
 ### Added

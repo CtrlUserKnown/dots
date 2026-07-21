@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>dots — macOS development environment</title>
-  <meta name="description" content="A personal macOS development environment. Automated setup, custom shell config, and a TUI for managing it all.">
+  <title>dots — cross-platform dotfiles manager</title>
+  <meta name="description" content="A fast, cross-platform dotfiles manager with an interactive TUI. Manage symlinks, install tools, and keep everything healthy — on macOS and Linux.">
   <meta name="author" content="CtrlUserKnown">
 
   <link rel="icon" href="img/svg/dots_icon_color.svg" type="image/svg+xml">
@@ -14,14 +14,14 @@
   <meta name="theme-color" content="#1a1a1a">
 
   <meta property="og:title" content="dots">
-  <meta property="og:description" content="A personal macOS development environment.">
+  <meta property="og:description" content="A fast, cross-platform dotfiles manager with an interactive TUI.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://ctrluserknown.github.io/dots/">
   <meta property="og:image" content="https://ctrluserknown.github.io/dots/img/svg/dots_logo_color.svg">
 
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="dots">
-  <meta name="twitter:description" content="A personal macOS development environment.">
+  <meta name="twitter:description" content="A fast, cross-platform dotfiles manager with an interactive TUI.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -69,16 +69,16 @@
               <span class="term-dot term-dot--red" aria-hidden="true"></span>
               <span class="term-dot term-dot--yellow" aria-hidden="true"></span>
               <span class="term-dot term-dot--green" aria-hidden="true"></span>
-              <span class="term-title">dots — zsh</span>
+              <span class="term-title">dots</span>
             </div>
             <div class="term-body">
               <img src="img/svg/dots_logo_alt_color.svg" alt="dots logo" class="hero__logo" width="180" height="70">
               <p class="hero__name">dots</p>
-              <h1>A development environment<br>built for macOS.</h1>
-              <p class="hero__tagline">One script sets up everything. Zsh, Ghostty, the tools, and a TUI to manage it all.</p>
+              <h1>A dotfiles manager<br>for macOS &amp; Linux.</h1>
+              <p class="hero__tagline">One script installs everything. Symlinks, tools, configs, and a TUI to manage it all.</p>
               <div class="hero__install" aria-label="Install command">
                 <span class="hero__install-prompt" aria-hidden="true">$</span>
-                <code id="install-cmd">curl -fsSL https://ctrluserknown.github.io/dots/install.sh | sh</code>
+                <code id="install-cmd">curl -fsSL https://raw.githubusercontent.com/CtrlUserKnown/dots/main/install.sh | sh</code>
                 <button class="hero__install-copy" id="copy-btn" aria-label="Copy install command" onclick="copyInstall()">Copy</button>
               </div>
             </div>
@@ -108,8 +108,8 @@
                 <polyline points="8 6 2 12 8 18"></polyline>
               </svg>
             </div>
-            <h3>Automated setup</h3>
-            <p>One script handles Homebrew, dependencies, and symlinks. Includes timeout fallbacks so slow connections don't block the install.</p>
+            <h3>Interactive TUI</h3>
+            <p>A ratatui-powered dashboard with 6 panes: symlinks, tools, plugins, configs, updates, and live network status. Supports keyboard and mouse.</p>
           </article>
 
           <article class="card" role="listitem">
@@ -120,8 +120,8 @@
                 <line x1="9" y1="21" x2="9" y2="9"></line>
               </svg>
             </div>
-            <h3>dots TUI</h3>
-            <p>A curses interface for health checks, theme picking, settings, and git operations. Run <code>dots</code> to open it.</p>
+            <h3>Symlink management</h3>
+            <p>Declare links in <code>links.toml</code> or use GNU Stow-style folding. Create and repair idempotently with automatic backups.</p>
           </article>
 
           <article class="card" role="listitem">
@@ -131,8 +131,8 @@
                 <polyline points="17 6 23 6 23 12"></polyline>
               </svg>
             </div>
-            <h3>Auto-update</h3>
-            <p>Runs a background update check on shell start. Frequency is configurable from hourly to weekly, or disable it entirely.</p>
+            <h3>Cross-platform installs</h3>
+            <p>One dependency list resolved per platform via Homebrew, apt, or dnf. Install required, optional, and dev tiers individually.</p>
           </article>
 
           <article class="card" role="listitem">
@@ -143,8 +143,8 @@
                 <line x1="12" y1="17" x2="12" y2="21"></line>
               </svg>
             </div>
-            <h3>Ghostty config</h3>
-            <p>Pre-configured for Ghostty with <code>noir-cat</code> and <code>knew-pines</code> themes included. Pick from 200+ built-in themes via the TUI.</p>
+            <h3>Premade configs</h3>
+            <p>Bundled starter configs for Ghostty, Neovim, and opencode. Compiled into the binary — always available offline.</p>
           </article>
 
           <article class="card" role="listitem">
@@ -156,8 +156,8 @@
                 <line x1="6" y1="18" x2="6.01" y2="18"></line>
               </svg>
             </div>
-            <h3>SSM</h3>
-            <p>A TUI SSH session manager. Search, connect, duplicate sessions, yank hostnames, and pull dotfiles to remote hosts.</p>
+            <h3>Network monitor</h3>
+            <p>Live dashboard pane showing connectivity, latency, network name, DNS servers, and VPN status — platform-specific probes.</p>
           </article>
 
           <article class="card" role="listitem">
@@ -167,8 +167,8 @@
                 <line x1="12" y1="19" x2="20" y2="19"></line>
               </svg>
             </div>
-            <h3>Custom Zsh</h3>
-            <p>The <code>charModel</code> prompt, fzf-tab completions, syntax highlighting, autosuggestions, and a clean set of aliases.</p>
+            <h3>Portable profiles</h3>
+            <p>Export your setup to <code>personal.json</code> and re-import it on another machine, locally or straight from GitHub.</p>
           </article>
         </div>
       </div>
@@ -180,40 +180,40 @@
     <section class="section" aria-labelledby="stack-heading">
       <div class="container">
         <h2 class="section-heading" id="stack-heading">The stack</h2>
-        <p class="section-sub">Tools configured and ready on install.</p>
+        <p class="section-sub">Built in Rust. Tools managed on install.</p>
 
         <div class="tool-list" role="list">
           <div class="tool-item" role="listitem">
-            <span class="tool-name">Ghostty</span>
-            <span class="tool-desc">GPU-accelerated terminal with built-in theme picker</span>
+            <span class="tool-name">Rust</span>
+            <span class="tool-desc">Single static binary with pure-Rust TLS</span>
           </div>
           <div class="tool-item" role="listitem">
-            <span class="tool-name">Zsh</span>
-            <span class="tool-desc">Custom charModel prompt, plugins, aliases, and shell functions</span>
+            <span class="tool-name">ratatui</span>
+            <span class="tool-desc">Terminal UI framework for the interactive dashboard</span>
           </div>
           <div class="tool-item" role="listitem">
-            <span class="tool-name">herdr</span>
-            <span class="tool-desc">Terminal multiplexer with SSH-aware auto-launch</span>
+            <span class="tool-name">git</span>
+            <span class="tool-desc">Version control and self-updating</span>
+          </div>
+          <div class="tool-item" role="listitem">
+            <span class="tool-name">eza</span>
+            <span class="tool-desc">Modern ls replacement</span>
           </div>
           <div class="tool-item" role="listitem">
             <span class="tool-name">fzf</span>
-            <span class="tool-desc">Fuzzy finder with fzf-tab for completions</span>
+            <span class="tool-desc">Fuzzy finder</span>
           </div>
           <div class="tool-item" role="listitem">
             <span class="tool-name">bat</span>
             <span class="tool-desc">Syntax-highlighted file previewer</span>
           </div>
           <div class="tool-item" role="listitem">
-            <span class="tool-name">eza</span>
-            <span class="tool-desc">Modern ls with icons and colors</span>
+            <span class="tool-name">zoxide</span>
+            <span class="tool-desc">Smarter cd</span>
           </div>
           <div class="tool-item" role="listitem">
             <span class="tool-name">fastfetch</span>
-            <span class="tool-desc">System info on shell start with custom crab art</span>
-          </div>
-          <div class="tool-item" role="listitem">
-            <span class="tool-name">zoxide</span>
-            <span class="tool-desc">Smarter cd with fuzzy jump</span>
+            <span class="tool-desc">System info on shell start</span>
           </div>
         </div>
       </div>
@@ -226,7 +226,7 @@
       <div class="container">
         <div class="cta-block">
           <h2>Ready to set it up?</h2>
-          <p>Run the install script and you'll have a working environment in a few minutes.</p>
+          <p>Run the install script and you'll have a working dotfiles setup in a few minutes.</p>
           <div class="hero__actions">
             <a href="docs.html" class="btn btn-primary">Read the docs</a>
             <a href="https://github.com/CtrlUserKnown/dots" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">View on GitHub</a>

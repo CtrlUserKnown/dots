@@ -63,39 +63,33 @@
       <div class="about-grid">
         <div class="about-main">
           <p>
-            Dots started as a Zsh config and kept growing. At some point it became easier to put everything in one place and automate the setup instead of running the same install steps on every new machine.
+            Dots started as a shell config and kept growing. At some point it became a Python script, and eventually it made more sense to rewrite the whole thing as a proper Rust tool — a single static binary with an interactive TUI, a symlink engine, and everything built in.
           </p>
           <p>
-            The project manages configs for Ghostty, Zsh, bat, fastfetch, and a few other tools. Everything lives in <code>src/</code> organized by tool, and a setup script handles Homebrew, dependencies, and symlinking everything into the right places.
+            dots manages symlinks (GNU Stow–style), installs tools via your system package manager, applies premade app configs, manages shell aliases, and updates itself — all from one binary with no runtime dependencies.
           </p>
 
-          <h2>The dots command</h2>
+          <h2>The TUI</h2>
           <p>
-            <code>dots</code> is a curses TUI that handles the day-to-day: health checks, theme switching, settings, viewing aliases, and git operations. It replaces a lot of one-off commands that I kept needing to remember. Advanced items like editing configs and adding aliases are unlocked in developer mode.
+            <code>dots</code> opens an interactive dashboard built on ratatui. Six panes give you a live view of symlink health, installed tools, shell plugins, app configs, available updates, and network status. Dedicated screens let you repair links, install missing tools, manage aliases, apply themes, and import/export portable profiles.
           </p>
           <p>
-            There's also <code>ssm</code>, a TUI for managing SSH sessions. It lets you search, connect, duplicate sessions, and pull dotfiles to remote hosts without switching windows.
+            Everything the TUI does is also available as CLI subcommands, so dots works well in scripts and setup flows.
           </p>
 
           <h2>Design goals</h2>
           <p>
-            Fast installs. Configs that don't break when you switch branches. Tools that talk to each other (bat previews in fzf, zoxide jump in completions, herdr auto-launching on SSH). And an update mechanism that stays out of the way unless there's actually something new.
-          </p>
-          <p>
-            The setup uses per-package install timeouts so one slow dependency doesn't block everything else. Symlinks are conditional based on what's installed so the config stays clean if you skip Ghostty or herdr.
+            Fast installs. Cross-platform support (macOS and Linux). A symlink engine that backs up existing files before replacing them. Premade configs compiled into the binary so they're always available offline. And a self-update mechanism that re-repairs symlinks after pulling.
           </p>
 
           <h2>Package tiers</h2>
           <p>
-            Dependencies are split into three tiers so you're only prompted for what's relevant to you. Required tools install automatically. Optional and dev packages are prompted during setup and can be installed later via the TUI or CLI flags.
-          </p>
-          <p>
-            The same dependency system works on Homebrew (macOS), DNF (Fedora), and APT (Debian/Ubuntu), so the configs travel further than just Mac.
+            Dependencies are split into three tiers — Required, Optional, and Dev — so you only install what's relevant to you. The same dependency list works across Homebrew (macOS), apt (Debian/Ubuntu), and dnf (Fedora), with per-platform package name resolution.
           </p>
 
           <h2>Theme</h2>
           <p>
-            This site uses the <strong>noir-cat</strong> Ghostty theme from the repo. It's a dark theme based on the Catppuccin Mocha palette with a neutral gray background instead of the standard purple-tinted one. The terminal and site share the same color scheme.
+            This site uses the <strong>noir-cat</strong> color palette — a dark theme based on Catppuccin Mocha with a neutral gray background. The terminal and site share the same color scheme.
           </p>
         </div>
 
@@ -136,28 +130,27 @@
 
           <div class="aside-card">
             <h4>Current version</h4>
-            <p style="font-family: 'JetBrains Mono', monospace; font-size: 1.1rem; color: #fff; margin: 0;">v1.5.5</p>
+            <p style="font-family: 'JetBrains Mono', monospace; font-size: 1.1rem; color: #fff; margin: 0;">v2.0.0</p>
           </div>
 
           <div class="aside-card">
             <h4>Requirements</h4>
-            <p style="color: var(--fg-muted); font-size: 0.875rem; margin-bottom: 0.75rem;">macOS 12.0+ (Monterey or newer)</p>
-            <p style="color: var(--fg-muted); font-size: 0.875rem; margin-bottom: 0.75rem;">Apple Silicon preferred, Intel supported</p>
-            <p style="color: var(--fg-muted); font-size: 0.875rem; margin: 0;">Zsh (default on macOS 10.15+)</p>
+            <p style="color: var(--fg-muted); font-size: 0.875rem; margin-bottom: 0.75rem;">macOS or Linux</p>
+            <p style="color: var(--fg-muted); font-size: 0.875rem; margin-bottom: 0.75rem;">Homebrew, apt, or dnf</p>
+            <p style="color: var(--fg-muted); font-size: 0.875rem; margin: 0;">git</p>
           </div>
 
           <div class="aside-card">
             <h4>Stack</h4>
             <div class="chips">
-              <span class="stack-chip">Ghostty</span>
-              <span class="stack-chip">Zsh</span>
-              <span class="stack-chip">herdr</span>
-              <span class="stack-chip">fzf</span>
-              <span class="stack-chip">bat</span>
+              <span class="stack-chip">Rust</span>
+              <span class="stack-chip">ratatui</span>
+              <span class="stack-chip">clap</span>
+              <span class="stack-chip">serde</span>
+              <span class="stack-chip">ureq</span>
+              <span class="stack-chip">git</span>
               <span class="stack-chip">eza</span>
-              <span class="stack-chip">fastfetch</span>
-              <span class="stack-chip">zoxide</span>
-              <span class="stack-chip">Python 3</span>
+              <span class="stack-chip">fzf</span>
             </div>
           </div>
         </aside>
