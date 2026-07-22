@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- Configs module (`configs.rs`) for discovering and managing dotfiles configs from your repo — replaces the old premade-only system with a full config browser that shows install status per app
+- TUI Configs screen (`tui/configs.rs`) with config listing, file preview, and install/remove actions
+- GitHub Releases-based binary self-update with SHA-256 verification
+- Install-source detection (Homebrew vs self-managed) — defers to package managers when appropriate
+
+### Changed
+- Self-update now downloads release tarballs from GitHub Releases instead of `git pull --ff-only`
+- Simplified installer: removed `--branch` flag, always clones default branch
+- Install script `build_binary` paths updated for root workspace layout (no more `dots-rs/` subdirectory)
+
+### Removed
+- Developer mode setting
+- Legacy `dots.bak/` backup directory
+
 ## [2.0.0] - 2026-07-21
 
 ### Added

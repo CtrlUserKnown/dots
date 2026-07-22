@@ -81,7 +81,7 @@
               <a href="#settings">Settings</a>
               <a href="#managing-symlinks">Managing symlinks</a>
               <a href="#dependencies">Dependencies</a>
-              <a href="#premade-configs">Premade configs</a>
+              <a href="#premade-configs">Configs</a>
               <a href="#profiles">Profiles</a>
             </nav>
           </div>
@@ -274,6 +274,11 @@ cargo build --release</code></pre>
                   <tr><td><code>dots aliases remove &lt;name&gt;</code></td><td>Remove a user alias</td></tr>
                   <tr><td><code>dots premade list</code></td><td>List available premade configs</td></tr>
                   <tr><td><code>dots premade apply &lt;app&gt;</code></td><td>Apply a bundled config</td></tr>
+                  <tr><td><code>dots premade remove &lt;app&gt;</code></td><td>Remove a bundled config</td></tr>
+                  <tr><td><code>dots config list</code></td><td>List discovered configs from your dotfiles repo</td></tr>
+                  <tr><td><code>dots config view &lt;name&gt;</code></td><td>View a config's files and preview contents</td></tr>
+                  <tr><td><code>dots config install &lt;name&gt;</code></td><td>Install a config (create symlinks into <code>$HOME</code>)</td></tr>
+                  <tr><td><code>dots config remove &lt;name&gt;</code></td><td>Remove a config (remove symlinks)</td></tr>
                   <tr><td><code>dots link add &lt;source&gt; &lt;target&gt;</code></td><td>Adopt a file/dir and symlink it</td></tr>
                   <tr><td><code>dots link list</code></td><td>List declared links and their status</td></tr>
                   <tr><td><code>dots link apply</code></td><td>Create or repair all declared links</td></tr>
@@ -292,7 +297,7 @@ cargo build --release</code></pre>
             <h2>Aliases</h2>
             <p>dots manages shell aliases from two sources:</p>
             <ul>
-              <li><strong>Built-in</strong> — defined in <code>~/.dots/src/zsh/zsh/.aliases</code> (read-only)</li>
+              <li><strong>Built-in</strong> — compiled into the binary (read-only)</li>
               <li><strong>User</strong> — defined in <code>~/.personal/aliases.zsh</code> (read/write)</li>
             </ul>
             <p>User aliases are sourced after built-in ones so your definitions win. Manage them from the TUI Aliases screen or the CLI.</p>
@@ -315,7 +320,6 @@ cargo build --release</code></pre>
                   <tr><td><code>update_check</code></td><td>bool</td><td><code>true</code></td><td>Enable/disable periodic update checks</td></tr>
                   <tr><td><code>update_frequency</code></td><td>int (minutes)</td><td><code>1440</code></td><td>How often to check (1440 = daily)</td></tr>
                   <tr><td><code>greeting</code></td><td>bool</td><td><code>true</code></td><td>Show the greeting banner</td></tr>
-                  <tr><td><code>developer_mode</code></td><td>bool</td><td><code>false</code></td><td>Enable developer features</td></tr>
                   <tr><td><code>theme</code></td><td>string</td><td><code>""</code></td><td>Selected theme name</td></tr>
                 </tbody>
               </table>
@@ -408,8 +412,11 @@ ignore   = [".DS_Store", "*.bak", "README.md"]</code></pre>
           </section>
 
           <section id="premade-configs">
-            <h2>Premade configs</h2>
-            <p>dots ships starter configs compiled into the binary — always available offline.</p>
+            <h2>Configs</h2>
+            <p>dots manages app configs from two sources:</p>
+
+            <h3>Premade configs</h3>
+            <p>Starter configs compiled into the binary — always available offline.</p>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -427,6 +434,13 @@ ignore   = [".DS_Store", "*.bak", "README.md"]</code></pre>
             </div>
             <pre><code>dots premade list
 dots premade apply ghostty</code></pre>
+
+            <h3>Discovered configs</h3>
+            <p>Every directory in your dotfiles repo (<code>nvim/</code>, <code>git/</code>, <code>bat/</code>, ...) shows up in the TUI's <strong>Configs</strong> screen with an install-status badge (<code>[ installed ]</code> / <code>[ partial ]</code> / <code>[ not installed ]</code>). View a config's files, preview their contents, and install or remove it by creating or removing symlinks into <code>$HOME</code>.</p>
+            <pre><code>dots config list
+dots config view nvim
+dots config install nvim
+dots config remove nvim</code></pre>
             <p>Existing files are backed up before writing.</p>
           </section>
 
@@ -447,14 +461,11 @@ dots health</code></pre>
             <h2>Updating</h2>
             <p>dots checks for updates periodically when <code>update_check</code> is enabled, respecting the <code>update_frequency</code> interval.</p>
 
-            <h3>Modes</h3>
-            <ul>
-              <li><strong>Normal mode</strong> — compares current tag against latest <code>v*</code> release tag</li>
-              <li><strong>Developer mode</strong> — compares against upstream branch tip, reports commits behind</li>
-            </ul>
+            <h3>How it works</h3>
+            <p>dots queries the GitHub Releases API for the latest version, compares it against your installed version, and downloads the appropriate release tarball for your OS/arch. Downloaded assets are verified with SHA-256 checksums. If dots was installed via Homebrew, it defers to <code>brew upgrade</code> instead.</p>
 
             <h3>Applying an update</h3>
-            <p>Runs <code>git pull --ff-only</code> in <code>~/.dots</code> then re-repairs all symlinks. Local edits block the update (fast-forward only).</p>
+            <p>After downloading, dots replaces the binary in place and re-repairs all symlinks so changes take effect immediately.</p>
             <pre><code>dots update        # open the update screen
 dots --version     # check current version</code></pre>
           </section>

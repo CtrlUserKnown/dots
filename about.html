@@ -66,7 +66,7 @@
             Dots started as a shell config and kept growing. At some point it became a Python script, and eventually it made more sense to rewrite the whole thing as a proper Rust tool — a single static binary with an interactive TUI, a symlink engine, and everything built in.
           </p>
           <p>
-            dots manages symlinks (GNU Stow–style), installs tools via your system package manager, applies premade app configs, manages shell aliases, and updates itself — all from one binary with no runtime dependencies.
+            dots manages symlinks (GNU Stow–style), installs tools via your system package manager, discovers and manages app configs from your dotfiles repo, applies premade starter configs, manages shell aliases, and updates itself — all from one binary with no runtime dependencies.
           </p>
 
           <h2>The TUI</h2>
@@ -79,7 +79,7 @@
 
           <h2>Design goals</h2>
           <p>
-            Fast installs. Cross-platform support (macOS and Linux). A symlink engine that backs up existing files before replacing them. Premade configs compiled into the binary so they're always available offline. And a self-update mechanism that re-repairs symlinks after pulling.
+            Fast installs. Cross-platform support (macOS and Linux). A symlink engine that backs up existing files before replacing them. Premade configs compiled into the binary so they're always available offline. And a self-update mechanism that downloads release binaries from GitHub, verifies them with SHA-256, and re-repairs symlinks after upgrading.
           </p>
 
           <h2>Package tiers</h2>

@@ -95,9 +95,9 @@ download_binary() {
 build_binary() {
     have cargo || return 1
     info "Building from source ($VERSION)…"
-    cargo build --release --manifest-path "$DOTS_DIR/dots-rs/Cargo.toml" || return 1
+    cargo build --release --manifest-path "$DOTS_DIR/Cargo.toml" || return 1
     mkdir -p "$BIN_DIR"
-    cp "$DOTS_DIR/dots-rs/target/release/dots" "$DOTS_BIN"
+    cp "$DOTS_DIR/target/release/dots" "$DOTS_BIN"
     [ -x "$DOTS_BIN" ]
 }
 
