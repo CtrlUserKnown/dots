@@ -10,7 +10,7 @@ use ratatui::{
     widgets::Paragraph,
 };
 
-use crate::installer::{apply_premade, detect_pm, install_dep, PREMADE_CONFIGS};
+use crate::installer::{detect_pm, install_dep};
 use crate::packages::{check_dep, check_plugin, Category, Dep, Plugin, DEPS, PLUGINS};
 use crate::symlinks::{self, SymlinkStatus};
 use crate::tui::{draw_desc, draw_footer, draw_header, FlashKind};
@@ -26,7 +26,6 @@ pub enum DisplayRow {
     SymlinkItem { link: PathBuf, target: PathBuf, status: SymlinkStatus },
     DepItem     { dep: &'static Dep,    installed: bool },
     PluginItem  { plugin: &'static Plugin, installed: bool },
-    PremadeItem { idx: usize, applied: bool },
 }
 
 fn is_navigable(row: &DisplayRow) -> bool {
@@ -39,12 +38,6 @@ fn row_desc(row: &DisplayRow) -> String {
         DisplayRow::SymlinkItem { target, .. }        => format!("→ {}", home_rel(target)),
         DisplayRow::DepItem     { dep, .. }           => dep.desc.to_string(),
         DisplayRow::PluginItem  { plugin, .. }        => plugin.desc.to_string(),
-        DisplayRow::PremadeItem { idx, .. }           => {
-            PREMADE_CONFIGS.get(*idx)
-                .map(|p| p.description)
-                .unwrap_or("")
-                .to_string()
-        }
     }
 }
 
@@ -69,13 +62,6 @@ pub fn build_display_rows() -> Vec<DisplayRow> {
         rows.push(DisplayRow::PluginItem { plugin, installed: check_plugin(plugin) });
     }
 
-    rows.push(DisplayRow::Section("premade configs"));
-    for (i, _) in PREMADE_CONFIGS.iter().enumerate() {
-        let dest    = (PREMADE_CONFIGS[i].dest)();
-        let applied = dest.exists();
-        rows.push(DisplayRow::PremadeItem { idx: i, applied });
-    }
-
     rows
 }
 
@@ -84,7 +70,6 @@ pub fn build_display_rows() -> Vec<DisplayRow> {
 #[derive(Debug)]
 enum Pending {
     ConfirmInstall(String),
-    ConfirmPremade(usize),
     Installing,
 }
 
@@ -254,30 +239,12 @@ pub fn render(f: &mut Frame, area: Rect, _app: &App, view: &HealthView) {
                     row_rect,
                 );
             }
-            DisplayRow::PremadeItem { idx, applied } => {
-                let cursor  = if is_cursor { "▶" } else { " " };
-                let sym     = if *applied { "✓" } else { "[ apply ]" };
-                let sty     = if *applied { style_select() } else { style_dim() };
-                let name    = PREMADE_CONFIGS.get(*idx).map(|p| p.app).unwrap_or("?");
-                f.render_widget(
-                    Paragraph::new(Line::from(vec![
-                        Span::styled(format!("{cursor} "), sty),
-                        Span::styled(sym.to_string(), sty),
-                        Span::raw(format!("  {name} config")),
-                    ])),
-                    row_rect,
-                );
-            }
         }
     }
 
     // Desc bar — show confirmation prompt if pending
     let desc_text = match &view.pending {
         Some(Pending::ConfirmInstall(name)) => format!("Install {name}? [y/N]"),
-        Some(Pending::ConfirmPremade(i)) => {
-            let name = PREMADE_CONFIGS.get(*i).map(|p| p.app).unwrap_or("?");
-            format!("Apply {name} premade config? Existing config will be backed up. [y/N]")
-        }
         Some(Pending::Installing) => "  Installing… please wait".to_string(),
         None => {
             let dr = view.cursor_display_row();
@@ -311,26 +278,6 @@ pub fn handle_key(app: &mut App, view: &mut HealthView, key: KeyEvent) {
             Pending::ConfirmInstall(name) => {
                 if key.code == KeyCode::Char('y') {
                     start_install(view, name);
-                } else {
-                    view.flash = None;
-                }
-                return;
-            }
-            Pending::ConfirmPremade(i) => {
-                if key.code == KeyCode::Char('y') {
-                    if let Some(entry) = PREMADE_CONFIGS.get(i) {
-                        match apply_premade(entry) {
-                            Ok(()) => {
-                                view.rebuild();
-                                let name = entry.app;
-                                view.flash = Some((
-                                    format!("✓ {name} config applied"),
-                                    FlashKind::Success,
-                                ));
-                            }
-                            Err(e) => view.flash = Some((format!("✗ {e}"), FlashKind::Error)),
-                        }
-                    }
                 } else {
                     view.flash = None;
                 }
@@ -374,7 +321,6 @@ fn can_fix_cursor(view: &HealthView) -> bool {
     match &view.rows[dr] {
         DisplayRow::SymlinkItem { status, .. } => *status != SymlinkStatus::Ok,
         DisplayRow::DepItem { installed, .. }  => !installed,
-        DisplayRow::PremadeItem { .. }         => true,
         _ => false,
     }
 }
@@ -392,10 +338,6 @@ fn activate_cursor(view: &mut HealthView) {
         }
         DisplayRow::DepItem { dep, installed: false } => {
             view.pending = Some(Pending::ConfirmInstall(dep.bin.to_string()));
-            view.flash   = None;
-        }
-        DisplayRow::PremadeItem { idx, .. } => {
-            view.pending = Some(Pending::ConfirmPremade(*idx));
             view.flash   = None;
         }
         DisplayRow::PluginItem { .. } => {

@@ -17,6 +17,11 @@ toml_edit  = "0.22"
 anyhow     = "1"
 dirs       = "5"
 
+# Self-update: tarball extract + checksum verification (HTTP via ureq, already a dep).
+flate2     = "1"
+tar        = "0.4"
+sha2       = "0.10"
+
 # dev
 tempfile   = "3"
 assert_cmd = "2"

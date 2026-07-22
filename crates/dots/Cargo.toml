@@ -27,6 +27,11 @@ dirs.workspace       = true
 # HTTP — GitHub release checks
 ureq       = { version = "2", features = ["json"] }
 
+# Self-update — download release tarball, verify checksum, swap the binary.
+flate2.workspace = true
+tar.workspace    = true
+sha2.workspace   = true
+
 [dev-dependencies]
 tempfile.workspace   = true
 assert_cmd.workspace = true

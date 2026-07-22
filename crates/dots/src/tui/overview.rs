@@ -11,7 +11,6 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
 };
 
-use crate::installer::PREMADE_CONFIGS;
 use crate::packages::{check_dep, check_plugin, Category, DEPS, PLUGINS};
 use crate::symlinks::{self, SymlinkStatus};
 use crate::tui::app::{App, Screen};
@@ -60,7 +59,7 @@ impl Pane {
             Pane::Symlinks => Some("symlinks"),
             Pane::Tools    => Some("tools"),
             Pane::Plugins  => Some("plugins"),
-            Pane::Configs  => Some("premade configs"),
+            Pane::Configs  => None,
             Pane::Update   => None,
             Pane::Network  => None,
         }
@@ -70,6 +69,7 @@ impl Pane {
     /// the dashboard (it refreshes on its own).
     pub fn target(self) -> Screen {
         match self {
+            Pane::Configs => Screen::Configs,
             Pane::Update  => Screen::Update,
             Pane::Network => Screen::Main,
             _             => Screen::Health,
@@ -128,8 +128,11 @@ fn plugin_summary() -> Summary {
 }
 
 fn config_summary() -> Summary {
-    let total = PREMADE_CONFIGS.len();
-    let ok = PREMADE_CONFIGS.iter().filter(|c| (c.dest)().exists()).count();
+    let cfgs = crate::configs::discover();
+    let total = cfgs.len();
+    let ok = cfgs.iter()
+        .filter(|c| c.status == crate::configs::ConfigStatus::Installed)
+        .count();
     Summary { ok, total }
 }
 
@@ -154,13 +157,23 @@ pub fn pane_hint(pane: Pane, app: &App) -> String {
         }
         Pane::Configs => {
             let s = config_summary();
-            format!("{}/{} premade configs applied — enter to manage", s.ok, s.total)
+            if s.total == 0 {
+                "no dotfiles configs found — enter for details".into()
+            } else {
+                format!("{}/{} configs installed — enter to manage", s.ok, s.total)
+            }
         }
-        Pane::Update => match &app.update_status {
-            None => "checking for updates…".into(),
-            Some(st) if st.behind > 0 => format!("update available: v{} — enter to update", st.label),
-            Some(_) => "up to date — enter for details".into(),
-        },
+        Pane::Update => {
+            if let Some(msg) = app.install_source.defer_message() {
+                format!("managed externally — {msg}")
+            } else if let Some(info) = &app.update_info {
+                format!("update available: v{} — enter to update", info.latest)
+            } else if app.update_error.is_some() {
+                "update check unavailable — enter for details".into()
+            } else {
+                "up to date — enter for details".into()
+            }
+        }
         Pane::Network => match &app.network {
             None => "probing network…".into(),
             Some(n) if !n.online => "offline — no connectivity".into(),
@@ -256,7 +269,7 @@ fn pane_lines(pane: Pane, app: &App) -> Vec<Line<'static>> {
         Pane::Symlinks => count_lines(symlink_summary(), "linked", "broken", true),
         Pane::Tools    => count_lines(tool_summary(),    "installed", "missing", true),
         Pane::Plugins  => count_lines(plugin_summary(),  "present", "missing", true),
-        Pane::Configs  => count_lines(config_summary(),  "applied", "pending", false),
+        Pane::Configs  => count_lines(config_summary(),  "installed", "pending", false),
         Pane::Update   => update_lines(app),
         Pane::Network  => network_lines(app),
     }
@@ -283,20 +296,28 @@ fn count_lines(s: Summary, ok_word: &str, bad_word: &str, bad_is_error: bool) ->
 }
 
 fn update_lines(app: &App) -> Vec<Line<'static>> {
-    match &app.update_status {
-        None => vec![
-            Line::from(Span::styled("checking…", style_dim())),
+    if app.install_source.defer_message().is_some() {
+        return vec![
+            Line::from(Span::styled("○ managed externally", style_dim().add_modifier(Modifier::BOLD))),
             Line::from(Span::styled(format!("v{VERSION}"), style_dim())),
-        ],
-        Some(st) if st.behind > 0 => vec![
-            Line::from(Span::styled("✗ update available", style_error().add_modifier(Modifier::BOLD))),
-            Line::from(Span::styled(format!("v{VERSION} → v{}", st.label), style_error())),
-        ],
-        Some(_) => vec![
-            Line::from(Span::styled("✓ up to date", style_select().add_modifier(Modifier::BOLD))),
-            Line::from(Span::styled(format!("v{VERSION}"), style_dim())),
-        ],
+        ];
     }
+    if let Some(info) = &app.update_info {
+        return vec![
+            Line::from(Span::styled("✗ update available", style_error().add_modifier(Modifier::BOLD))),
+            Line::from(Span::styled(format!("v{VERSION} → v{}", info.latest), style_error())),
+        ];
+    }
+    if app.update_error.is_some() {
+        return vec![
+            Line::from(Span::styled("• check unavailable", style_dim().add_modifier(Modifier::BOLD))),
+            Line::from(Span::styled(format!("v{VERSION}"), style_dim())),
+        ];
+    }
+    vec![
+        Line::from(Span::styled("✓ up to date", style_select().add_modifier(Modifier::BOLD))),
+        Line::from(Span::styled(format!("v{VERSION}"), style_dim())),
+    ]
 }
 
 /// Live network snapshot: reachability + latency, the network name, and DNS.

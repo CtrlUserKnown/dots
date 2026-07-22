@@ -11,6 +11,7 @@ pub enum SymlinkStatus {
     WrongTarget,
 }
 
+#[derive(Debug, Clone)]
 pub struct Symlink {
     pub link: PathBuf,
     pub target: PathBuf,

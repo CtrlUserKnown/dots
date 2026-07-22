@@ -1,5 +1,6 @@
 pub mod aliases;
 pub mod app;
+pub mod configs;
 pub mod health;
 pub mod overview;
 pub mod profile;

@@ -47,6 +47,11 @@ enum Command {
         #[command(subcommand)]
         action: PremadeAction,
     },
+    /// View and (un)install app configs discovered in your dotfiles repo
+    Config {
+        #[command(subcommand)]
+        action: ConfigAction,
+    },
     /// Export/import personal config
     Profile {
         #[command(subcommand)]
@@ -79,8 +84,22 @@ enum AliasAction {
 enum PremadeAction {
     /// List available premade configs
     List,
-    /// Apply a premade config
+    /// Apply a premade config (turn it on)
     Apply { app: String },
+    /// Remove a premade config (turn it off, restoring any backup)
+    Remove { app: String },
+}
+
+#[derive(Subcommand)]
+enum ConfigAction {
+    /// List discovered configs and their install status
+    List,
+    /// List the files a config links (with per-file status)
+    View { name: String },
+    /// Install a config (create/repair its symlinks)
+    Install { name: String },
+    /// Remove a config (unlink only; real files are untouched)
+    Remove { name: String },
 }
 
 #[derive(Subcommand)]
@@ -128,6 +147,7 @@ fn main() -> anyhow::Result<()> {
         Some(Command::Aliases { action }) => cli_aliases(action)?,
         Some(Command::Install { name, all, optional }) => cli_install(name, all, optional)?,
         Some(Command::Premade { action }) => cli_premade(action)?,
+        Some(Command::Config { action }) => cli_config(action)?,
         Some(Command::Profile { action }) => cli_profile(action)?,
         Some(Command::Link { action }) => cli_link(action)?,
         Some(Command::Init { quiet }) => cli_init(quiet)?,
@@ -222,6 +242,64 @@ fn cli_premade(action: PremadeAction) -> anyhow::Result<()> {
                 .ok_or_else(|| anyhow::anyhow!("unknown premade config '{app}'"))?;
             dots::installer::apply_premade(entry)?;
             println!("✓ {} config applied (backup created if existed)", app);
+        }
+        PremadeAction::Remove { app } => {
+            let entry = PREMADE_CONFIGS.iter().find(|p| p.app == app)
+                .ok_or_else(|| anyhow::anyhow!("unknown premade config '{app}'"))?;
+            dots::installer::remove_premade(entry)?;
+            println!("✓ {} config removed (backup restored if existed)", app);
+        }
+    }
+    Ok(())
+}
+
+fn cli_config(action: ConfigAction) -> anyhow::Result<()> {
+    use dots::configs;
+
+    let find = |name: &str| -> anyhow::Result<configs::Config> {
+        configs::discover().into_iter().find(|c| c.name == name)
+            .ok_or_else(|| anyhow::anyhow!("unknown config '{name}' (try 'dots config list')"))
+    };
+
+    match action {
+        ConfigAction::List => {
+            let cfgs = configs::discover();
+            if cfgs.is_empty() {
+                match configs::configs_root() {
+                    Some(root) => println!("No config directories in {}", root.display()),
+                    None => println!("No dotfiles configs directory found (set a [stow] dir in links.toml, or create ~/dotfiles)."),
+                }
+                return Ok(());
+            }
+            for c in &cfgs {
+                // Left-aligned name, right-aligned badge — the requested look.
+                println!("{:<20} {:>18}", c.name, c.status.badge());
+            }
+        }
+        ConfigAction::View { name } => {
+            let c = find(&name)?;
+            println!("{} — {}", c.name, c.dir.display());
+            if c.links.is_empty() {
+                println!("  (no linkable files)");
+            }
+            for link in &c.links {
+                let mark = match dots::symlinks::check(link) {
+                    dots::symlinks::SymlinkStatus::Ok => "✓",
+                    dots::symlinks::SymlinkStatus::Missing => "·",
+                    _ => "✗",
+                };
+                println!("  {mark} {}", link.link.display());
+            }
+        }
+        ConfigAction::Install { name } => {
+            let c = find(&name)?;
+            let r = configs::install(&c)?;
+            println!("✓ {} installed ({} linked, {} skipped)", name, r.repaired + r.ok, r.skipped);
+        }
+        ConfigAction::Remove { name } => {
+            let c = find(&name)?;
+            let n = configs::remove(&c)?;
+            println!("✓ {} removed ({n} link(s) unlinked)", name);
         }
     }
     Ok(())

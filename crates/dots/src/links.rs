@@ -116,6 +116,18 @@ fn stow_symlinks(stow: &StowConfig, out: &mut Vec<Symlink>) {
     }
 }
 
+/// The set of symlinks a single stow package (`pkg_root`) would create under
+/// `target_root`, using the same fold/unfold logic as `[stow]`. Exposed so the
+/// configs view can compute a config directory's link status without diverging
+/// from how `dots health` plans and repairs those very links.
+pub fn plan_package(pkg_root: &Path, target_root: &Path, ignore: &[String]) -> Vec<Symlink> {
+    let mut out = Vec::new();
+    if pkg_root.is_dir() {
+        plan_stow_dir(pkg_root, target_root, ignore, &mut out);
+    }
+    out
+}
+
 /// Walk a package directory, mirroring it into the target. A subdirectory is
 /// "folded" into a single symlink when its destination doesn't already exist as
 /// a real directory; otherwise we "unfold" and recurse so we never clobber a

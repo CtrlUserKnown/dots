@@ -102,6 +102,32 @@ pub fn apply_premade(entry: &PremadeConfig) -> Result<()> {
     write_premade(entry.content, &(entry.dest)())
 }
 
+/// Whether a premade config is currently "on": the file exists at its
+/// destination *and* its contents match the bundled premade config. Comparing
+/// content (rather than mere existence) lets a user's own file at the same path
+/// read as "off", and lets [`remove_premade`] flip the state back cleanly.
+pub fn is_applied(entry: &PremadeConfig) -> bool {
+    std::fs::read_to_string((entry.dest)())
+        .map(|c| c == entry.content)
+        .unwrap_or(false)
+}
+
+/// Turn a premade config "off". If a `.bak` from a previous [`apply_premade`]
+/// exists, restore it over the destination (undoing the apply); otherwise just
+/// remove the applied file. A no-op if nothing is there.
+pub fn remove_premade(entry: &PremadeConfig) -> Result<()> {
+    let dest = (entry.dest)();
+    let bak  = PathBuf::from(format!("{}.bak", dest.display()));
+    if bak.exists() {
+        std::fs::rename(&bak, &dest)
+            .with_context(|| format!("restoring backup {}", bak.display()))?;
+    } else if dest.exists() {
+        std::fs::remove_file(&dest)
+            .with_context(|| format!("removing {}", dest.display()))?;
+    }
+    Ok(())
+}
+
 pub fn write_premade(content: &str, dest: &Path) -> Result<()> {
     if dest.is_dir() {
         bail!("destination is a directory: {}", dest.display());

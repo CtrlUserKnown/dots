@@ -1,130 +1,166 @@
+//! The update screen: shows current vs. latest version and offers to apply a
+//! release in place. It reads the check result held on [`App`] (populated by the
+//! background check in the event loop) and owns the apply/re-check background
+//! work. Mirrors the self-update UX in `ssm`.
+
 use std::sync::mpsc::Receiver;
 
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     Frame,
     layout::Rect,
+    style::Modifier,
     text::{Line, Span},
     widgets::Paragraph,
 };
 
-use crate::tui::{draw_desc, draw_footer, draw_header};
 use crate::tui::app::{App, Screen};
-use crate::tui::theme::{style_dim, style_error, style_header, style_select};
-use crate::update as update_core;
+use crate::tui::theme::{style_dim, style_header, style_select};
+use crate::tui::{draw_desc, draw_footer, draw_header};
+use crate::update::{self as update_core, UpdateInfo};
 
 const VERSION: &str = env!("DOTS_VERSION");
 
-// ── state machine ─────────────────────────────────────────────────────────────
-
-pub enum UpdateState {
-    Checking,
-    UpToDate,
-    Available { behind: u32, label: String },
-    Pulling,
-    Done    { new_ver: String },
-    Error   (String),
-}
+// ── view state ────────────────────────────────────────────────────────────────
 
 pub struct UpdateScreen {
-    pub state:   UpdateState,
-    pub pull_rx: Option<Receiver<anyhow::Result<String>>>,
+    /// Background re-check kicked off from this screen (separate from the initial
+    /// check the event loop runs on launch).
+    recheck_rx: Option<Receiver<anyhow::Result<Option<UpdateInfo>>>>,
+    apply_rx:   Option<Receiver<anyhow::Result<()>>>,
+    applying:   bool,
+    /// True once the swap succeeded — the view then asks for a restart.
+    done:       bool,
 }
 
 impl UpdateScreen {
     pub fn new() -> Self {
-        Self { state: UpdateState::Checking, pull_rx: None }
+        Self { recheck_rx: None, apply_rx: None, applying: false, done: false }
     }
 
-    pub fn sync_from_app(&mut self, app: &App) {
-        match &app.update_status {
-            Some(status) if status.behind > 0 => {
-                self.state = UpdateState::Available {
-                    behind: status.behind,
-                    label:  status.label.clone(),
-                };
+    /// Reset transient state when (re)entering the screen. Kept for parity with
+    /// the navigation flow; the underlying check result lives on `App`.
+    pub fn sync_from_app(&mut self, _app: &App) {
+        // A completed update stays "done" until the process restarts, so we only
+        // clear the in-flight flags when nothing is running.
+        if !self.applying {
+            self.recheck_rx = None;
+        }
+    }
+
+    /// Drain the apply/re-check channels. Called each tick from the event loop.
+    /// `app` is updated in place so the dashboard summary reflects a re-check.
+    pub fn pump(&mut self, app: &mut App) {
+        if let Some(rx) = &self.recheck_rx {
+            if let Ok(result) = rx.try_recv() {
+                self.recheck_rx = None;
+                match result {
+                    Ok(info)  => { app.update_info = info; app.update_error = None; }
+                    Err(e)    => app.update_error = Some(e.to_string()),
+                }
             }
-            Some(_) => self.state = UpdateState::UpToDate,
-            None => match &app.update_error {
-                Some(e) => self.state = UpdateState::Error(e.clone()),
-                None    => self.state = UpdateState::Checking,
-            },
+        }
+
+        if let Some(rx) = &self.apply_rx {
+            if let Ok(result) = rx.try_recv() {
+                self.applying = false;
+                self.apply_rx = None;
+                match result {
+                    Ok(())  => self.done = true,
+                    Err(e)  => app.update_error = Some(format!("update failed: {e}")),
+                }
+            }
         }
     }
 
-    pub fn try_complete_pull(&mut self) {
-        let done = if let Some(rx) = &self.pull_rx {
-            rx.try_recv().ok()
-        } else {
-            None
-        };
-        if let Some(result) = done {
-            self.pull_rx = None;
-            self.state = match result {
-                Ok(ver) => UpdateState::Done { new_ver: ver },
-                Err(e)  => UpdateState::Error(e.to_string()),
-            };
+    fn start_apply(&mut self, app: &App) {
+        if self.applying || self.done { return; }
+        if let Some(info) = app.update_info.clone() {
+            self.applying = true;
+            self.apply_rx = Some(update_core::spawn_apply(info));
         }
+    }
+
+    fn start_recheck(&mut self, app: &mut App) {
+        if self.applying || self.recheck_rx.is_some() { return; }
+        app.update_error = None;
+        // Force a check regardless of the throttle by passing a zero interval.
+        self.recheck_rx = Some(update_core::spawn_check(0));
     }
 }
 
 // ── rendering ─────────────────────────────────────────────────────────────────
 
-pub fn render(f: &mut Frame, area: Rect, _app: &App, screen: &UpdateScreen) {
+pub fn render(f: &mut Frame, area: Rect, app: &App, screen: &UpdateScreen) {
     draw_header(f, area, " check for updates ", VERSION);
 
     if area.height < 5 { return; }
 
-    let body_y    = area.y + 2;
-    let body_rect = Rect { x: area.x + 2, y: body_y, width: area.width.saturating_sub(4), height: 1 };
+    let bold = style_header().add_modifier(Modifier::BOLD);
+    let mut lines: Vec<Line> = Vec::new();
 
-    let (line, desc) = match &screen.state {
-        UpdateState::Checking => (
-            Line::from(Span::styled("  Checking for updates…", style_dim())),
-            "contacting upstream…",
-        ),
-        UpdateState::UpToDate => (
-            Line::from(vec![
-                Span::styled("✓  ", style_select()),
-                Span::raw(format!("No updates — you're on v{VERSION}")),
-            ]),
-            "you're up to date",
-        ),
-        UpdateState::Available { behind, label } => (
-            Line::from(vec![
-                Span::styled("📦 ", style_header()),
-                Span::raw(format!("Update available: v{VERSION} → v{label}  ({behind} commit(s))")),
-            ]),
-            "press y to update, any other key to skip",
-        ),
-        UpdateState::Pulling => (
-            Line::from(Span::styled("  Pulling update…", style_dim())),
-            "please wait",
-        ),
-        UpdateState::Done { new_ver } => (
-            Line::from(vec![
-                Span::styled("✓  ", style_select()),
-                Span::raw(format!("Updated to v{new_ver}. Restart your shell to apply.")),
-            ]),
-            "restart your shell to load the new version",
-        ),
-        UpdateState::Error(msg) => (
-            Line::from(vec![
-                Span::styled("✗  ", style_error()),
-                Span::raw(format!("Could not reach upstream: {msg}")),
-            ]),
-            "check your internet connection",
-        ),
+    lines.push(Line::from(vec![
+        Span::styled(format!("{:<12}", "current"), bold),
+        Span::styled(format!("v{}", update_core::CURRENT), style_dim()),
+    ]));
+
+    // What we show — and which actions are live — depends on install source and
+    // how far the background work has gotten.
+    let footer = if screen.done {
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "✓ Updated — restart dots to run the new version.",
+            style_select(),
+        )));
+        " esc back  q quit "
+    } else if screen.applying {
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "Downloading and installing… this can take a moment.",
+            bold,
+        )));
+        " esc back  q quit "
+    } else if let Some(msg) = app.install_source.defer_message() {
+        // Package-manager install: never self-replace, just point at the manager.
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            format!("Installed via a package manager — {msg}."),
+            style_dim(),
+        )));
+        " esc back  q quit "
+    } else if let Some(info) = &app.update_info {
+        lines.push(Line::from(vec![
+            Span::styled(format!("{:<12}", "latest"), bold),
+            Span::styled(format!("v{}", info.latest), style_select()),
+        ]));
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled("A newer release is available.", style_header())));
+        " a apply update  r re-check  esc back  q quit "
+    } else if screen.recheck_rx.is_some() {
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled("Checking for updates…", style_dim())));
+        " esc back  q quit "
+    } else if let Some(err) = &app.update_error {
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(format!("✗ {err}"), style_dim())));
+        " r re-check  esc back  q quit "
+    } else {
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled("You're on the latest version.", style_dim())));
+        " r re-check  esc back  q quit "
     };
 
-    f.render_widget(Paragraph::new(line), body_rect);
+    for (i, line) in lines.into_iter().enumerate() {
+        let y = area.y + 2 + i as u16;
+        if y + 4 >= area.y + area.height { break; }
+        f.render_widget(
+            Paragraph::new(line),
+            Rect { x: area.x + 2, y, width: area.width.saturating_sub(4), height: 1 },
+        );
+    }
 
-    let hint_str = match screen.state {
-        UpdateState::Available { .. } => " y update  esc back  q quit ",
-        _ => " esc back  q quit ",
-    };
-    draw_desc(f, area, desc, None);
-    draw_footer(f, area, hint_str);
+    draw_desc(f, area, "", app.flash.as_ref());
+    draw_footer(f, area, footer);
 }
 
 // ── key handling ─────────────────────────────────────────────────────────────
@@ -136,21 +172,12 @@ pub fn handle_key(app: &mut App, screen: &mut UpdateScreen, key: KeyEvent) {
             app.flash  = None;
         }
         KeyCode::Char('q') => app.should_quit = true,
-        KeyCode::Char('y') => {
-            if matches!(screen.state, UpdateState::Available { .. }) {
-                start_pull(screen);
+        KeyCode::Char('a') => {
+            if app.update_info.is_some() && app.install_source.defer_message().is_none() {
+                screen.start_apply(app);
             }
         }
+        KeyCode::Char('r') => screen.start_recheck(app),
         _ => {}
     }
-}
-
-fn start_pull(screen: &mut UpdateScreen) {
-    let dots_dir = crate::config::settings::dots_dir();
-    let (tx, rx) = std::sync::mpsc::channel();
-    std::thread::spawn(move || {
-        let _ = tx.send(update_core::do_pull(&dots_dir));
-    });
-    screen.state   = UpdateState::Pulling;
-    screen.pull_rx = Some(rx);
 }

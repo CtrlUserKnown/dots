@@ -1,5 +1,6 @@
 pub mod aliases;
 pub mod config;
+pub mod configs;
 pub mod installer;
 pub mod links;
 pub mod network;

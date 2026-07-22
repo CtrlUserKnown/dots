@@ -13,14 +13,13 @@ use ratatui::{
     Terminal,
 };
 
-use crate::config::settings::{dots_dir, Settings};
+use crate::config::settings::Settings;
 use crate::tui::theme::style_error;
 use crate::tui::{draw_desc, draw_footer, draw_header, FlashKind};
-use crate::update::{
-    check_upstream, record_check, should_check, UpdateMode, UpdateStatus,
-};
+use crate::update::{self, InstallSource, UpdateInfo};
 
 use super::aliases::{handle_alias_key, render_aliases, AliasView};
+use super::configs::ConfigsView;
 use super::health::HealthView;
 use super::profile::{handle_profile_key, render_profile, ProfileView};
 use super::settings::{handle_settings_key, render_settings, render_theme, handle_theme_key, SettingsView, ThemeView};
@@ -35,6 +34,7 @@ pub enum Screen {
     Main,
     Health,
     Aliases,
+    Configs,
     Profile,
     Theme,
     Settings,
@@ -44,28 +44,32 @@ pub enum Screen {
 // ── app state ─────────────────────────────────────────────────────────────────
 
 pub struct App {
-    pub should_quit:   bool,
-    pub screen:        Screen,
-    pub flash:         Option<(String, FlashKind)>,
-    pub menu_idx:      usize,
-    pub dash_focus:    usize,
-    pub update_status: Option<UpdateStatus>,
-    pub update_error:  Option<String>,
-    pub network:       Option<crate::network::NetworkStatus>,
-    pub settings:      Settings,
+    pub should_quit:    bool,
+    pub screen:         Screen,
+    pub flash:          Option<(String, FlashKind)>,
+    pub menu_idx:       usize,
+    pub dash_focus:     usize,
+    /// The newest release, if a background check found one newer than us.
+    pub update_info:    Option<UpdateInfo>,
+    pub update_error:   Option<String>,
+    /// How this binary was installed — gates whether self-update is offered.
+    pub install_source: InstallSource,
+    pub network:        Option<crate::network::NetworkStatus>,
+    pub settings:       Settings,
 }
 
 impl App {
     pub fn new(start: Screen, settings: Settings) -> Self {
         Self {
-            should_quit:   false,
-            screen:        start,
-            flash:         None,
-            menu_idx:      0,
-            dash_focus:    0,
-            update_status: None,
-            update_error:  None,
-            network:       None,
+            should_quit:    false,
+            screen:         start,
+            flash:          None,
+            menu_idx:       0,
+            dash_focus:     0,
+            update_info:    None,
+            update_error:   None,
+            install_source: update::install_source(),
+            network:        None,
             settings,
         }
     }
@@ -91,6 +95,7 @@ pub fn run(
 ) -> anyhow::Result<()> {
     let mut app           = App::new(start, settings.clone());
     let mut health_view   = HealthView::new();
+    let mut configs_view  = ConfigsView::new();
     let mut alias_view    = AliasView::new();
     let mut profile_view  = ProfileView::new();
     let mut update_screen = UpdateScreen::new();
@@ -101,19 +106,12 @@ pub fn run(
     if start == Screen::Settings { settings_view.load_from(&app.settings); }
     if start == Screen::Theme    { theme_view.load(); }
 
-    // Spawn background update check
-    let (tx, update_rx) = std::sync::mpsc::channel::<anyhow::Result<UpdateStatus>>();
-    {
-        let dots = dots_dir();
-        let freq = settings.dots.update_frequency;
-        let mode = if settings.dots.developer_mode { UpdateMode::Dev } else { UpdateMode::Normal };
-        std::thread::spawn(move || {
-            if should_check(&dots, freq) {
-                let _ = record_check(&dots);
-                let _ = tx.send(check_upstream(&dots, mode));
-            }
-        });
-    }
+    // Kick off the background release check, unless disabled or this binary is
+    // managed by a package manager (then updating is the manager's job). The
+    // spawned thread honours the throttle stamp internally.
+    let update_rx = (app.settings.dots.update_check
+        && app.install_source == InstallSource::SelfManaged)
+        .then(|| update::spawn_check(app.settings.dots.update_frequency));
 
     // Spawn the live network monitor: probe now, then refresh every few seconds.
     // Sending fails once the receiver is dropped (app exit), which ends the loop.
@@ -126,7 +124,7 @@ pub fn run(
     });
 
     loop {
-        update_screen.try_complete_pull();
+        update_screen.pump(&mut app);
         health_view.try_complete_install();
 
         // Drain the latest network snapshot (keep only the freshest).
@@ -134,44 +132,33 @@ pub fn run(
             app.network = Some(status);
         }
 
-        if let Ok(result) = update_rx.try_recv() {
-            match result {
-                Ok(status) => {
-                    if status.behind > 0 && app.screen != Screen::Update {
-                        app.flash = Some((
-                            format!("Update available: v{} — open Update screen", status.label),
-                            FlashKind::Info,
-                        ));
-                    }
-                    if app.screen == Screen::Update {
-                        if status.behind > 0 {
-                            update_screen.state = super::update::UpdateState::Available {
-                                behind: status.behind,
-                                label:  status.label.clone(),
-                            };
-                        } else {
-                            update_screen.state = super::update::UpdateState::UpToDate;
+        // Fold in the initial release check the moment it lands.
+        if let Some(rx) = &update_rx {
+            if let Ok(result) = rx.try_recv() {
+                match result {
+                    Ok(Some(info)) => {
+                        if app.screen != Screen::Update {
+                            app.flash = Some((
+                                format!("Update available: v{} — open Update screen", info.latest),
+                                FlashKind::Info,
+                            ));
                         }
+                        app.update_info = Some(info);
                     }
-                    app.update_status = Some(status);
-                }
-                Err(e) => {
-                    let msg = e.to_string();
-                    if app.screen == Screen::Update {
-                        update_screen.state = super::update::UpdateState::Error(msg.clone());
-                    }
-                    app.update_error = Some(msg);
+                    Ok(None) => {}
+                    Err(e)   => app.update_error = Some(e.to_string()),
                 }
             }
         }
 
-        terminal.draw(|f| render(f, &app, &health_view, &alias_view, &profile_view, &update_screen, &settings_view, &theme_view))?;
+        terminal.draw(|f| render(f, &app, &health_view, &configs_view, &alias_view, &profile_view, &update_screen, &settings_view, &theme_view))?;
 
         if event::poll(Duration::from_millis(16))? {
             match event::read()? {
                 Event::Key(key) => handle_key(
                     &mut app,
                     &mut health_view,
+                    &mut configs_view,
                     &mut alias_view,
                     &mut profile_view,
                     &mut update_screen,
@@ -184,6 +171,7 @@ pub fn run(
                     handle_mouse(
                         &mut app,
                         &mut health_view,
+                        &mut configs_view,
                         &mut alias_view,
                         &mut profile_view,
                         &mut update_screen,
@@ -211,6 +199,7 @@ fn render(
     f:        &mut Frame,
     app:      &App,
     health:   &HealthView,
+    configs:  &ConfigsView,
     aliases:  &AliasView,
     profile:  &ProfileView,
     update:   &UpdateScreen,
@@ -225,6 +214,7 @@ fn render(
     match app.screen {
         Screen::Main     => render_main(f, area, app),
         Screen::Health   => super::health::render(f, area, app, health),
+        Screen::Configs  => super::configs::render(f, area, app, configs),
         Screen::Aliases  => render_aliases(f, area, app, aliases),
         Screen::Profile  => render_profile(f, area, app, profile),
         Screen::Update   => super::update::render(f, area, app, update),
@@ -278,6 +268,7 @@ fn render_too_small(f: &mut Frame, area: Rect) {
 fn handle_key(
     app:      &mut App,
     health:   &mut HealthView,
+    configs:  &mut ConfigsView,
     aliases:  &mut AliasView,
     profile:  &mut ProfileView,
     update:   &mut UpdateScreen,
@@ -290,8 +281,9 @@ fn handle_key(
         return;
     }
     match app.screen {
-        Screen::Main     => handle_main_key(app, health, aliases, profile, update, settings, theme, key),
+        Screen::Main     => handle_main_key(app, health, configs, aliases, profile, update, settings, theme, key),
         Screen::Health   => super::health::handle_key(app, health, key),
+        Screen::Configs  => super::configs::handle_key(app, configs, key),
         Screen::Aliases  => handle_alias_key(app, aliases, key),
         Screen::Profile  => handle_profile_key(app, profile, key),
         Screen::Update   => super::update::handle_key(app, update, key),
@@ -304,6 +296,7 @@ fn handle_key(
 fn handle_main_key(
     app:      &mut App,
     health:   &mut HealthView,
+    configs:  &mut ConfigsView,
     aliases:  &mut AliasView,
     profile:  &mut ProfileView,
     update:   &mut UpdateScreen,
@@ -323,12 +316,12 @@ fn handle_main_key(
             let idx = (c as u8 - b'1') as usize;
             if idx < MAIN_MENU.len() {
                 app.menu_idx = idx;
-                navigate_to(app, health, aliases, profile, update, settings, theme, MAIN_MENU[idx]);
+                navigate_to(app, health, configs, aliases, profile, update, settings, theme, MAIN_MENU[idx]);
             }
         }
         KeyCode::Enter => {
             if let Some(&pane) = PANES.get(app.dash_focus) {
-                navigate_to(app, health, aliases, profile, update, settings, theme, pane.target());
+                navigate_to(app, health, configs, aliases, profile, update, settings, theme, pane.target());
                 if let Some(section) = pane.section() {
                     health.focus_section(section);
                 }
@@ -342,6 +335,7 @@ fn handle_main_key(
 fn handle_mouse(
     app:      &mut App,
     health:   &mut HealthView,
+    configs:  &mut ConfigsView,
     aliases:  &mut AliasView,
     profile:  &mut ProfileView,
     update:   &mut UpdateScreen,
@@ -358,7 +352,7 @@ fn handle_mouse(
         MouseEventKind::ScrollDown | MouseEventKind::ScrollUp => {
             let code = if matches!(me.kind, MouseEventKind::ScrollDown) { KeyCode::Down } else { KeyCode::Up };
             let key = KeyEvent::new(code, KeyModifiers::NONE);
-            handle_key(app, health, aliases, profile, update, settings, theme, key);
+            handle_key(app, health, configs, aliases, profile, update, settings, theme, key);
         }
         // Left-click on a dashboard pane focuses and opens it. The 50×14 guard
         // matches the threshold below which the dashboard isn't drawn at all.
@@ -369,7 +363,7 @@ fn handle_mouse(
             if let Some(i) = overview::pane_at(grid, me.column, me.row) {
                 app.dash_focus = i;
                 if let Some(&pane) = PANES.get(i) {
-                    navigate_to(app, health, aliases, profile, update, settings, theme, pane.target());
+                    navigate_to(app, health, configs, aliases, profile, update, settings, theme, pane.target());
                     if let Some(section) = pane.section() {
                         health.focus_section(section);
                     }
@@ -384,6 +378,7 @@ fn handle_mouse(
 fn navigate_to(
     app:      &mut App,
     health:   &mut HealthView,
+    configs:  &mut ConfigsView,
     aliases:  &mut AliasView,
     profile:  &mut ProfileView,
     update:   &mut UpdateScreen,
@@ -395,6 +390,11 @@ fn navigate_to(
         Screen::Health => {
             health.rebuild();
             app.screen = Screen::Health;
+            app.flash  = None;
+        }
+        Screen::Configs => {
+            configs.reload();
+            app.screen = Screen::Configs;
             app.flash  = None;
         }
         Screen::Aliases => {

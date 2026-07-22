@@ -45,7 +45,6 @@ enum FieldKey {
     CheckInterval,
     Greeting,
     Theme,
-    DeveloperMode,
 }
 
 fn field_label(k: FieldKey) -> &'static str {
@@ -55,18 +54,16 @@ fn field_label(k: FieldKey) -> &'static str {
         FieldKey::CheckInterval => "Check interval",
         FieldKey::Greeting      => "Shell greeting",
         FieldKey::Theme         => "Theme",
-        FieldKey::DeveloperMode => "Developer mode",
     }
 }
 
 fn field_desc(k: FieldKey) -> &'static str {
     match k {
-        FieldKey::CheckUpdates  => "manually check for dotfiles updates right now",
+        FieldKey::CheckUpdates  => "open the update screen to check for and apply a release",
         FieldKey::AutoUpdates   => "automatically check for updates in the background",
         FieldKey::CheckInterval => "how often to check for updates",
         FieldKey::Greeting      => "show fastfetch system info when opening a terminal",
         FieldKey::Theme         => "pick a terminal color theme",
-        FieldKey::DeveloperMode => "track commits instead of releases",
     }
 }
 
@@ -99,7 +96,6 @@ impl SettingsView {
             FieldKey::CheckInterval,
             FieldKey::Greeting,
             FieldKey::Theme,
-            FieldKey::DeveloperMode,
         ];
     }
 
@@ -109,7 +105,6 @@ impl SettingsView {
             FieldKey::AutoUpdates   => bool_display(self.settings.dots.update_check),
             FieldKey::CheckInterval => (freq_label(self.settings.dots.update_frequency).to_string(), true),
             FieldKey::Greeting      => bool_display(self.settings.dots.greeting),
-            FieldKey::DeveloperMode => bool_display(self.settings.dots.developer_mode),
             FieldKey::CheckUpdates | FieldKey::Theme => (String::new(), true),
         }
     }
@@ -118,7 +113,6 @@ impl SettingsView {
         match k {
             FieldKey::AutoUpdates   => { self.settings.dots.update_check    ^= true; SettingsAction::None }
             FieldKey::Greeting      => { self.settings.dots.greeting         ^= true; SettingsAction::None }
-            FieldKey::DeveloperMode => { self.settings.dots.developer_mode   ^= true; SettingsAction::None }
             FieldKey::CheckInterval => {
                 self.settings.dots.update_frequency = next_freq(self.settings.dots.update_frequency);
                 SettingsAction::None

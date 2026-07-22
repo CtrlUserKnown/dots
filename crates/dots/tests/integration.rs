@@ -35,12 +35,18 @@ fn health_exits_zero() {
 // ── update ────────────────────────────────────────────────────────────────────
 
 #[test]
-fn update_check_with_local_repo() {
-    let (_root, _bare, local) = common::fake_git_repo_behind(1);
-    match dots::update::check_upstream(&local, dots::update::UpdateMode::Dev) {
-        Ok(status) => assert_eq!(status.behind, 1, "local should be 1 commit behind"),
-        Err(e)     => eprintln!("update_check_with_local_repo skipped: {e}"),
+fn install_source_is_detectable_offline() {
+    // Self-update gating must resolve without any network. A package-manager
+    // install yields a defer message; a self-managed one does not.
+    use dots::update::{install_source, InstallSource};
+    match install_source() {
+        InstallSource::SelfManaged => {}
+        InstallSource::PackageManager(_) => {
+            assert!(install_source().defer_message().is_some());
+        }
     }
+    // The baked-in version is always present.
+    assert!(!dots::update::CURRENT.is_empty());
 }
 
 // ── alias CLI ─────────────────────────────────────────────────────────────────

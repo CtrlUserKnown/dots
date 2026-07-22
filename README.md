@@ -11,6 +11,7 @@
 - **Interactive TUI** — run `dots` for a dashboard covering symlink health, installed tools, shell plugins, app configs, and updates.
 - **Cross-platform installs** — one dependency list, resolved per platform via Homebrew, `apt`, or `dnf`.
 - **Symlink management** — declare your own links (`dots link add`), then create/repair them idempotently. Adopts existing files with automatic backups.
+- **App configs** — every directory in your dotfiles repo (`nvim/`, `git/`, `bat/`, …) shows up in the TUI's **Configs** screen with an install-status badge (`[ installed ]` / `[ partial ]` / `[ not installed ]`); view a config's files, preview their contents, and install/remove it by (un)linking into `$HOME`.
 - **Premade configs** — bundled starter configs for Ghostty, Neovim, and opencode, applied on demand (existing files are backed up).
 - **Portable profiles** — export your setup to `personal.json` and re-import it on another machine, locally or straight from GitHub.
 - **Self-updating** — built-in update checker and one-command upgrade.
@@ -25,7 +26,7 @@ curl -fsSL https://raw.githubusercontent.com/CtrlUserKnown/dots/main/install.sh 
 The installer clones the repo to `~/.dots`, downloads a prebuilt binary for your OS/arch (or builds from source with `cargo` if no release matches), puts `dots` on your `PATH`, and initializes config.
 
 ```
-install.sh [--branch <name>] [--version <tag>] [--dir <path>]
+install.sh [--version <tag>] [--dir <path>]
 ```
 
 Prefer to build it yourself? See [`BUILD_MACOS.md`](BUILD_MACOS.md), or from a clone:
@@ -50,7 +51,8 @@ Everything is also scriptable via subcommands:
 | `dots install --all` | Install all missing **required** dependencies |
 | `dots install --optional` | Install all missing **optional** dependencies |
 | `dots aliases list \| add <name> <value> \| remove <name>` | Manage shell aliases |
-| `dots premade list \| apply <app>` | List/apply bundled app configs (ghostty, neovim, opencode) |
+| `dots premade list \| apply \| remove <app>` | List/apply/remove bundled starter configs (ghostty, neovim, opencode) |
+| `dots config list \| view \| install \| remove <name>` | View and (un)install app configs discovered in your dotfiles repo |
 | `dots link add <source> <target>` | Adopt a file/dir and symlink it (recorded in `links.toml`) |
 | `dots link list \| apply \| remove <target>` | Inspect, create/repair, or remove declared links |
 | `dots profile generate [path]` | Export your setup to `personal.json` |
