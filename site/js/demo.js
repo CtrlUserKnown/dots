@@ -1,40 +1,34 @@
 (function () {
   var lines = [
-    { type: 'input', text: '$ dots' },
-    { type: 'blank' },
-    { type: 'header', text: '┌─────────────────────────────────────────────────────┐' },
-    { type: 'header', text: '│  ⠋ dots — dotfiles manager                          │' },
-    { type: 'header', text: '├─────────────────────────────────────────────────────┤' },
-    { type: 'ok',    text: '│  ● symlinks    12 linked   0 broken                 │' },
-    { type: 'ok',    text: '│  ● tools       8 installed all up to date           │' },
-    { type: 'ok',    text: '│  ● plugins     3 active                            │' },
-    { type: 'warn',  text: '│  ○ updates     1 available  (eza → 1.2.0)          │' },
-    { type: 'ok',    text: '│  ● configs     synced                              │' },
-    { type: 'ok',    text: '│  ● network     online  12ms  Wi-Fi                  │' },
-    { type: 'header', text: '├─────────────────────────────────────────────────────┤' },
-    { type: 'muted', text: '│  press [q] quit  [↑↓] navigate  [enter] select      │' },
-    { type: 'header', text: '└─────────────────────────────────────────────────────┘' },
-    { type: 'blank' },
-    { type: 'input', text: '$ dots install eza' },
-    { type: 'ok',    text: '✓ resolved  eza@1.2.0 (linux-amd64)' },
-    { type: 'ok',    text: '✓ downloaded  2.1 MB' },
-    { type: 'ok',    text: '✓ installed   /usr/local/bin/eza' },
-    { type: 'blank' },
-    { type: 'input', text: '$ dots link' },
-    { type: 'ok',    text: '✓ linked  ghostty/config → ~/.config/ghostty/config' },
-    { type: 'ok',    text: '✓ linked  nvim/           → ~/.config/nvim/' },
-    { type: 'ok',    text: '✓ linked  opencode/       → ~/.config/opencode/' },
-    { type: 'muted', text: '  12 symlinks OK, 0 skipped, 0 errors' },
+    { type: 'full', html: '<span class="tui-title"> dots </span> <span class="tui-subtitle">dotfiles manager</span> <span class="tui-float">q: quit  ?: help  1-6: panes</span>' },
+    { type: 'full', html: '<span class="tui-border">─────────────────────────── symlinks ───────────────────────────</span>' },
+    { type: 'full', html: '  <span class="tui-ok">●</span> <span class="tui-label">ghostty</span>    <span class="tui-path">~/.config/ghostty/config</span>' },
+    { type: 'full', html: '  <span class="tui-ok">●</span> <span class="tui-label">nvim</span>       <span class="tui-path">~/.config/nvim/</span>' },
+    { type: 'full', html: '  <span class="tui-ok">●</span> <span class="tui-label">opencode</span>   <span class="tui-path">~/.config/opencode/</span>' },
+    { type: 'full', html: '  <span class="tui-ok">●</span> <span class="tui-label">zsh</span>        <span class="tui-path">~/.zshrc</span>' },
+    { type: 'full', html: '  <span class="tui-ok">●</span> <span class="tui-label">tmux</span>       <span class="tui-path">~/.tmux.conf</span>' },
+    { type: 'full', html: '  <span class="tui-ok">●</span> <span class="tui-label">git</span>        <span class="tui-path">~/.gitconfig</span>' },
+    { type: 'full', html: '<span class="tui-border">──────────────────────────── tools ────────────────────────────</span>' },
+    { type: 'full', html: '  <span class="tui-ok">●</span> <span class="tui-label">eza</span>        <span class="tui-ver">v1.1.0</span>    <span class="tui-status-ok">installed</span>' },
+    { type: 'full', html: '  <span class="tui-ok">●</span> <span class="tui-label">fzf</span>        <span class="tui-ver">v0.53.0</span>   <span class="tui-status-ok">installed</span>' },
+    { type: 'full', html: '  <span class="tui-ok">●</span> <span class="tui-label">bat</span>        <span class="tui-ver">v0.24.0</span>   <span class="tui-status-ok">installed</span>' },
+    { type: 'full', html: '  <span class="tui-ok">●</span> <span class="tui-label">zoxide</span>     <span class="tui-ver">v0.9.4</span>    <span class="tui-status-ok">installed</span>' },
+    { type: 'full', html: '  <span class="tui-ok">●</span> <span class="tui-label">ripgrep</span>    <span class="tui-ver">v14.1.0</span>   <span class="tui-status-ok">installed</span>' },
+    { type: 'full', html: '<span class="tui-border">──────────────────────────── plugins ───────────────────────────</span>' },
+    { type: 'full', html: '  <span class="tui-ok">●</span> <span class="tui-label">lazy.nvim</span>           <span class="tui-status-ok">active</span>' },
+    { type: 'full', html: '  <span class="tui-ok">●</span> <span class="tui-label">telescope.nvim</span>      <span class="tui-status-ok">active</span>' },
+    { type: 'full', html: '  <span class="tui-ok">●</span> <span class="tui-label">treesitter</span>          <span class="tui-status-ok">active</span>' },
+    { type: 'full', html: '<span class="tui-border">──────────────────────────── updates ───────────────────────────</span>' },
+    { type: 'full', html: '  <span class="tui-warn">○</span> <span class="tui-label">eza</span>        <span class="tui-ver">v1.1.0 → v1.2.0</span>  <span class="tui-status-warn">update available</span>' },
+    { type: 'full', html: '  <span class="tui-ok">●</span> <span class="tui-label">fzf</span>        <span class="tui-ver">v0.53.0</span>           <span class="tui-status-ok">up to date</span>' },
+    { type: 'full', html: '  <span class="tui-ok">●</span> <span class="tui-label">bat</span>        <span class="tui-ver">v0.24.0</span>           <span class="tui-status-ok">up to date</span>' },
+    { type: 'full', html: '<span class="tui-border">──────────────────────────── network ───────────────────────────</span>' },
+    { type: 'full', html: '  <span class="tui-ok">●</span> <span class="tui-label">status</span>     <span class="tui-status-ok">online</span>    <span class="tui-ver">12ms</span>    <span class="tui-label">Wi-Fi</span>' },
+    { type: 'full', html: '  <span class="tui-ok">●</span> <span class="tui-label">dns</span>        <span class="tui-path">1.1.1.1, 8.8.8.8</span>' },
+    { type: 'full', html: '  <span class="tui-ok">●</span> <span class="tui-label">vpn</span>        <span class="tui-status-ok">not connected</span>' },
+    { type: 'full', html: '<span class="tui-border">─────────────────────────────────────────────────────────────────</span>' },
+    { type: 'full', html: '<span class="tui-footer"> <span class="tui-key">↑↓</span> navigate  <span class="tui-key">enter</span> select  <span class="tui-key">i</span> install  <span class="tui-key">l</span> link  <span class="tui-key">u</span> update</span>' },
   ];
-
-  var classMap = {
-    input: 'demo-line--input',
-    ok:    'demo-line--ok',
-    warn:  'demo-line--warn',
-    muted: 'demo-line--muted',
-    header:'demo-line--header',
-    blank: '',
-  };
 
   function init() {
     var container = document.getElementById('demo-output');
@@ -47,20 +41,14 @@
           container.innerHTML = '';
           idx = 0;
           addLine();
-        }, 2400);
+        }, 3000);
         return;
       }
 
       var line = lines[idx];
       var el = document.createElement('div');
-      el.className = 'demo-line ' + (classMap[line.type] || '');
-
-      if (line.type === 'blank') {
-        el.innerHTML = '&nbsp;';
-      } else {
-        el.textContent = line.text;
-      }
-
+      el.className = 'demo-line tui-line';
+      el.innerHTML = line.html;
       el.style.opacity = '0';
       container.appendChild(el);
 
@@ -69,7 +57,7 @@
       });
 
       idx++;
-      var delay = line.type === 'blank' ? 100 : line.type === 'input' ? 420 : 160;
+      var delay = line.type === 'full' ? 110 : 100;
       setTimeout(addLine, delay);
     }
 

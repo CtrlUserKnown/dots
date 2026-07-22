@@ -1043,10 +1043,10 @@ tr:hover td {
 }
 
 /* ============================================================
-   Demo terminal
+   Demo terminal — TUI style
    ============================================================ */
 .demo-terminal {
-  max-width: 580px;
+  max-width: 640px;
   margin: 0 auto;
   border-radius: 10px;
   overflow: hidden;
@@ -1056,24 +1056,33 @@ tr:hover td {
 }
 
 .demo-body {
-  padding: 1.5rem 1.75rem;
+  padding: 0.5rem 0.75rem;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.8rem;
-  line-height: 1.65;
-  min-height: 380px;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  min-height: 520px;
   overflow: hidden;
 }
 
 .demo-line {
   white-space: pre;
-  transition: opacity 0.18s ease;
+  transition: opacity 0.15s ease;
 }
 
-.demo-line--input  { color: #fff; font-weight: 500; }
-.demo-line--ok     { color: #a6e3a1; }
-.demo-line--warn   { color: #f9e2af; }
-.demo-line--muted  { color: #585b70; }
-.demo-line--header { color: #45475a; }
+.tui-line { color: var(--fg); }
+.tui-title { color: var(--blue); font-weight: 700; }
+.tui-subtitle { color: var(--fg-subtle); }
+.tui-float { color: var(--fg-subtle); float: right; }
+.tui-border { color: #45475a; }
+.tui-label { color: var(--fg); }
+.tui-path { color: var(--cyan); }
+.tui-ver { color: var(--fg-subtle); }
+.tui-ok { color: var(--green); }
+.tui-warn { color: var(--yellow); }
+.tui-status-ok { color: var(--green); }
+.tui-status-warn { color: var(--yellow); }
+.tui-footer { color: var(--fg-subtle); }
+.tui-key { color: var(--blue); font-weight: 600; }
 
 /* ============================================================
    Responsive — Tablet (< 900px)
