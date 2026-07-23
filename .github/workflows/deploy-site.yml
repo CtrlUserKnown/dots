@@ -3,7 +3,10 @@ name: Deploy Site to GitHub Pages
 on:
   push:
     branches: [main]
-    paths: [site/**]
+    paths:
+      - site/**
+      - install.sh
+      - CHANGELOG.md
   workflow_dispatch:
 
 permissions:
@@ -26,6 +29,12 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
+
+      # Mirror the canonical root files into the published site: the installer
+      # (so both raw.githubusercontent.com and <pages>/install.sh work) and the
+      # changelog (fetched at runtime by js/changelog.js).
+      - name: Stage root files
+        run: cp install.sh CHANGELOG.md site/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

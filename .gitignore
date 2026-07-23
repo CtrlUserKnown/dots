@@ -23,3 +23,10 @@ CLAUDE.md
 
 # logs
 *.log
+
+# mirrored at deploy time from the canonical root copies
+site/install.sh
+site/CHANGELOG.md
+
+# stray build output — site/ is published wholesale by deploy-site.yml
+site/target/
