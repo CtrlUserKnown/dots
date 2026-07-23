@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-07-23
+
+### Added
+- Static site pages (`site/`) — about, docs, changelog with version-based navigation
+- Interactive TUI demo page with live ratatui-style dashboard rendering
+- GitHub Pages deploy workflow (`deploy-site.yml`)
+- Root file mirroring in deploy (README, CHANGELOG, install.sh, etc.)
+
+### Changed
+- README updated with site links, CHANGELOG reference, and clean documentation structure
+
+## [2.1.0] - 2026-07-22
+
 ### Added
 - Configs module (`configs.rs`) for discovering and managing dotfiles configs from your repo — replaces the old premade-only system with a full config browser that shows install status per app
 - TUI Configs screen (`tui/configs.rs`) with config listing, file preview, and install/remove actions
