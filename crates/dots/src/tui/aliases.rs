@@ -39,6 +39,10 @@ pub struct AliasView {
     pub mode:     AliasMode,
 }
 
+impl Default for AliasView {
+    fn default() -> Self { Self::new() }
+}
+
 impl AliasView {
     pub fn new() -> Self {
         let mut v = Self {

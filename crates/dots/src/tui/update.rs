@@ -33,6 +33,10 @@ pub struct UpdateScreen {
     done:       bool,
 }
 
+impl Default for UpdateScreen {
+    fn default() -> Self { Self::new() }
+}
+
 impl UpdateScreen {
     pub fn new() -> Self {
         Self { recheck_rx: None, apply_rx: None, applying: false, done: false }

@@ -31,6 +31,10 @@ pub struct ProfileView {
     pub flash: Option<(String, FlashKind)>,
 }
 
+impl Default for ProfileView {
+    fn default() -> Self { Self::new() }
+}
+
 impl ProfileView {
     pub fn new() -> Self {
         Self { mode: ProfileMode::Normal, flash: None }

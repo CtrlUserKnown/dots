@@ -160,7 +160,7 @@ pub fn install_dep(dep: &crate::packages::Dep) -> Result<()> {
         PackageManager::Unknown => bail!("no supported package manager found"),
     };
     if name.is_empty() {
-        bail!("{} is not available via {} on this system", dep.bin, format!("{pm:?}"));
+        bail!("{} is not available via {pm:?} on this system", dep.bin);
     }
     install_package(&pm, &name)
 }

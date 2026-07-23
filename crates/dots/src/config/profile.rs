@@ -171,7 +171,7 @@ pub fn apply_personal_config(cfg: &PersonalConfig) -> Result<Vec<String>> {
         .and_then(|a| a.get("theme"))
         .and_then(|t| t.as_str())
         .filter(|t| !t.is_empty())
-        .or_else(|| if cfg.theme.is_empty() { None } else { Some(cfg.theme.as_str()) });
+        .or(if cfg.theme.is_empty() { None } else { Some(cfg.theme.as_str()) });
 
     if let Some(t) = theme {
         let dots = dots_dir();
@@ -257,7 +257,9 @@ fn epoch_days_to_ymd(mut days: u32) -> (u32, u32, u32) {
     (y, mo, days + 1)
 }
 
-fn is_leap(y: u32) -> bool { y % 4 == 0 && (y % 100 != 0 || y % 400 == 0) }
+fn is_leap(y: u32) -> bool {
+    y.is_multiple_of(4) && (!y.is_multiple_of(100) || y.is_multiple_of(400))
+}
 
 // ── tests ─────────────────────────────────────────────────────────────────────
 
@@ -290,7 +292,7 @@ mod tests {
         let cfg = load_from_value(&v1).unwrap();
         assert_eq!(cfg.version, "2", "version should be upgraded to 2");
         assert_eq!(cfg.theme, "Nord");
-        assert_eq!(cfg.settings.greeting, false);
+        assert!(!cfg.settings.greeting);
     }
 
     #[test]

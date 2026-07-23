@@ -168,7 +168,7 @@ fn cli_aliases(action: AliasAction) -> anyhow::Result<()> {
         AliasAction::List => {
             let all = load_all_aliases(&dots, &personal);
             if all.is_empty() { println!("No aliases found."); return Ok(()); }
-            println!("{:<20} {:<40} {}", "NAME", "COMMAND", "TYPE");
+            println!("{:<20} {:<40} TYPE", "NAME", "COMMAND");
             println!("{}", "-".repeat(65));
             for a in &all {
                 let t = if matches!(a.source, AliasSource::User) { "user" } else { "built-in" };
@@ -231,7 +231,7 @@ fn cli_premade(action: PremadeAction) -> anyhow::Result<()> {
 
     match action {
         PremadeAction::List => {
-            println!("{:<12} {}", "APP", "DESCRIPTION");
+            println!("{:<12} DESCRIPTION", "APP");
             println!("{}", "-".repeat(60));
             for p in PREMADE_CONFIGS {
                 println!("{:<12} {}", p.app, p.description);
@@ -366,7 +366,7 @@ fn cli_link(action: LinkAction) -> anyhow::Result<()> {
                     links::manifest_path().display());
                 return Ok(());
             }
-            println!("{:<40} {:<40} {}", "LINK", "SOURCE", "STATUS");
+            println!("{:<40} {:<40} STATUS", "LINK", "SOURCE");
             println!("{}", "-".repeat(90));
             for s in &syms {
                 let status = match check(s) {

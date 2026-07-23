@@ -47,6 +47,10 @@ pub struct ConfigsView {
     pub flash:   Option<(String, FlashKind)>,
 }
 
+impl Default for ConfigsView {
+    fn default() -> Self { Self::new() }
+}
+
 impl ConfigsView {
     pub fn new() -> Self {
         Self {

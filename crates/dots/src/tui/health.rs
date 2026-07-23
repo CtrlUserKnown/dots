@@ -86,6 +86,10 @@ pub struct HealthView {
     install_rx:      Option<Receiver<anyhow::Result<()>>>,
 }
 
+impl Default for HealthView {
+    fn default() -> Self { Self::new() }
+}
+
 impl HealthView {
     pub fn new() -> Self {
         let mut v = Self {
@@ -359,7 +363,7 @@ fn start_install(view: &mut HealthView, bin: String) {
     let dep_copy = dep.bin; // &'static str
     std::thread::spawn(move || {
         let result = DEPS.iter().find(|d| d.bin == dep_copy)
-            .map(|d| install_dep(d))
+            .map(install_dep)
             .unwrap_or_else(|| anyhow::bail!("dep not found"));
         let _ = tx.send(result);
     });

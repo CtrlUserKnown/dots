@@ -76,6 +76,10 @@ pub struct SettingsView {
     fields:       Vec<FieldKey>,
 }
 
+impl Default for SettingsView {
+    fn default() -> Self { Self::new() }
+}
+
 impl SettingsView {
     pub fn new() -> Self {
         Self {
@@ -238,6 +242,10 @@ pub struct ThemeView {
     pub flash:   Option<(String, FlashKind)>,
 }
 
+impl Default for ThemeView {
+    fn default() -> Self { Self::new() }
+}
+
 impl ThemeView {
     pub fn new() -> Self {
         Self { themes: Vec::new(), cursor: 0, scroll: 0, current: String::new(), flash: None }
@@ -384,7 +392,7 @@ pub fn get_current_theme(dots_dir: &Path) -> String {
     for line in text.lines() {
         let l = line.trim();
         if let Some(rest) = l.strip_prefix("theme") {
-            let rest = rest.trim_start_matches(|c: char| c == ' ' || c == '=').trim();
+            let rest = rest.trim_start_matches([' ', '=']).trim();
             let rest = rest.trim_matches('"');
             if !rest.is_empty() { return rest.to_string(); }
         }
