@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="dots.bak/img/svg/dots_logo_color_title.svg" alt="dots" width="180" />
+  <img src="site/img/svg/dots_logo_color_title.svg" alt="dots" width="180" />
 </p>
 
 **dots** is a fast, cross-platform dotfiles manager with an interactive TUI, written in Rust. It installs your tools, wires up symlinks GNU Stow–style, applies premade app configs, and keeps everything healthy — on macOS (Homebrew) and Linux (apt/dnf) alike.
 
 > This repository is the **`dots` tool** itself. Your actual dotfiles/configs live in a separate repo (e.g. [`dotfiles-CUK`](https://github.com/CtrlUserKnown/dotfiles)); `dots` manages the symlinks between them and your `$HOME`.
 
-## What changed?
+## Features
 
 - **Interactive TUI** — run `dots` for a dashboard covering symlink health, installed tools, shell plugins, app configs, and updates.
 - **Cross-platform installs** — one dependency list, resolved per platform via Homebrew, `apt`, or `dnf`.
@@ -16,6 +16,8 @@
 - **Portable profiles** — export your setup to `personal.json` and re-import it on another machine, locally or straight from GitHub.
 - **Self-updating** — built-in update checker and one-command upgrade.
 - **Single static binary** — no runtime dependencies (pure-Rust TLS, no OpenSSL/keychain), optimized for size.
+
+Release-by-release history lives in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Install
 
@@ -27,6 +29,12 @@ The installer clones the repo to `~/.dots`, downloads a prebuilt binary for your
 
 ```
 install.sh [--version <tag>] [--dir <path>]
+```
+
+The same script is mirrored on the site, if you prefer the shorter URL:
+
+```sh
+curl -fsSL https://ctrluserknown.github.io/dots/install.sh | sh
 ```
 
 Prefer to build it yourself? See [`BUILD_MACOS.md`](BUILD_MACOS.md), or from a clone:
