@@ -44,6 +44,8 @@ pub struct ConfigsView {
     file_cursor: usize,
     file_scroll: usize,
     pager:       Option<Pager>,
+    /// When `Some`, the screen is in add-path input mode; holds the typed buffer.
+    adding:      Option<String>,
     pub flash:   Option<(String, FlashKind)>,
 }
 
@@ -62,6 +64,7 @@ impl ConfigsView {
             file_cursor: 0,
             file_scroll: 0,
             pager:       None,
+            adding:      None,
             flash:       None,
         }
     }
@@ -110,6 +113,27 @@ impl ConfigsView {
         };
         match result {
             Ok(msg) => { self.reload(); self.flash = Some((msg, FlashKind::Success)); }
+            Err(e)  => self.flash = Some((format!("✗ {e}"), FlashKind::Error)),
+        }
+    }
+
+    /// Pull the latest source repo and re-apply installed configs (Phase 5 sync).
+    fn sync_now(&mut self) {
+        match configs::sync() {
+            Ok(msg) => { self.reload(); self.flash = Some((format!("✓ {msg}"), FlashKind::Success)); }
+            Err(e)  => self.flash = Some((format!("✗ {e}"), FlashKind::Error)),
+        }
+    }
+
+    /// Adopt the file at the typed path into the source repo (Phase 3 `add`).
+    fn commit_add(&mut self, path: &str) {
+        let path = path.trim();
+        if path.is_empty() {
+            self.flash = Some(("add cancelled".into(), FlashKind::Info));
+            return;
+        }
+        match configs::add(Path::new(path), None) {
+            Ok(msg) => { self.reload(); self.flash = Some((first_line(&msg), FlashKind::Success)); }
             Err(e)  => self.flash = Some((format!("✗ {e}"), FlashKind::Error)),
         }
     }
@@ -226,15 +250,20 @@ pub fn render(f: &mut Frame, area: Rect, _app: &App, view: &ConfigsView) {
         render_detail(f, right, view);
     }
 
-    // Desc bar: where we're reading configs from.
-    let where_from = view.root.as_ref()
-        .map(|r| format!("configs from {}", home_rel(r)))
-        .unwrap_or_else(|| "no dotfiles configs dir found".into());
-    draw_desc(f, area, &where_from, view.flash.as_ref());
+    // Desc bar: the add-path prompt when adding, else where we read configs from.
+    if let Some(buf) = &view.adding {
+        draw_desc(f, area, &format!("add path › {buf}▏"), view.flash.as_ref());
+    } else {
+        let where_from = view.root.as_ref()
+            .map(|r| format!("configs from {}", home_rel(r)))
+            .unwrap_or_else(|| "no dotfiles configs dir found".into());
+        draw_desc(f, area, &where_from, view.flash.as_ref());
+    }
 
     let footer = match view.focus {
-        _ if view.pager.is_some() => " j/k scroll  esc close ",
-        Focus::List  => " j/k move  space install/remove  l/→ files  r rescan  esc back  q quit ",
+        _ if view.adding.is_some() => " type a path  enter add  esc cancel ",
+        _ if view.pager.is_some()  => " j/k scroll  esc close ",
+        Focus::List  => " j/k move  space install/remove  a add  s sync  l/→ files  r rescan  q quit ",
         Focus::Files => " j/k move  v/enter view file  h/← back  esc back  q quit ",
     };
     draw_footer(f, area, footer);
@@ -253,7 +282,7 @@ fn render_empty(f: &mut Frame, area: Rect, view: &ConfigsView) {
         ],
         None => vec![
             Line::from(Span::styled("No dotfiles configs directory found.", style_dim())),
-            Line::from(Span::styled("Set a [stow] dir in links.toml, or create ~/dotfiles.", style_dim())),
+            Line::from(Span::styled("Pull a repo with 'dots gc -u=<user/repo>', or press 'a' to add a config.", style_dim())),
         ],
     };
     f.render_widget(Paragraph::new(msg), Rect { x: area.x + 1, y: area.y, width: area.width.saturating_sub(1), height: 2 });
@@ -377,6 +406,21 @@ fn render_pager(f: &mut Frame, area: Rect, pager: &Pager) {
 // ── key handling ──────────────────────────────────────────────────────────────
 
 pub fn handle_key(app: &mut App, view: &mut ConfigsView, key: KeyEvent) {
+    // Add-path input mode captures all input while open.
+    if view.adding.is_some() {
+        match key.code {
+            KeyCode::Esc => view.adding = None,
+            KeyCode::Backspace => { if let Some(b) = &mut view.adding { b.pop(); } }
+            KeyCode::Char(c)   => { if let Some(b) = &mut view.adding { b.push(c); } }
+            KeyCode::Enter => {
+                let path = view.adding.take().unwrap_or_default();
+                view.commit_add(&path);
+            }
+            _ => {}
+        }
+        return;
+    }
+
     // Pager captures all input while open.
     if let Some(pager) = &mut view.pager {
         let page = 10;
@@ -410,6 +454,8 @@ pub fn handle_key(app: &mut App, view: &mut ConfigsView, key: KeyEvent) {
                 if view.file_count() > 0 { view.focus = Focus::Files; }
             }
             KeyCode::Char(' ') => view.toggle_install(),
+            KeyCode::Char('a') => { view.adding = Some(String::new()); view.flash = None; }
+            KeyCode::Char('s') => view.sync_now(),
             KeyCode::Char('r') => { view.reload(); view.flash = Some(("rescanned".into(), FlashKind::Info)); }
             _ => {}
         },
@@ -449,6 +495,10 @@ fn truncate(s: &str, max: usize) -> String {
         let keep: String = s.chars().take(max - 1).collect();
         format!("{keep}…")
     }
+}
+
+fn first_line(s: &str) -> String {
+    s.lines().next().unwrap_or("").trim_start_matches('✓').trim().to_string()
 }
 
 fn rel_to(base: &Path, path: &Path) -> String {

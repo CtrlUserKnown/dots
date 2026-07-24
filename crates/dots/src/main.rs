@@ -62,6 +62,27 @@ enum Command {
         #[command(subcommand)]
         action: LinkAction,
     },
+    /// Install packages declared in ~/.dots/packages.toml
+    Packages {
+        #[command(subcommand)]
+        action: PackagesAction,
+    },
+    /// Pull your dotfiles repo into ~/.dots/src (user/repo or full git URL)
+    #[command(visible_alias = "gc")]
+    GetConfig {
+        /// Repo to pull: user/repo, user/repo@ref, or a full git URL
+        #[arg(short = 'u', long = "url", value_name = "SPEC")]
+        url: String,
+        /// After pulling, install all configs and packages it declares
+        #[arg(long)]
+        apply: bool,
+        /// Skip the confirmation prompt before applying
+        #[arg(long)]
+        yes: bool,
+        /// Replace an existing source repo at ~/.dots/src
+        #[arg(long)]
+        force: bool,
+    },
     /// Initialize dots config (idempotent)
     Init {
         /// Suppress greeting output
@@ -96,10 +117,26 @@ enum ConfigAction {
     List,
     /// List the files a config links (with per-file status)
     View { name: String },
-    /// Install a config (create/repair its symlinks)
-    Install { name: String },
+    /// Install a config by name, or all of them with --all
+    Install {
+        /// Config to install (omit when using --all)
+        name: Option<String>,
+        /// Install every discovered config
+        #[arg(long)]
+        all: bool,
+    },
     /// Remove a config (unlink only; real files are untouched)
     Remove { name: String },
+    /// Adopt an existing dotfile into ~/.dots/src and link it back
+    Add {
+        /// File or directory to add (e.g. ~/.config/nvim)
+        path: std::path::PathBuf,
+        /// Config name to file it under (inferred from the path if omitted)
+        #[arg(long)]
+        app: Option<String>,
+    },
+    /// Pull the latest source repo and re-apply installed configs
+    Sync,
 }
 
 #[derive(Subcommand)]
@@ -120,6 +157,18 @@ enum LinkAction {
     },
     /// Create or repair all declared links
     Apply,
+}
+
+#[derive(Subcommand)]
+enum PackagesAction {
+    /// Install everything in packages.toml that matches this system
+    Install {
+        /// Print what would run without executing anything
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Show the resolved plan for this system without installing (alias for `install --dry-run`)
+    Plan,
 }
 
 #[derive(Subcommand)]
@@ -150,6 +199,10 @@ fn main() -> anyhow::Result<()> {
         Some(Command::Config { action }) => cli_config(action)?,
         Some(Command::Profile { action }) => cli_profile(action)?,
         Some(Command::Link { action }) => cli_link(action)?,
+        Some(Command::Packages { action }) => cli_packages(action)?,
+        Some(Command::GetConfig { url, apply, yes, force }) => {
+            cli_get_config(url, apply, yes, force)?
+        }
         Some(Command::Init { quiet }) => cli_init(quiet)?,
     }
     Ok(())
@@ -226,6 +279,101 @@ fn cli_install(name: Option<String>, all: bool, optional: bool) -> anyhow::Resul
     Ok(())
 }
 
+fn cli_packages(action: PackagesAction) -> anyhow::Result<()> {
+    use dots::user_packages::{execute, plan_current};
+
+    let manifest = dots::manifest::load()?.to_packages_manifest();
+    let plan = plan_current(&manifest);
+
+    let dry_run = match action {
+        PackagesAction::Plan => true,
+        PackagesAction::Install { dry_run } => dry_run,
+    };
+
+    if plan.actions.is_empty() && plan.skips.is_empty() {
+        println!("Nothing declared for this system in {}.", dots::manifest::manifest_path().display());
+        return Ok(());
+    }
+    if dry_run {
+        println!("Plan for this system (nothing will be executed):");
+    }
+    execute(&plan, dry_run)?;
+    if !dry_run {
+        println!("✓ done");
+    }
+    Ok(())
+}
+
+fn cli_get_config(url: String, apply: bool, yes: bool, force: bool) -> anyhow::Result<()> {
+    use dots::config::settings::dots_dir;
+    use dots::configs;
+    use dots::import::{clone_source, resolve};
+    use dots::user_packages::{execute, plan_current};
+
+    let source = resolve(&url)?;
+    let src = dots_dir().join("src");
+    if src.exists() && !force {
+        anyhow::bail!(
+            "a source repo already exists at {} — pass --force to replace it",
+            src.display()
+        );
+    }
+    let ref_note = source.reference.as_deref().map(|r| format!("@{r}")).unwrap_or_default();
+    println!("Pulling '{}' from {}{}…", source.name, source.url, ref_note);
+    let repo = clone_source(&source, force)?;
+    println!("✓ pulled to {}", repo.display());
+
+    // Now that ~/.dots/src exists, discovery and the unified manifest see it.
+    let cfgs = configs::discover();
+    println!("\nConfigs found ({}):", cfgs.len());
+    for c in &cfgs {
+        println!("  {:<20} {}", c.name, c.status.badge());
+    }
+
+    let plan = plan_current(&dots::manifest::load()?.to_packages_manifest());
+    if !plan.actions.is_empty() || !plan.skips.is_empty() {
+        println!("\nPackage plan (review — [script] steps run arbitrary code):");
+        execute(&plan, true)?; // preview
+    }
+
+    if !apply {
+        println!(
+            "\nNothing applied. Run with --apply to set everything up, or use\n  \
+             'dots config install --all' and 'dots packages install' individually."
+        );
+        return Ok(());
+    }
+    if !yes && !confirm("\nInstall all configs and packages now?") {
+        println!("Aborted — nothing applied.");
+        return Ok(());
+    }
+
+    println!("\nApplying…");
+    let mut links = 0;
+    for c in &cfgs {
+        let r = configs::install(c)?;
+        links += r.ok + r.repaired;
+    }
+    println!("  ✓ {} config(s), {links} link(s)", cfgs.len());
+    if !plan.actions.is_empty() {
+        execute(&plan, false)?;
+    }
+    println!("✓ done");
+    Ok(())
+}
+
+/// Prompt for a yes/no answer on stdin, defaulting to no.
+fn confirm(prompt: &str) -> bool {
+    use std::io::Write;
+    print!("{prompt} [y/N] ");
+    let _ = io::stdout().flush();
+    let mut line = String::new();
+    if io::stdin().read_line(&mut line).is_err() {
+        return false;
+    }
+    matches!(line.trim().to_lowercase().as_str(), "y" | "yes")
+}
+
 fn cli_premade(action: PremadeAction) -> anyhow::Result<()> {
     use dots::installer::PREMADE_CONFIGS;
 
@@ -291,15 +439,40 @@ fn cli_config(action: ConfigAction) -> anyhow::Result<()> {
                 println!("  {mark} {}", link.link.display());
             }
         }
-        ConfigAction::Install { name } => {
-            let c = find(&name)?;
-            let r = configs::install(&c)?;
-            println!("✓ {} installed ({} linked, {} skipped)", name, r.repaired + r.ok, r.skipped);
+        ConfigAction::Install { name, all } => {
+            if all {
+                let cfgs = configs::discover();
+                if cfgs.is_empty() {
+                    println!("No configs found.");
+                    return Ok(());
+                }
+                let mut links = 0;
+                for c in &cfgs {
+                    let r = configs::install(c)?;
+                    links += r.ok + r.repaired;
+                    println!("  ✓ {}", c.name);
+                }
+                println!("✓ installed {} config(s), {links} link(s)", cfgs.len());
+            } else if let Some(name) = name {
+                let c = find(&name)?;
+                let r = configs::install(&c)?;
+                println!("✓ {} installed ({} linked, {} skipped)", name, r.repaired + r.ok, r.skipped);
+            } else {
+                println!("Usage: dots config install <name>  |  dots config install --all");
+            }
         }
         ConfigAction::Remove { name } => {
             let c = find(&name)?;
             let n = configs::remove(&c)?;
             println!("✓ {} removed ({n} link(s) unlinked)", name);
+        }
+        ConfigAction::Add { path, app } => {
+            let msg = configs::add(&path, app.as_deref())?;
+            println!("{msg}");
+        }
+        ConfigAction::Sync => {
+            let msg = configs::sync()?;
+            println!("✓ {msg}");
         }
     }
     Ok(())

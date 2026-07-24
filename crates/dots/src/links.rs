@@ -72,12 +72,14 @@ pub fn load_manifest() -> Result<LinksManifest> {
     toml::from_str(&text).with_context(|| format!("parsing {}", path.display()))
 }
 
-/// All symlinks the manifest declares (explicit `[[link]]` + `[stow]` packages).
-/// Errors are reported to stderr and produce an empty list, so callers such as
-/// `get_symlinks()` never fail solely because of a bad manifest.
+/// All symlinks the effective manifest declares (explicit `[[link]]` + `[stow]`
+/// packages), read via the unified [`crate::manifest`] so `dots.toml` and the
+/// legacy `links.toml` both contribute. Errors are reported to stderr and
+/// produce an empty list, so callers such as `get_symlinks()` never fail solely
+/// because of a bad manifest.
 pub fn planned_symlinks() -> Vec<Symlink> {
-    match load_manifest() {
-        Ok(m) => manifest_to_symlinks(&m),
+    match crate::manifest::load() {
+        Ok(m) => manifest_to_symlinks(&m.to_links_manifest()),
         Err(e) => {
             eprintln!("warning: {e:#}");
             Vec::new()
