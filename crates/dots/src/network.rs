@@ -84,21 +84,94 @@ fn command_output(cmd: &str, args: &[&str]) -> Option<String> {
 
 // ── platform-specific: active network name ──────────────────────────────────
 
+/// Getting the real SSID here (vs. just "connected to Wi-Fi") depends on the
+/// calling process holding Location Services authorization — since roughly
+/// Ventura/Sonoma, macOS withholds the SSID from every unentitled reader, not
+/// just `networksetup`: `ipconfig getsummary`, `system_profiler
+/// SPAirPortDataType`, and even `scutil`'s System Configuration dynamic store
+/// (`State:/Network/Interface/<if>/AirPort`) all return an empty/redacted SSID
+/// alike when unauthorized (verified directly against all four).
+///
+/// There is no fix available from here: authorization is normally granted per
+/// app in System Settings → Privacy & Security → Location Services, but an
+/// entry only appears there once an app makes a proper CoreLocation request —
+/// which a plain shelled-out `networksetup` call never does. Third-party
+/// terminals (Ghostty, iTerm2, …) essentially never get an entry to grant, so
+/// there's no setting to point anyone at. The only real fix is `dots`
+/// shipping as a signed, entitled `.app` bundle that requests the permission
+/// itself, which is out of scope for a dotfiles TUI. If that ever changes,
+/// [`wifi_ssid`] already parses the unredacted response correctly — no other
+/// code here needs to change.
 #[cfg(target_os = "macos")]
 fn network_name() -> Option<String> {
-    // Ask each Wi-Fi-capable interface for its current SSID.
+    // Find the interface actually carrying traffic first — unlike SSID lookups,
+    // the default route isn't gated behind Location Services, so it's a much
+    // more reliable starting point than guessing at "en0"/"en1".
+    if let Some(iface) = active_interface() {
+        if is_wifi_interface(&iface) {
+            // We already know we're on Wi-Fi (this *is* the Wi-Fi hardware
+            // port carrying the default route), so a failed SSID lookup here
+            // means "hidden by macOS", not "not connected" — say so plainly
+            // rather than passing off a bare "Wi-Fi" as the real name.
+            return Some(wifi_ssid(&iface).unwrap_or_else(|| "Wi-Fi (name hidden by macOS)".to_string()));
+        }
+        if let Some(port) = hardware_port_name(&iface) {
+            return Some(port);
+        }
+    }
+
+    // No default route found (or hardware port lookup failed) — last resort:
+    // try the conventional Wi-Fi device names directly.
     for iface in ["en0", "en1"] {
-        if let Some(out) = command_output("networksetup", &["-getairportnetwork", iface]) {
-            // "Current Wi-Fi Network: <SSID>"  |  "You are not associated…"
-            if let Some((_, ssid)) = out.split_once(": ") {
-                let ssid = ssid.trim();
-                if !ssid.is_empty() {
-                    return Some(ssid.to_string());
-                }
+        if let Some(ssid) = wifi_ssid(iface) {
+            return Some(ssid);
+        }
+    }
+    None
+}
+
+/// The interface carrying the default route, from `route -n get default`.
+#[cfg(target_os = "macos")]
+fn active_interface() -> Option<String> {
+    let out = command_output("route", &["-n", "get", "default"])?;
+    out.lines()
+        .find_map(|l| l.trim().strip_prefix("interface: "))
+        .map(str::to_string)
+}
+
+/// True if `iface` is this Mac's Wi-Fi hardware port.
+#[cfg(target_os = "macos")]
+fn is_wifi_interface(iface: &str) -> bool {
+    hardware_port_name(iface).as_deref() == Some("Wi-Fi")
+}
+
+/// The hardware port label for a device (e.g. "Wi-Fi", "Ethernet Adapter (en3)",
+/// "Thunderbolt Bridge"), from `networksetup -listallhardwareports`.
+#[cfg(target_os = "macos")]
+fn hardware_port_name(iface: &str) -> Option<String> {
+    let out = command_output("networksetup", &["-listallhardwareports"])?;
+    let mut current: Option<&str> = None;
+    for line in out.lines() {
+        if let Some(port) = line.strip_prefix("Hardware Port: ") {
+            current = Some(port.trim());
+        } else if let Some(dev) = line.strip_prefix("Device: ") {
+            if dev.trim() == iface {
+                return current.map(str::to_string);
             }
         }
     }
     None
+}
+
+/// The current Wi-Fi SSID for `iface`, if `networksetup` will give it up —
+/// modern macOS withholds it from callers without Location Services access.
+#[cfg(target_os = "macos")]
+fn wifi_ssid(iface: &str) -> Option<String> {
+    let out = command_output("networksetup", &["-getairportnetwork", iface])?;
+    // "Current Wi-Fi Network: <SSID>"  |  "You are not associated…"
+    let (_, ssid) = out.split_once(": ")?;
+    let ssid = ssid.trim();
+    (!ssid.is_empty() && ssid != "<redacted>").then(|| ssid.to_string())
 }
 
 #[cfg(not(target_os = "macos"))]

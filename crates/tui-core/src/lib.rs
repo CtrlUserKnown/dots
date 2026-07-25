@@ -26,6 +26,15 @@ pub enum FlashKind {
 
 /// Renders the top border line with the title at col 4 and the version near the right edge.
 pub fn draw_header(f: &mut Frame, area: Rect, title: &str, version: &str) {
+    let right = if version.is_empty() { String::new() } else { format!("v{version}") };
+    draw_header_right(f, area, title, &right);
+}
+
+/// Renders the top border line with the title at col 4 and arbitrary text
+/// right-aligned near the right edge — e.g. quick keybinding hints once the
+/// version tag has moved elsewhere. Unlike [`draw_header`], `right` is shown
+/// verbatim (no "v" prefix).
+pub fn draw_header_right(f: &mut Frame, area: Rect, title: &str, right: &str) {
     let w = area.width as usize;
     if w == 0 { return; }
 
@@ -36,10 +45,10 @@ pub fn draw_header(f: &mut Frame, area: Rect, title: &str, version: &str) {
         if pos < w { chars[pos] = ch; }
     }
 
-    if !version.is_empty() {
-        let ver = format!(" v{version} ");
-        let start = w.saturating_sub(ver.len() + 2).max(4 + title.len() + 1);
-        for (i, ch) in ver.chars().enumerate() {
+    if !right.is_empty() {
+        let text = format!(" {right} ");
+        let start = w.saturating_sub(text.len() + 2).max(4 + title.len() + 1);
+        for (i, ch) in text.chars().enumerate() {
             let pos = start + i;
             if pos < w { chars[pos] = ch; }
         }

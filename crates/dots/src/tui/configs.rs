@@ -21,8 +21,6 @@ use crate::tui::app::{App, Screen};
 use crate::tui::theme::{style_dim, style_error, style_header, style_select, style_warn};
 use crate::tui::{draw_desc, draw_footer, draw_header, FlashKind};
 
-const VERSION: &str = env!("DOTS_VERSION");
-
 // ── view state ────────────────────────────────────────────────────────────────
 
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -208,7 +206,7 @@ fn status_style(s: ConfigStatus) -> Style {
 // ── rendering ─────────────────────────────────────────────────────────────────
 
 pub fn render(f: &mut Frame, area: Rect, _app: &App, view: &ConfigsView) {
-    draw_header(f, area, " configs ", VERSION);
+    draw_header(f, area, " configs ", "");
     if area.height < 6 { return; }
 
     // Summary line.

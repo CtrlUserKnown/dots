@@ -16,8 +16,6 @@ use crate::tui::{draw_desc, draw_footer, draw_header, FlashKind};
 use crate::tui::app::{App, Screen};
 use crate::tui::theme::{style_dim, style_header, style_select};
 
-const VERSION: &str = env!("DOTS_VERSION");
-
 // ── modes ─────────────────────────────────────────────────────────────────────
 
 pub enum AliasMode {
@@ -104,7 +102,7 @@ pub fn render_aliases(f: &mut Frame, area: Rect, _app: &App, view: &AliasView) {
 }
 
 fn render_list(f: &mut Frame, area: Rect, view: &AliasView) {
-    draw_header(f, area, " aliases ", VERSION);
+    draw_header(f, area, " aliases ", "");
     if area.height < 5 { return; }
 
     let visible_rows = (area.height as usize).saturating_sub(5);
@@ -173,7 +171,7 @@ fn render_form(
     field: usize,
     flash: &Option<(String, FlashKind)>,
 ) {
-    draw_header(f, area, &format!(" {title} "), VERSION);
+    draw_header(f, area, &format!(" {title} "), "");
 
     for (i, (label, text)) in [("Name", name), ("Value", value)].iter().enumerate() {
         let y       = area.y + 2 + i as u16 * 2;

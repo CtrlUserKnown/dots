@@ -203,7 +203,7 @@ fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
         None => run_tui(dots::tui::app::Screen::Main)?,
-        Some(Command::Update) => run_tui(dots::tui::app::Screen::Update)?,
+        Some(Command::Update) => run_tui(dots::tui::app::Screen::Settings)?,
         Some(Command::Health { .. }) => {
             let report = dots::symlinks::repair_all()?;
             println!("  {} OK, {} repaired, {} skipped", report.ok, report.repaired, report.skipped);

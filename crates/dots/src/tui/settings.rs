@@ -5,11 +5,12 @@ use ratatui::{
     layout::Rect,
     style::Modifier,
     text::{Line, Span},
-    widgets::Paragraph,
+    widgets::{Block, Borders, Clear, Paragraph},
 };
 use std::path::Path;
 
 use crate::config::settings::{self, dots_dir, Settings};
+use crate::tui::update::UpdateScreen;
 use crate::tui::{draw_desc, draw_footer, draw_header, FlashKind};
 use crate::tui::app::{App, Screen};
 use crate::tui::theme::{style_dim, style_error, style_header, style_select};
@@ -40,7 +41,7 @@ fn next_freq(current: u64) -> u64 {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum FieldKey {
-    CheckUpdates,
+    Update,
     AutoUpdates,
     CheckInterval,
     Greeting,
@@ -49,7 +50,7 @@ enum FieldKey {
 
 fn field_label(k: FieldKey) -> &'static str {
     match k {
-        FieldKey::CheckUpdates  => "Check for updates",
+        FieldKey::Update        => "Update",
         FieldKey::AutoUpdates   => "Auto-updates",
         FieldKey::CheckInterval => "Check interval",
         FieldKey::Greeting      => "Shell greeting",
@@ -57,13 +58,15 @@ fn field_label(k: FieldKey) -> &'static str {
     }
 }
 
-fn field_desc(k: FieldKey) -> &'static str {
+/// Static fields describe themselves; `Update`'s description depends on live
+/// check/apply state, so it defers to [`UpdateScreen::desc`].
+fn field_desc(k: FieldKey, app: &App, update: &UpdateScreen) -> String {
     match k {
-        FieldKey::CheckUpdates  => "open the update screen to check for and apply a release",
-        FieldKey::AutoUpdates   => "automatically check for updates in the background",
-        FieldKey::CheckInterval => "how often to check for updates",
-        FieldKey::Greeting      => "show fastfetch system info when opening a terminal",
-        FieldKey::Theme         => "pick a terminal color theme",
+        FieldKey::Update        => update.desc(app),
+        FieldKey::AutoUpdates   => "automatically check for updates in the background".into(),
+        FieldKey::CheckInterval => "how often to check for updates".into(),
+        FieldKey::Greeting      => "show fastfetch system info when opening a terminal".into(),
+        FieldKey::Theme         => "pick a terminal color theme".into(),
     }
 }
 
@@ -95,7 +98,7 @@ impl SettingsView {
         self.cursor   = 0;
         self.flash    = None;
         self.fields   = vec![
-            FieldKey::CheckUpdates,
+            FieldKey::Update,
             FieldKey::AutoUpdates,
             FieldKey::CheckInterval,
             FieldKey::Greeting,
@@ -103,13 +106,15 @@ impl SettingsView {
         ];
     }
 
-    fn value_str(&self, k: FieldKey) -> (String, bool) {
-        // (display text, is_positive)
+    /// (display text, is_positive). `Update`'s value is live check/apply
+    /// state, so it defers to [`UpdateScreen::status`].
+    fn value_str(&self, k: FieldKey, app: &App, update: &UpdateScreen) -> (String, bool) {
         match k {
+            FieldKey::Update        => update.status(app),
             FieldKey::AutoUpdates   => bool_display(self.settings.dots.update_check),
             FieldKey::CheckInterval => (freq_label(self.settings.dots.update_frequency).to_string(), true),
             FieldKey::Greeting      => bool_display(self.settings.dots.greeting),
-            FieldKey::CheckUpdates | FieldKey::Theme => (String::new(), true),
+            FieldKey::Theme         => (String::new(), true),
         }
     }
 
@@ -121,58 +126,119 @@ impl SettingsView {
                 self.settings.dots.update_frequency = next_freq(self.settings.dots.update_frequency);
                 SettingsAction::None
             }
-            FieldKey::CheckUpdates  => SettingsAction::OpenUpdate,
-            FieldKey::Theme         => SettingsAction::OpenTheme,
+            FieldKey::Update  => SettingsAction::ActivateUpdate,
+            FieldKey::Theme   => SettingsAction::OpenTheme,
         }
     }
 }
 
 #[must_use]
-enum SettingsAction { None, OpenUpdate, OpenTheme }
+enum SettingsAction { None, ActivateUpdate, OpenTheme }
 
 fn bool_display(v: bool) -> (String, bool) {
     (if v { "ON".to_string() } else { "OFF".to_string() }, v)
 }
 
-pub fn render_settings(f: &mut Frame, area: Rect, _app: &App, view: &SettingsView) {
-    draw_header(f, area, " settings ", VERSION);
+/// Renders settings as a floating popup over whatever screen is behind it
+/// (the dashboard), mirroring ssm's which-key popup: a small bordered box,
+/// cleared and drawn in the bottom-right, rather than a full-screen takeover.
+pub fn render_settings(f: &mut Frame, area: Rect, app: &App, view: &SettingsView, update: &UpdateScreen) {
+    let title = format!(" settings v{VERSION} ");
+    let hint  = "space/enter toggle  esc back  q quit";
 
-    for (i, &k) in view.fields.iter().enumerate() {
-        let y = area.y + 2 + i as u16;
-        if y + 4 >= area.y + area.height { break; }
+    let rows: Vec<(String, String, bool)> = view.fields.iter().map(|&k| {
+        let (val, pos) = view.value_str(k, app, update);
+        (field_label(k).to_string(), val, pos)
+    }).collect();
 
+    // Widest line (a padded label + its value, the hint, or the title) drives
+    // the box width, same approach as ssm's which-key sizing.
+    let content_w = rows.iter()
+        .map(|(_, val, _)| 2 + 22 + val.len())
+        .chain(std::iter::once(hint.len()))
+        .chain(std::iter::once(title.len()))
+        .max()
+        .unwrap_or(28);
+
+    let box_w = (content_w as u16 + 4).min(area.width.saturating_sub(2));
+    // rows + desc/flash line + hint line + top/bottom border.
+    let box_h = rows.len() as u16 + 2 + 2;
+
+    let x = area.x + area.width.saturating_sub(box_w + 1);
+    let y = area.y + area.height.saturating_sub(box_h + 4);
+    let rect = Rect { x, y, width: box_w, height: box_h };
+
+    f.render_widget(Clear, rect);
+    f.render_widget(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_style(style_header())
+            .title(Span::styled(title, style_header())),
+        rect,
+    );
+
+    let inner_x = rect.x + 2;
+    let inner_w = rect.width.saturating_sub(3);
+
+    for (i, (label, val, pos)) in rows.iter().enumerate() {
+        let ry     = rect.y + 1 + i as u16;
         let is_sel = i == view.cursor;
         let cursor = if is_sel { "▶" } else { " " };
-        let label  = field_label(k);
-        let (val, pos) = view.value_str(k);
 
         let cursor_style = if is_sel { style_select().add_modifier(Modifier::BOLD) } else { style_dim() };
         let label_style  = if is_sel { ratatui::style::Style::default().add_modifier(Modifier::BOLD) } else { ratatui::style::Style::default() };
         let val_style    = if val.is_empty() {
             style_header()
-        } else if pos {
+        } else if *pos {
             style_select()
         } else {
             style_error()
         };
 
-        let rect = Rect { x: area.x, y, width: area.width, height: 1 };
         f.render_widget(
             Paragraph::new(Line::from(vec![
                 Span::styled(format!("{cursor} "), cursor_style),
                 Span::styled(format!("{:<22}", label), label_style),
-                Span::styled(val, val_style),
+                Span::styled(val.clone(), val_style),
             ])),
-            rect,
+            Rect { x: inner_x, y: ry, width: inner_w, height: 1 },
         );
     }
 
-    let desc = view.fields.get(view.cursor).copied().map(field_desc).unwrap_or("");
-    draw_desc(f, area, desc, view.flash.as_ref());
-    draw_footer(f, area, " j/k navigate  space/enter activate  esc save & back  q save & quit ");
+    // Below the rows: the focused field's description, or the flash message
+    // when one is active (flash takes priority, as in the other screens).
+    let desc_y = rect.y + 1 + rows.len() as u16;
+    let (desc_text, desc_style) = match &view.flash {
+        Some((msg, kind)) => (msg.clone(), match kind {
+            FlashKind::Success => style_select(),
+            FlashKind::Error   => style_error(),
+            FlashKind::Info    => style_dim().add_modifier(Modifier::BOLD),
+        }),
+        None => {
+            let desc = view.fields.get(view.cursor).copied()
+                .map(|k| field_desc(k, app, update))
+                .unwrap_or_default();
+            (desc, style_dim())
+        }
+    };
+    f.render_widget(
+        Paragraph::new(Line::from(Span::styled(desc_text, desc_style))),
+        Rect { x: inner_x, y: desc_y, width: inner_w, height: 1 },
+    );
+
+    f.render_widget(
+        Paragraph::new(Line::from(Span::styled(hint, style_dim()))),
+        Rect { x: inner_x, y: desc_y + 1, width: inner_w, height: 1 },
+    );
 }
 
-pub fn handle_settings_key(app: &mut App, view: &mut SettingsView, theme: &mut ThemeView, key: KeyEvent) {
+pub fn handle_settings_key(
+    app:    &mut App,
+    view:   &mut SettingsView,
+    theme:  &mut ThemeView,
+    update: &mut UpdateScreen,
+    key:    KeyEvent,
+) {
     match key.code {
         KeyCode::Esc => save_and_exit(app, view),
         KeyCode::Char('q') => save_and_quit(app, view),
@@ -190,8 +256,8 @@ pub fn handle_settings_key(app: &mut App, view: &mut SettingsView, theme: &mut T
             if let Some(&k) = view.fields.get(view.cursor) {
                 match view.activate(k) {
                     SettingsAction::None => {}
-                    SettingsAction::OpenUpdate => {
-                        app.screen = Screen::Update;
+                    SettingsAction::ActivateUpdate => {
+                        update.activate(app);
                     }
                     SettingsAction::OpenTheme => {
                         theme.load();
@@ -262,7 +328,7 @@ impl ThemeView {
 }
 
 pub fn render_theme(f: &mut Frame, area: Rect, _app: &App, view: &ThemeView) {
-    draw_header(f, area, " theme ", VERSION);
+    draw_header(f, area, " theme ", "");
 
     if view.themes.is_empty() {
         let rect = Rect { x: area.x + 2, y: area.y + 2, width: area.width.saturating_sub(4), height: 2 };

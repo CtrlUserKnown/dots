@@ -17,24 +17,24 @@ use crate::tui::{draw_desc, draw_footer, draw_header, FlashKind};
 use crate::tui::app::{App, Screen};
 use crate::tui::theme::{style_dim, style_error, style_select};
 
-const VERSION: &str = env!("DOTS_VERSION");
-
 // ── display model ─────────────────────────────────────────────────────────────
 
 pub enum DisplayRow {
     Section(&'static str),
+    /// A nested heading within a section (e.g. "zsh" under "tools").
+    SubSection(&'static str),
     SymlinkItem { link: PathBuf, target: PathBuf, status: SymlinkStatus },
     DepItem     { dep: &'static Dep,    installed: bool },
     PluginItem  { plugin: &'static Plugin, installed: bool },
 }
 
 fn is_navigable(row: &DisplayRow) -> bool {
-    !matches!(row, DisplayRow::Section(_))
+    !matches!(row, DisplayRow::Section(_) | DisplayRow::SubSection(_))
 }
 
 fn row_desc(row: &DisplayRow) -> String {
     match row {
-        DisplayRow::Section(_)                        => String::new(),
+        DisplayRow::Section(_) | DisplayRow::SubSection(_) => String::new(),
         DisplayRow::SymlinkItem { target, .. }        => format!("→ {}", home_rel(target)),
         DisplayRow::DepItem     { dep, .. }           => dep.desc.to_string(),
         DisplayRow::PluginItem  { plugin, .. }        => plugin.desc.to_string(),
@@ -57,7 +57,7 @@ pub fn build_display_rows() -> Vec<DisplayRow> {
         }
     }
 
-    rows.push(DisplayRow::Section("plugins"));
+    rows.push(DisplayRow::SubSection("zsh"));
     for plugin in PLUGINS {
         rows.push(DisplayRow::PluginItem { plugin, installed: check_plugin(plugin) });
     }
@@ -175,7 +175,7 @@ impl HealthView {
 // ── rendering ─────────────────────────────────────────────────────────────────
 
 pub fn render(f: &mut Frame, area: Rect, _app: &App, view: &HealthView) {
-    draw_header(f, area, " health ", VERSION);
+    draw_header(f, area, " health ", "");
 
     if area.height < 5 { return; }
     let visible   = (area.height as usize).saturating_sub(5);
@@ -193,6 +193,15 @@ pub fn render(f: &mut Frame, area: Rect, _app: &App, view: &HealthView) {
                     Paragraph::new(Line::from(Span::styled(
                         format!("  {label}"),
                         style_dim().add_modifier(Modifier::BOLD),
+                    ))),
+                    row_rect,
+                );
+            }
+            DisplayRow::SubSection(label) => {
+                f.render_widget(
+                    Paragraph::new(Line::from(Span::styled(
+                        format!("    {label}"),
+                        style_dim(),
                     ))),
                     row_rect,
                 );
@@ -451,7 +460,22 @@ mod tests {
         let sections: Vec<_> = rows.iter()
             .filter(|r| matches!(r, DisplayRow::Section(_)))
             .collect();
-        assert!(sections.len() >= 3, "expected at least 3 sections, got {}", sections.len());
+        assert!(sections.len() >= 2, "expected at least 2 sections, got {}", sections.len());
+    }
+
+    #[test]
+    fn zsh_is_a_subsection_under_tools() {
+        let rows = build_display_rows();
+        let tools_idx = rows.iter().position(
+            |r| matches!(r, DisplayRow::Section(l) if *l == "tools"),
+        ).expect("tools section present");
+        let zsh_idx = rows.iter().position(
+            |r| matches!(r, DisplayRow::SubSection(l) if *l == "zsh"),
+        ).expect("zsh subsection present");
+        assert!(zsh_idx > tools_idx, "zsh subsection should come after the tools section");
+        let next_section = rows.iter().skip(zsh_idx + 1)
+            .find(|r| matches!(r, DisplayRow::Section(_)));
+        assert!(next_section.is_none(), "zsh subsection should stay within tools (no top-level section follows)");
     }
 
     #[test]

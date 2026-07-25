@@ -16,8 +16,6 @@ use crate::tui::{draw_desc, draw_footer, draw_header, FlashKind};
 use crate::tui::app::{App, Screen};
 use crate::tui::theme::{style_dim, style_error, style_select};
 
-const VERSION: &str = env!("DOTS_VERSION");
-
 // ── state ─────────────────────────────────────────────────────────────────────
 
 pub enum ProfileMode {
@@ -49,7 +47,7 @@ impl ProfileView {
 // ── rendering ─────────────────────────────────────────────────────────────────
 
 pub fn render_profile(f: &mut Frame, area: Rect, _app: &App, view: &ProfileView) {
-    draw_header(f, area, " profile ", VERSION);
+    draw_header(f, area, " profile ", "");
     if area.height < 6 { return; }
 
     let path    = personal_config_path();

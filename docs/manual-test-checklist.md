@@ -14,7 +14,7 @@ Date: __________   Tester: __________
 - [ ] Theme picker: apply a theme, confirm ghostty config updated
 - [ ] Aliases: add alias, restart shell, confirm active
 - [ ] Profile: generate personal.json, inspect file
-- [ ] Update screen: check for updates without network (should show error, not crash)
+- [ ] Settings popup: check for updates without network (should show error, not crash)
 
 ## SSM golden paths
 - [ ] `dots ssm` opens TUI

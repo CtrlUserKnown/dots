@@ -1,6 +1,6 @@
 //! The dashboard shown on the main screen: a grid of summary panes giving an
-//! at-a-glance view of symlinks, tools, plugins, premade configs, updates and
-//! live network status. Each pane is a summary; pressing enter drills into the
+//! at-a-glance view of symlinks, tools, premade configs, Lua plugins, and live
+//! network status. Each pane is a summary; pressing enter drills into the
 //! matching detail view where one exists.
 
 use ratatui::{
@@ -27,9 +27,8 @@ pub use crate::plugins::layout::Dir;
 pub enum Pane {
     Symlinks,
     Tools,
-    Plugins,
     Configs,
-    Update,
+    Plugins,
     Network,
 }
 
@@ -38,12 +37,11 @@ pub enum Pane {
 pub const DEFAULT_COLS: usize = 2;
 
 /// Grid order, laid out left-to-right, top-to-bottom in the grid.
-pub const PANES: [Pane; 6] = [
+pub const PANES: [Pane; 5] = [
     Pane::Symlinks,
     Pane::Tools,
-    Pane::Plugins,
     Pane::Configs,
-    Pane::Update,
+    Pane::Plugins,
     Pane::Network,
 ];
 
@@ -52,9 +50,8 @@ impl Pane {
         match self {
             Pane::Symlinks => " Symlinks ",
             Pane::Tools    => " Tools ",
-            Pane::Plugins  => " Zsh ",
             Pane::Configs  => " Configs ",
-            Pane::Update   => " Update ",
+            Pane::Plugins  => " Plugins ",
             Pane::Network  => " Network ",
         }
     }
@@ -64,20 +61,19 @@ impl Pane {
         match self {
             Pane::Symlinks => Some("symlinks"),
             Pane::Tools    => Some("tools"),
-            Pane::Plugins  => Some("plugins"),
             Pane::Configs  => None,
-            Pane::Update   => None,
+            Pane::Plugins  => None,
             Pane::Network  => None,
         }
     }
 
-    /// Screen this pane opens on enter. Network is informational and stays on
-    /// the dashboard (it refreshes on its own).
+    /// Screen this pane opens on enter. Network and Plugins are informational
+    /// and stay on the dashboard — Plugins has no drill-down screen; `dots
+    /// plugins list` covers the detail this tile only summarizes.
     pub fn target(self) -> Screen {
         match self {
             Pane::Configs => Screen::Configs,
-            Pane::Update  => Screen::Update,
-            Pane::Network => Screen::Main,
+            Pane::Plugins | Pane::Network => Screen::Main,
             _             => Screen::Health,
         }
     }
@@ -139,18 +135,15 @@ fn symlink_summary() -> Summary {
     Summary { ok, total }
 }
 
+/// Tools covers both installed CLI deps and zsh plugins — the dashboard tile
+/// and the Health screen's "tools" section (with zsh as a subheading) agree.
 fn tool_summary() -> Summary {
     let tools: Vec<_> = DEPS.iter()
         .filter(|d| d.category == Category::Required || d.category == Category::Optional)
         .collect();
-    let total = tools.len();
-    let ok = tools.iter().filter(|d| check_dep(d)).count();
-    Summary { ok, total }
-}
-
-fn plugin_summary() -> Summary {
-    let total = PLUGINS.len();
-    let ok = PLUGINS.iter().filter(|p| check_plugin(p)).count();
+    let total = tools.len() + PLUGINS.len();
+    let ok = tools.iter().filter(|d| check_dep(d)).count()
+        + PLUGINS.iter().filter(|p| check_plugin(p)).count();
     Summary { ok, total }
 }
 
@@ -160,6 +153,14 @@ fn config_summary() -> Summary {
     let ok = cfgs.iter()
         .filter(|c| c.status == crate::configs::ConfigStatus::Installed)
         .count();
+    Summary { ok, total }
+}
+
+/// Lua plugins in `~/.dots/plugins/` — distinct from the zsh plugins folded
+/// into the Tools tile. `ok` counts files that loaded without error.
+fn plugin_summary(app: &App) -> Summary {
+    let total = app.plugin_infos.len();
+    let ok = app.plugin_infos.iter().filter(|p| p.error.is_none()).count();
     Summary { ok, total }
 }
 
@@ -177,11 +178,6 @@ pub fn pane_hint(pane: Pane, app: &App) -> String {
             if s.all_ok() { "all tools installed — enter to view".into() }
             else { format!("{} tool(s) missing — enter to install", s.bad()) }
         }
-        Pane::Plugins => {
-            let s = plugin_summary();
-            if s.all_ok() { "all zsh plugins present — enter to view".into() }
-            else { format!("{} plugin(s) missing — enter to view", s.bad()) }
-        }
         Pane::Configs => {
             let s = config_summary();
             if s.total == 0 {
@@ -190,15 +186,14 @@ pub fn pane_hint(pane: Pane, app: &App) -> String {
                 format!("{}/{} configs installed — enter to manage", s.ok, s.total)
             }
         }
-        Pane::Update => {
-            if let Some(msg) = app.install_source.defer_message() {
-                format!("managed externally — {msg}")
-            } else if let Some(info) = &app.update_info {
-                format!("update available: v{} — enter to update", info.latest)
-            } else if app.update_error.is_some() {
-                "update check unavailable — enter for details".into()
+        Pane::Plugins => {
+            let s = plugin_summary(app);
+            if s.total == 0 {
+                "no lua plugins in ~/.dots/plugins".into()
+            } else if s.all_ok() {
+                "all plugins loaded".into()
             } else {
-                "up to date — enter for details".into()
+                format!("{} plugin(s) failed to load — see `dots plugins list`", s.bad())
             }
         }
         Pane::Network => match &app.network {
@@ -216,8 +211,6 @@ pub fn pane_hint(pane: Pane, app: &App) -> String {
 }
 
 // ── rendering ───────────────────────────────────────────────────────────────
-
-const VERSION: &str = env!("DOTS_VERSION");
 
 /// Whether `area` is large enough to draw the grid at all.
 fn grid_fits(area: Rect) -> bool {
@@ -315,9 +308,8 @@ fn pane_lines(pane: Pane, app: &App) -> Vec<Line<'static>> {
     match pane {
         Pane::Symlinks => count_lines(symlink_summary(), "linked", "broken", true),
         Pane::Tools    => count_lines(tool_summary(),    "installed", "missing", true),
-        Pane::Plugins  => count_lines(plugin_summary(),  "present", "missing", true),
         Pane::Configs  => count_lines(config_summary(),  "installed", "pending", false),
-        Pane::Update   => update_lines(app),
+        Pane::Plugins  => plugin_lines(app),
         Pane::Network  => network_lines(app),
     }
 }
@@ -342,29 +334,17 @@ fn count_lines(s: Summary, ok_word: &str, bad_word: &str, bad_is_error: bool) ->
     vec![head, status]
 }
 
-fn update_lines(app: &App) -> Vec<Line<'static>> {
-    if app.install_source.defer_message().is_some() {
+/// Plugin counts aren't "broken" in the way missing tools are when the folder
+/// is simply empty (the common case), so that state renders neutral, not red.
+fn plugin_lines(app: &App) -> Vec<Line<'static>> {
+    let s = plugin_summary(app);
+    if s.total == 0 {
         return vec![
-            Line::from(Span::styled("○ managed externally", style_dim().add_modifier(Modifier::BOLD))),
-            Line::from(Span::styled(format!("v{VERSION}"), style_dim())),
+            Line::from(Span::styled("0 plugins", style_header().add_modifier(Modifier::BOLD))),
+            Line::from(Span::styled("• none installed", style_dim())),
         ];
     }
-    if let Some(info) = &app.update_info {
-        return vec![
-            Line::from(Span::styled("✗ update available", style_error().add_modifier(Modifier::BOLD))),
-            Line::from(Span::styled(format!("v{VERSION} → v{}", info.latest), style_error())),
-        ];
-    }
-    if app.update_error.is_some() {
-        return vec![
-            Line::from(Span::styled("• check unavailable", style_dim().add_modifier(Modifier::BOLD))),
-            Line::from(Span::styled(format!("v{VERSION}"), style_dim())),
-        ];
-    }
-    vec![
-        Line::from(Span::styled("✓ up to date", style_select().add_modifier(Modifier::BOLD))),
-        Line::from(Span::styled(format!("v{VERSION}"), style_dim())),
-    ]
+    count_lines(s, "loaded", "errors", true)
 }
 
 /// Live network snapshot: reachability + latency, the network name, and DNS.

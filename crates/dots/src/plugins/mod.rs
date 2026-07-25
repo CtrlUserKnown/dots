@@ -62,7 +62,9 @@ pub struct PluginPaneView {
     pub lines: Vec<String>,
 }
 
-/// What `dots plugins list` reports for one `.lua` file.
+/// What `dots plugins list` (and the dashboard's Plugins tile) reports for one
+/// `.lua` file.
+#[derive(Clone)]
 pub struct PluginInfo {
     pub name: String,
     pub pane_ids: Vec<String>,

@@ -16,7 +16,7 @@ use ratatui::{
 use crate::config::settings::Settings;
 use crate::plugins::{PluginHost, PluginPaneView};
 use crate::tui::theme::style_error;
-use crate::tui::{draw_desc, draw_footer, draw_header, FlashKind};
+use crate::tui::{draw_desc, draw_footer, draw_header_right, FlashKind};
 use crate::update::{self, InstallSource, UpdateInfo};
 
 use super::aliases::{handle_alias_key, render_aliases, AliasView};
@@ -25,8 +25,6 @@ use super::health::HealthView;
 use super::profile::{handle_profile_key, render_profile, ProfileView};
 use super::settings::{handle_settings_key, render_settings, render_theme, handle_theme_key, SettingsView, ThemeView};
 use super::update::UpdateScreen;
-
-const VERSION: &str = env!("DOTS_VERSION");
 
 // ── screen enum ───────────────────────────────────────────────────────────────
 
@@ -38,8 +36,8 @@ pub enum Screen {
     Configs,
     Profile,
     Theme,
+    /// Also where the update check/apply flow lives, as a row in the popup.
     Settings,
-    Update,
 }
 
 // ── app state ─────────────────────────────────────────────────────────────────
@@ -59,6 +57,9 @@ pub struct App {
     pub settings:       Settings,
     /// Cached snapshots of plugin-registered dashboard panes.
     pub plugin_panes:   Vec<PluginPaneView>,
+    /// Per-file load report for the Lua plugins in `~/.dots/plugins/` — static
+    /// for the session, snapshotted once at startup. Drives the Plugins tile.
+    pub plugin_infos:   Vec<crate::plugins::PluginInfo>,
     /// Dashboard column count (a plugin's `ui.layout{columns=N}` overrides the default).
     pub grid_cols:      usize,
     /// Set when a plugin pane is activated; the event loop runs its `on_enter`.
@@ -79,6 +80,7 @@ impl App {
             network:        None,
             settings,
             plugin_panes:   Vec::new(),
+            plugin_infos:   Vec::new(),
             grid_cols:      super::overview::DEFAULT_COLS,
             pending_plugin_enter: None,
         }
@@ -117,11 +119,14 @@ pub fn run(
     let mut plugin_host = PluginHost::load();
     plugin_host.tick();
     app.plugin_panes = plugin_host.views();
+    app.plugin_infos = plugin_host.plugins().to_vec();
     app.grid_cols    = plugin_host.columns().unwrap_or(super::overview::DEFAULT_COLS);
 
-    if start == Screen::Update   { update_screen.sync_from_app(&app); }
-    if start == Screen::Settings { settings_view.load_from(&app.settings); }
-    if start == Screen::Theme    { theme_view.load(); }
+    if start == Screen::Settings {
+        settings_view.load_from(&app.settings);
+        update_screen.sync_from_app(&app);
+    }
+    if start == Screen::Theme { theme_view.load(); }
 
     // Kick off the background release check, unless disabled or this binary is
     // managed by a package manager (then updating is the manager's job). The
@@ -159,9 +164,9 @@ pub fn run(
             if let Ok(result) = rx.try_recv() {
                 match result {
                     Ok(Some(info)) => {
-                        if app.screen != Screen::Update {
+                        if app.screen != Screen::Settings {
                             app.flash = Some((
-                                format!("Update available: v{} — open Update screen", info.latest),
+                                format!("Update available: v{} — see settings (4)", info.latest),
                                 FlashKind::Info,
                             ));
                         }
@@ -246,8 +251,13 @@ fn render(
         Screen::Configs  => super::configs::render(f, area, app, configs),
         Screen::Aliases  => render_aliases(f, area, app, aliases),
         Screen::Profile  => render_profile(f, area, app, profile),
-        Screen::Update   => super::update::render(f, area, app, update),
-        Screen::Settings => render_settings(f, area, app, settings),
+        // Settings (which folds in updates) is a popup: draw the dashboard
+        // underneath, then overlay it, mirroring ssm's which-key popup over
+        // its list screen.
+        Screen::Settings => {
+            render_main(f, area, app);
+            render_settings(f, area, app, settings, update);
+        }
         Screen::Theme    => render_theme(f, area, app, theme),
     }
 }
@@ -269,14 +279,14 @@ fn dashboard_grid(area: Rect) -> Rect {
 fn render_main(f: &mut Frame, area: Rect, app: &App) {
     use super::overview;
 
-    draw_header(f, area, " dots ", VERSION);
+    draw_header_right(f, area, " dots ", "hjkl move  q quit");
 
     let grid = dashboard_grid(area);
     overview::render_grid(f, grid, app, app.dash_focus);
 
     let hint = overview::focus_hint(app, app.dash_focus);
     draw_desc(f, area, &hint, app.flash.as_ref());
-    draw_footer(f, area, " hjkl/↑↓←→ move  enter open  1 aliases 2 profile 3 theme 4 settings  q quit ");
+    draw_footer(f, area, " enter open  1 aliases 2 profile 3 theme 4 settings ");
 }
 
 fn render_too_small(f: &mut Frame, area: Rect) {
@@ -312,8 +322,7 @@ fn handle_key(
         Screen::Configs  => super::configs::handle_key(app, configs, key),
         Screen::Aliases  => handle_alias_key(app, aliases, key),
         Screen::Profile  => handle_profile_key(app, profile, key),
-        Screen::Update   => super::update::handle_key(app, update, key),
-        Screen::Settings => handle_settings_key(app, settings, theme, key),
+        Screen::Settings => handle_settings_key(app, settings, theme, update, key),
         Screen::Theme    => handle_theme_key(app, theme, key),
     }
 }
@@ -438,13 +447,9 @@ fn navigate_to(
             app.screen = Screen::Profile;
             app.flash  = None;
         }
-        Screen::Update => {
-            update.sync_from_app(app);
-            app.screen = Screen::Update;
-            app.flash  = None;
-        }
         Screen::Settings => {
             settings.load_from(&app.settings);
+            update.sync_from_app(app);
             app.screen = Screen::Settings;
             app.flash  = None;
         }
