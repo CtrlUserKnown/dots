@@ -91,11 +91,11 @@ impl App {
 
 /// Screens reachable by number key from the dashboard (1 = first). Health and
 /// Update are omitted here because they are opened by drilling into their panes.
+/// Settings is reachable via the space key instead, handled separately below.
 const MAIN_MENU: &[Screen] = &[
     Screen::Aliases,
     Screen::Profile,
     Screen::Theme,
-    Screen::Settings,
 ];
 
 // ── event loop ────────────────────────────────────────────────────────────────
@@ -286,7 +286,7 @@ fn render_main(f: &mut Frame, area: Rect, app: &App) {
 
     let hint = overview::focus_hint(app, app.dash_focus);
     draw_desc(f, area, &hint, app.flash.as_ref());
-    draw_footer(f, area, " enter open  1 aliases 2 profile 3 theme 4 settings ");
+    draw_footer(f, area, " enter open  1 aliases 2 profile 3 theme  space settings ");
 }
 
 fn render_too_small(f: &mut Frame, area: Rect) {
@@ -353,6 +353,9 @@ fn handle_main_key(
                 app.menu_idx = idx;
                 navigate_to(app, health, configs, aliases, profile, update, settings, theme, MAIN_MENU[idx]);
             }
+        }
+        KeyCode::Char(' ') => {
+            navigate_to(app, health, configs, aliases, profile, update, settings, theme, Screen::Settings);
         }
         KeyCode::Enter => {
             if let Some(&pane) = PANES.get(app.dash_focus) {
