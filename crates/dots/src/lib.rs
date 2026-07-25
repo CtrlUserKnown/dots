@@ -7,6 +7,7 @@ pub mod links;
 pub mod manifest;
 pub mod network;
 pub mod packages;
+pub mod plugins;
 pub mod symlinks;
 pub mod system;
 pub mod tui;

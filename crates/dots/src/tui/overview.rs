@@ -12,9 +12,14 @@ use ratatui::{
 };
 
 use crate::packages::{check_dep, check_plugin, Category, DEPS, PLUGINS};
+use crate::plugins::layout::{self, Cell};
+use crate::plugins::PluginPaneView;
 use crate::symlinks::{self, SymlinkStatus};
 use crate::tui::app::{App, Screen};
 use crate::tui::theme::{style_dim, style_error, style_header, style_select};
+
+// Directional moves for dashboard focus come from the shared layout engine.
+pub use crate::plugins::layout::Dir;
 
 // ── pane model ──────────────────────────────────────────────────────────────
 
@@ -28,10 +33,11 @@ pub enum Pane {
     Network,
 }
 
-/// Number of columns in the dashboard grid.
-const COLS: usize = 2;
+/// Default number of columns in the dashboard grid, overridable by a plugin via
+/// `ui.layout{ columns = N }` (stored in [`App::grid_cols`]).
+pub const DEFAULT_COLS: usize = 2;
 
-/// Grid order, laid out left-to-right, top-to-bottom in a 2-column grid.
+/// Grid order, laid out left-to-right, top-to-bottom in the grid.
 pub const PANES: [Pane; 6] = [
     Pane::Symlinks,
     Pane::Tools,
@@ -46,7 +52,7 @@ impl Pane {
         match self {
             Pane::Symlinks => " Symlinks ",
             Pane::Tools    => " Tools ",
-            Pane::Plugins  => " Plugins ",
+            Pane::Plugins  => " Zsh ",
             Pane::Configs  => " Configs ",
             Pane::Update   => " Update ",
             Pane::Network  => " Network ",
@@ -77,20 +83,41 @@ impl Pane {
     }
 }
 
+// ── layout: built-in panes + plugin panes ───────────────────────────────────
+
+/// The combined layout cells for this dashboard: the six built-in panes (each a
+/// uniform 1×1 cell) followed by any plugin panes, which carry their own
+/// `span`/`size` so a plugin can make its pane wider or taller.
+fn cells(app: &App) -> Vec<Cell> {
+    let mut v: Vec<Cell> = PANES.iter().map(|_| Cell::new(1, 1)).collect();
+    v.extend(app.plugin_panes.iter().map(|p| Cell::new(p.span, p.weight)));
+    v
+}
+
+fn cols(app: &App) -> u16 {
+    app.grid_cols.max(1) as u16
+}
+
+/// Total dashboard panes, built-ins plus plugin panes.
+pub fn pane_count(app: &App) -> usize {
+    PANES.len() + app.plugin_panes.len()
+}
+
+/// On-screen rectangle of every pane within the grid `area`, in grid order.
+fn pane_rects(area: Rect, app: &App) -> Vec<Rect> {
+    layout::grid(area, cols(app), &cells(app))
+}
+
 // ── focus navigation ────────────────────────────────────────────────────────
 
-pub enum Dir { Up, Down, Left, Right }
-
-/// Move focus within the 2-column grid.
-pub fn move_focus(focus: usize, dir: Dir) -> usize {
-    let last = PANES.len() - 1;
-    let in_left_col = focus.is_multiple_of(COLS);
-    match dir {
-        Dir::Right => if in_left_col { (focus + 1).min(last) } else { focus },
-        Dir::Left  => if in_left_col { focus } else { focus - 1 },
-        Dir::Down  => if focus + COLS <= last { focus + COLS } else { focus },
-        Dir::Up    => if focus >= COLS { focus - COLS } else { focus },
-    }
+/// Move dashboard focus geometrically. Adjacency depends only on the relative
+/// arrangement of panes, not on pixel size, so a synthetic area is enough and
+/// no terminal dimensions are needed at key-handling time.
+pub fn move_focus(app: &App, focus: usize, dir: Dir) -> usize {
+    let c = cols(app);
+    let area = Rect::new(0, 0, c.saturating_mul(40).max(40), 240);
+    let rects = layout::grid(area, c, &cells(app));
+    layout::move_focus(&rects, focus, dir)
 }
 
 // ── summaries ───────────────────────────────────────────────────────────────
@@ -197,42 +224,62 @@ fn grid_fits(area: Rect) -> bool {
     area.height >= 6 && area.width >= 20
 }
 
-/// The on-screen rectangle of pane `i` within the grid `area`. Shared by both
-/// rendering and mouse hit-testing so the two never drift apart.
-fn pane_cell(area: Rect, i: usize) -> Rect {
-    // A uniform 2-column grid; one row per pair of panes.
-    let rows = PANES.len().div_ceil(COLS) as u16;
-    let band_h = area.height / rows;
-    let mid = area.width / 2;
-    let row = (i / COLS) as u16;
-    let right = i % COLS == 1;
-    // The final row absorbs any rounding remainder so it reaches the bottom.
-    let y = area.y + row * band_h;
-    let h = if row == rows - 1 { area.height - band_h * row } else { band_h };
-    Rect {
-        x:      if right { area.x + mid } else { area.x },
-        y,
-        width:  if right { area.width - mid } else { mid },
-        height: h,
+/// Index of the pane (built-in or plugin) covering point `(col, row)`, if any.
+/// Indices past [`PANES`]`.len()` are plugin panes.
+pub fn pane_at(area: Rect, app: &App, col: u16, row: u16) -> Option<usize> {
+    if !grid_fits(area) { return None; }
+    layout::cell_at(&pane_rects(area, app), col, row)
+}
+
+/// The one-line hint for the desc bar for whichever pane is focused — the
+/// contextual summary for built-ins, or the pane's own first line for plugins.
+pub fn focus_hint(app: &App, focus: usize) -> String {
+    if let Some(&pane) = PANES.get(focus) {
+        pane_hint(pane, app)
+    } else if let Some(view) = app.plugin_panes.get(focus - PANES.len()) {
+        view.lines.first().cloned().unwrap_or_else(|| format!("{} — plugin pane", view.title))
+    } else {
+        String::new()
     }
 }
 
-/// Index into [`PANES`] of the pane covering point `(col, row)`, if any.
-pub fn pane_at(area: Rect, col: u16, row: u16) -> Option<usize> {
-    if !grid_fits(area) { return None; }
-    (0..PANES.len()).find(|&i| {
-        let r = pane_cell(area, i);
-        col >= r.x && col < r.x + r.width && row >= r.y && row < r.y + r.height
-    })
-}
-
 /// Renders the pane grid into `area` (the content region between header/footer).
-/// `focus` is the index into [`PANES`] of the currently selected pane.
+/// `focus` is the index of the currently selected pane across built-ins and
+/// plugin panes.
 pub fn render_grid(f: &mut Frame, area: Rect, app: &App, focus: usize) {
     if !grid_fits(area) { return; }
 
-    for (i, pane) in PANES.iter().enumerate() {
-        draw_pane(f, pane_cell(area, i), *pane, app, i == focus);
+    for (i, rect) in pane_rects(area, app).into_iter().enumerate() {
+        let focused = i == focus;
+        if let Some(&pane) = PANES.get(i) {
+            draw_pane(f, rect, pane, app, focused);
+        } else if let Some(view) = app.plugin_panes.get(i - PANES.len()) {
+            draw_plugin_pane(f, rect, view, focused);
+        }
+    }
+}
+
+/// Draws a plugin-registered pane: the same chrome as a built-in, with the
+/// plugin's cached `render()` lines inside.
+fn draw_plugin_pane(f: &mut Frame, area: Rect, view: &PluginPaneView, focused: bool) {
+    if area.width < 6 || area.height < 3 { return; }
+
+    let border_style = if focused { style_select() } else { style_dim() };
+    let title_style  = if focused { style_select() } else { style_header() };
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(border_style)
+        .title(Span::styled(format!(" {} ", view.title), title_style.add_modifier(Modifier::BOLD)));
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    for (i, text) in view.lines.iter().enumerate() {
+        if inner.height as usize <= i { break; }
+        f.render_widget(
+            Paragraph::new(Line::from(Span::styled(text.clone(), style_header()))),
+            Rect { x: inner.x + 1, y: inner.y + i as u16, width: inner.width.saturating_sub(1), height: 1 },
+        );
     }
 }
 
@@ -362,26 +409,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn focus_moves_within_grid() {
-        // 2-column grid: [0 1 / 2 3 / 4 5]
-        assert_eq!(move_focus(0, Dir::Right), 1);
-        assert_eq!(move_focus(1, Dir::Left), 0);
-        assert_eq!(move_focus(0, Dir::Down), 2);
-        assert_eq!(move_focus(2, Dir::Down), 4);
-        assert_eq!(move_focus(4, Dir::Up), 2);
-        // right on an already-right cell stays put
-        assert_eq!(move_focus(1, Dir::Right), 1);
-        // Update (4) and Network (5) are horizontal neighbours on the last row
-        assert_eq!(move_focus(4, Dir::Right), 5);
-        assert_eq!(move_focus(5, Dir::Left), 4);
-        // clamped at edges
-        assert_eq!(move_focus(0, Dir::Up), 0);
-        assert_eq!(move_focus(4, Dir::Down), 4);
-        assert_eq!(move_focus(5, Dir::Down), 5);
-        assert_eq!(move_focus(5, Dir::Up), 3);
-    }
-
-    #[test]
     fn every_pane_maps_to_a_target() {
         for p in PANES {
             let _ = p.target();
@@ -390,20 +417,26 @@ mod tests {
     }
 
     #[test]
-    fn pane_at_hit_tests_the_grid() {
-        // 80×18 grid → 2 cols × 3 rows, each cell 40×6.
-        let area = Rect::new(0, 0, 80, 18);
-        assert_eq!(pane_at(area, 5, 3), Some(0)); // top-left
-        assert_eq!(pane_at(area, 45, 3), Some(1)); // top-right
-        assert_eq!(pane_at(area, 5, 8), Some(2)); // mid-left
-        assert_eq!(pane_at(area, 45, 15), Some(5)); // bottom-right (Network)
-        assert_eq!(pane_at(area, 5, 12), Some(4)); // bottom-left (Update)
-        // Every cell maps back to itself.
-        for i in 0..PANES.len() {
-            let r = pane_cell(area, i);
-            assert_eq!(pane_at(area, r.x, r.y), Some(i));
-        }
-        // Too-small areas hit nothing.
-        assert_eq!(pane_at(Rect::new(0, 0, 10, 4), 1, 1), None);
+    fn renders_plugin_panes_without_panicking() {
+        use crate::config::settings::Settings;
+        use crate::plugins::PluginPaneView;
+        use crate::tui::app::App;
+        use ratatui::{backend::TestBackend, Terminal};
+
+        let mut app = App::new(Screen::Main, Settings::default());
+        app.grid_cols = 2;
+        app.plugin_panes = vec![
+            PluginPaneView { id: "gh".into(), title: "GitHub".into(), span: 2, weight: 1, lines: vec!["3 PRs".into()] },
+            PluginPaneView { id: "aws".into(), title: "AWS".into(), span: 1, weight: 2, lines: vec!["account 123".into()] },
+        ];
+
+        // Grid + hit-test see the extra panes.
+        assert_eq!(pane_count(&app), PANES.len() + 2);
+        let grid = Rect::new(0, 0, 80, 30);
+        assert!(pane_at(grid, &app, 1, 1).is_some());
+
+        // Focus can reach a plugin pane and drawing it doesn't panic.
+        let mut term = Terminal::new(TestBackend::new(80, 30)).unwrap();
+        term.draw(|f| render_grid(f, grid, &app, PANES.len())).unwrap();
     }
 }

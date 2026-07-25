@@ -83,6 +83,11 @@ enum Command {
         #[arg(long)]
         force: bool,
     },
+    /// Manage Lua plugins that add dashboard panes (~/.dots/plugins/*.lua)
+    Plugins {
+        #[command(subcommand)]
+        action: PluginsAction,
+    },
     /// Initialize dots config (idempotent)
     Init {
         /// Suppress greeting output
@@ -172,6 +177,16 @@ enum PackagesAction {
 }
 
 #[derive(Subcommand)]
+enum PluginsAction {
+    /// List discovered plugins, the panes they register, and any load errors
+    List,
+    /// Scaffold a new plugin at ~/.dots/plugins/<name>.lua
+    New { name: String },
+    /// Print the plugins directory path
+    Dir,
+}
+
+#[derive(Subcommand)]
 enum ProfileAction {
     /// Generate personal.json from current system
     Generate {
@@ -203,6 +218,7 @@ fn main() -> anyhow::Result<()> {
         Some(Command::GetConfig { url, apply, yes, force }) => {
             cli_get_config(url, apply, yes, force)?
         }
+        Some(Command::Plugins { action }) => cli_plugins(action)?,
         Some(Command::Init { quiet }) => cli_init(quiet)?,
     }
     Ok(())
@@ -560,6 +576,77 @@ fn cli_link(action: LinkAction) -> anyhow::Result<()> {
             let report = dots::symlinks::repair_list(&links::planned_symlinks());
             println!("  {} OK, {} repaired, {} skipped", report.ok, report.repaired, report.skipped);
         }
+    }
+    Ok(())
+}
+
+/// Template written by `dots plugins new <name>`.
+const PLUGIN_TEMPLATE: &str = r#"-- {name}.lua — a dots plugin.
+--
+-- Register a dashboard pane with ui.pane{...}. `render` returns the lines shown
+-- inside it; `size` makes the pane taller, `span` makes it wider. Use dots.sh()
+-- to shell out to CLIs like gh or aws for real integrations.
+
+ui.pane{
+  id      = "{name}",
+  title   = "{title}",
+  size    = 1,        -- row-height weight (2 = twice as tall)
+  span    = 1,        -- columns spanned (2 = full width in a 2-col grid)
+  refresh = 30,       -- seconds between render() calls
+  render  = function()
+    return { "hello from {name}", "edit ~/.dots/plugins/{name}.lua" }
+  end,
+}
+
+-- Optionally change the whole dashboard layout:
+-- ui.layout{ columns = 3 }
+"#;
+
+fn cli_plugins(action: PluginsAction) -> anyhow::Result<()> {
+    use dots::plugins::{plugins_dir, PluginHost};
+
+    match action {
+        PluginsAction::List => {
+            let host = PluginHost::load();
+            let plugins = host.plugins();
+            if plugins.is_empty() {
+                println!("No plugins in {}", plugins_dir().display());
+                println!("Create one with 'dots plugins new <name>'.");
+                return Ok(());
+            }
+            for p in plugins {
+                match &p.error {
+                    Some(e) => println!("✗ {:<16} error: {}", p.name, e),
+                    None => {
+                        let panes = if p.pane_ids.is_empty() {
+                            "(no panes)".to_string()
+                        } else {
+                            p.pane_ids.join(", ")
+                        };
+                        println!("✓ {:<16} {}", p.name, panes);
+                    }
+                }
+            }
+        }
+        PluginsAction::New { name } => {
+            let dir = plugins_dir();
+            std::fs::create_dir_all(&dir)
+                .with_context(|| format!("creating {}", dir.display()))?;
+            let path = dir.join(format!("{name}.lua"));
+            if path.exists() {
+                anyhow::bail!("{} already exists", path.display());
+            }
+            let title = {
+                let mut c = name.chars();
+                c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default()
+            };
+            let body = PLUGIN_TEMPLATE.replace("{name}", &name).replace("{title}", &title);
+            std::fs::write(&path, body)
+                .with_context(|| format!("writing {}", path.display()))?;
+            println!("✓ Created {}", path.display());
+            println!("  Edit it, then run 'dots' to see your pane on the dashboard.");
+        }
+        PluginsAction::Dir => println!("{}", plugins_dir().display()),
     }
     Ok(())
 }

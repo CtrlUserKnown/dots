@@ -22,6 +22,9 @@ flate2     = "1"
 tar        = "0.4"
 sha2       = "0.10"
 
+# Lua plugin system: embedded Lua 5.4, statically vendored (needs a C compiler).
+mlua       = { version = "0.10", features = ["lua54", "vendored"] }
+
 # dev
 tempfile   = "3"
 assert_cmd = "2"

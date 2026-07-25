@@ -32,6 +32,9 @@ flate2.workspace = true
 tar.workspace    = true
 sha2.workspace   = true
 
+# Lua plugin system — embedded, sandbox-free (plugins are trusted dotfiles).
+mlua.workspace   = true
+
 [dev-dependencies]
 tempfile.workspace   = true
 assert_cmd.workspace = true

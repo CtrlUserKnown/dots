@@ -47,7 +47,7 @@ To remove it: [`uninstall.sh`](uninstall.sh).
 
 ## Usage
 
-Run `dots` with no arguments to open the TUI. The dashboard's panes — **Symlinks**, **Tools**, **Plugins**, **Configs**, **Update** — drill into full-screen views for health checks, aliases, profile, theme, and settings.
+Run `dots` with no arguments to open the TUI. The dashboard's panes — **Symlinks**, **Tools**, **Zsh**, **Configs**, **Update**, **Network** — drill into full-screen views for health checks, aliases, profile, theme, and settings. [Lua plugins](#plugins-lua) can add their own panes here.
 
 Everything is also scriptable via subcommands:
 
@@ -66,6 +66,7 @@ Everything is also scriptable via subcommands:
 | `dots profile generate [path]` | Export your setup to `personal.json` |
 | `dots profile import <path>` | Import a `personal.json` from a local file |
 | `dots profile import-git <user/repo/path.json>` | Import a `personal.json` from GitHub |
+| `dots plugins list \| new <name> \| dir` | Manage [Lua plugins](#plugins-lua) that add dashboard panes |
 | `dots init [--quiet]` | Initialize config (idempotent; run automatically by the installer) |
 | `dots --version` | Print the version |
 
@@ -94,11 +95,59 @@ The dependency list is defined in [`crates/dots/src/packages.rs`](crates/dots/sr
 
 - `~/.personal/` — your personal, machine-local layer: `aliases.zsh` (sourced after the built-in aliases), `apps/`, and an optional `config.toml` that overrides `settings.toml`.
 
+## Plugins (Lua)
+
+Drop `*.lua` files in `~/.dots/plugins/` to add your own panes to the dashboard — GitHub, AWS, or anything a shell command can report. Plugins are loaded at startup, run on the TUI thread, and each pane refreshes on its own interval. A plugin that fails to load is reported by `dots plugins list` and skipped; it never crashes the TUI.
+
+Scaffold one with `dots plugins new <name>`, then edit it. Two globals are available:
+
+**`ui`** — register panes and shape the dashboard:
+
+| Call | Purpose |
+|---|---|
+| `ui.pane{ … }` | Register a dashboard pane (see fields below) |
+| `ui.layout{ columns = N }` | Set the dashboard's column count (default 2) |
+
+`ui.pane` fields — `render` is the only one you always want:
+
+| Field | Default | Meaning |
+|---|---|---|
+| `id` | auto | Stable identifier (shown by `dots plugins list`) |
+| `title` | `id` | Pane title |
+| `render` | — | `function() → lines` returning a string (split on newlines) or a table of strings |
+| `size` | `1` | Row-height weight — **`2` makes the pane twice as tall** |
+| `span` | `1` | Columns spanned — **`2` makes it full-width in a 2-col grid** |
+| `refresh` | `30` | Seconds between `render()` calls |
+| `on_enter` | — | `function()` run when the pane is selected with <kbd>enter</kbd> / click |
+
+**`dots`** — helpers for integrations:
+
+| Call | Returns |
+|---|---|
+| `dots.sh(cmd)` | Trimmed stdout of `sh -c cmd` (drives `gh`, `aws`, …; `""` on failure) |
+| `dots.env(name)` | An environment variable (`""` if unset) |
+| `dots.dir()` | The `~/.dots` path |
+
+A minimal example:
+
+```lua
+ui.pane{
+  id = "github", title = "GitHub", span = 2, refresh = 120,
+  render = function()
+    local prs = dots.sh("gh pr list --author @me --state open | wc -l | tr -d ' '")
+    if prs == "" then return { "gh not available" } end
+    return { prs .. " PR(s) open" }
+  end,
+}
+```
+
+Ready-to-use examples live in [`examples/plugins/`](examples/plugins/) (`github.lua`, `aws.lua`) — copy one into `~/.dots/plugins/` and run `dots`.
+
 ## Project Structure
 
 A Cargo workspace with two crates:
 
-- [`crates/dots/`](crates/dots/) — the `dots` binary: CLI, TUI screens, installer, symlink/link engine, config, and bundled premade `assets/`.
+- [`crates/dots/`](crates/dots/) — the `dots` binary: CLI, TUI screens, installer, symlink/link engine, config, the [Lua plugin host](crates/dots/src/plugins/), and bundled premade `assets/`.
 - [`crates/tui-core/`](crates/tui-core/) — shared TUI chrome (header/footer/description bars, color theme, flash model) used by the `dots` screens.
 
 ## Development

@@ -14,6 +14,7 @@ use ratatui::{
 };
 
 use crate::config::settings::Settings;
+use crate::plugins::{PluginHost, PluginPaneView};
 use crate::tui::theme::style_error;
 use crate::tui::{draw_desc, draw_footer, draw_header, FlashKind};
 use crate::update::{self, InstallSource, UpdateInfo};
@@ -56,6 +57,12 @@ pub struct App {
     pub install_source: InstallSource,
     pub network:        Option<crate::network::NetworkStatus>,
     pub settings:       Settings,
+    /// Cached snapshots of plugin-registered dashboard panes.
+    pub plugin_panes:   Vec<PluginPaneView>,
+    /// Dashboard column count (a plugin's `ui.layout{columns=N}` overrides the default).
+    pub grid_cols:      usize,
+    /// Set when a plugin pane is activated; the event loop runs its `on_enter`.
+    pub pending_plugin_enter: Option<usize>,
 }
 
 impl App {
@@ -71,6 +78,9 @@ impl App {
             install_source: update::install_source(),
             network:        None,
             settings,
+            plugin_panes:   Vec::new(),
+            grid_cols:      super::overview::DEFAULT_COLS,
+            pending_plugin_enter: None,
         }
     }
 }
@@ -102,6 +112,13 @@ pub fn run(
     let mut settings_view = SettingsView::new();
     let mut theme_view    = ThemeView::new();
 
+    // Load Lua plugins and seed the dashboard with their panes + column count.
+    // The host stays on this thread (its Lua state is not Send).
+    let mut plugin_host = PluginHost::load();
+    plugin_host.tick();
+    app.plugin_panes = plugin_host.views();
+    app.grid_cols    = plugin_host.columns().unwrap_or(super::overview::DEFAULT_COLS);
+
     if start == Screen::Update   { update_screen.sync_from_app(&app); }
     if start == Screen::Settings { settings_view.load_from(&app.settings); }
     if start == Screen::Theme    { theme_view.load(); }
@@ -126,6 +143,11 @@ pub fn run(
     loop {
         update_screen.pump(&mut app);
         health_view.try_complete_install();
+
+        // Refresh any plugin panes whose interval has elapsed.
+        if plugin_host.tick() {
+            app.plugin_panes = plugin_host.views();
+        }
 
         // Drain the latest network snapshot (keep only the freshest).
         while let Ok(status) = net_rx.try_recv() {
@@ -186,6 +208,13 @@ pub fn run(
             }
         }
 
+        // A plugin pane was activated: run its handler, then show the result.
+        if let Some(i) = app.pending_plugin_enter.take() {
+            plugin_host.on_enter(i);
+            plugin_host.tick();
+            app.plugin_panes = plugin_host.views();
+        }
+
         if app.should_quit { break; }
     }
 
@@ -238,17 +267,14 @@ fn dashboard_grid(area: Rect) -> Rect {
 }
 
 fn render_main(f: &mut Frame, area: Rect, app: &App) {
-    use super::overview::{self, PANES};
+    use super::overview;
 
     draw_header(f, area, " dots ", VERSION);
 
     let grid = dashboard_grid(area);
     overview::render_grid(f, grid, app, app.dash_focus);
 
-    let hint = PANES
-        .get(app.dash_focus)
-        .map(|p| overview::pane_hint(*p, app))
-        .unwrap_or_default();
+    let hint = overview::focus_hint(app, app.dash_focus);
     draw_desc(f, area, &hint, app.flash.as_ref());
     draw_footer(f, area, " hjkl/↑↓←→ move  enter open  1 aliases 2 profile 3 theme 4 settings  q quit ");
 }
@@ -308,10 +334,10 @@ fn handle_main_key(
 
     match key.code {
         KeyCode::Char('q') => app.should_quit = true,
-        KeyCode::Char('h') | KeyCode::Left  => app.dash_focus = overview::move_focus(app.dash_focus, Dir::Left),
-        KeyCode::Char('l') | KeyCode::Right => app.dash_focus = overview::move_focus(app.dash_focus, Dir::Right),
-        KeyCode::Char('j') | KeyCode::Down  => app.dash_focus = overview::move_focus(app.dash_focus, Dir::Down),
-        KeyCode::Char('k') | KeyCode::Up    => app.dash_focus = overview::move_focus(app.dash_focus, Dir::Up),
+        KeyCode::Char('h') | KeyCode::Left  => app.dash_focus = overview::move_focus(app, app.dash_focus, Dir::Left),
+        KeyCode::Char('l') | KeyCode::Right => app.dash_focus = overview::move_focus(app, app.dash_focus, Dir::Right),
+        KeyCode::Char('j') | KeyCode::Down  => app.dash_focus = overview::move_focus(app, app.dash_focus, Dir::Down),
+        KeyCode::Char('k') | KeyCode::Up    => app.dash_focus = overview::move_focus(app, app.dash_focus, Dir::Up),
         KeyCode::Char(c) if ('1'..='9').contains(&c) => {
             let idx = (c as u8 - b'1') as usize;
             if idx < MAIN_MENU.len() {
@@ -325,6 +351,9 @@ fn handle_main_key(
                 if let Some(section) = pane.section() {
                     health.focus_section(section);
                 }
+            } else {
+                // A plugin pane — hand off to the host in the event loop.
+                app.pending_plugin_enter = Some(app.dash_focus - PANES.len());
             }
         }
         _ => {}
@@ -360,13 +389,15 @@ fn handle_mouse(
             if app.screen == Screen::Main && area.width >= 50 && area.height >= 14 =>
         {
             let grid = dashboard_grid(area);
-            if let Some(i) = overview::pane_at(grid, me.column, me.row) {
+            if let Some(i) = overview::pane_at(grid, app, me.column, me.row) {
                 app.dash_focus = i;
                 if let Some(&pane) = PANES.get(i) {
                     navigate_to(app, health, configs, aliases, profile, update, settings, theme, pane.target());
                     if let Some(section) = pane.section() {
                         health.focus_section(section);
                     }
+                } else {
+                    app.pending_plugin_enter = Some(i - PANES.len());
                 }
             }
         }
