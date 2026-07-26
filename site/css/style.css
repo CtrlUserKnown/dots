@@ -130,25 +130,56 @@ body {
 .nav-files a:hover { color: var(--cyan); }
 .nav-files a.active { color: var(--green); }
 
-/* ── Hero / logo ── */
-.hero-logo {
-  font-size: 2.4rem;
-  font-weight: 600;
+/* ── Neofetch ── */
+.neofetch {
+  display: flex;
+  gap: 2rem;
+  padding: 0.75rem 0.5rem 0.25rem;
+  margin: 0 0 1.25rem;
+  align-items: flex-start;
+}
+
+.nf-ascii pre {
   color: var(--cyan);
-  margin-bottom: 0.25rem;
-  line-height: 1.2;
+  font-size: 0.58rem;
+  line-height: 1.25;
+  letter-spacing: normal;
 }
 
-.hero-logo-sub {
-  font-size: 0.85rem;
-  color: var(--fg-muted);
-  margin-bottom: 1rem;
+.nf-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding-top: 0.35rem;
 }
 
-.hero-tagline {
-  font-size: 0.95rem;
+.nf-row {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.82rem;
+  align-items: baseline;
+}
+
+.nf-label {
+  color: var(--fg-dim);
+  min-width: 5.5em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.7rem;
+}
+
+.nf-val {
   color: var(--fg);
-  margin: 0.75rem 0 1.25rem;
+}
+
+.nf-val::before {
+  content: ": ";
+  color: var(--fg-dim);
+}
+
+@media (max-width: 600px) {
+  .neofetch { flex-direction: column; gap: 0.5rem; }
+  .nf-ascii pre { font-size: 0.5rem; }
 }
 
 .install-block {
@@ -677,7 +708,6 @@ tr:hover td { background: rgba(255,255,255,0.015); color: var(--fg); }
 }
 
 @media (max-width: 480px) {
-  .hero-logo { font-size: 1.8rem; }
   .term-screen { padding: 0.75rem; }
   .nav-files { gap: 0.1rem 1rem; }
   .btn-line { flex-direction: column; }
