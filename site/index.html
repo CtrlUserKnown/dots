@@ -11,7 +11,7 @@
   <link rel="alternate icon" href="img/svg/dots_favicons_color.svg">
   <link rel="apple-touch-icon" href="img/svg/dots_favicons_color.svg">
   <link rel="manifest" href="site.webmanifest">
-  <meta name="theme-color" content="#1a1a1a">
+  <meta name="theme-color" content="#0c0c0c">
 
   <base href="/dots/">
 
@@ -27,281 +27,181 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-  <nav class="nav" role="navigation" aria-label="Main navigation">
-    <div class="nav__inner">
-      <a href="index.html" class="nav__logo" aria-label="dots home">
-        <img src="img/svg/dots_logo_alt_color.svg" alt="dots" width="80" height="26">
-      </a>
-      <button class="nav__toggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="nav-menu">
-        <span></span>
-        <span></span>
-        <span></span>
-      </button>
-      <div class="nav__menu" id="nav-menu">
-        <ul class="nav__links" role="list">
-          <li><a href="index.html">Home</a></li>
-          <li><a href="about.html">About</a></li>
-          <li><a href="docs.html">Docs</a></li>
-          <li><a href="changelog.html">Changelog</a></li>
-        </ul>
-        <a href="https://github.com/CtrlUserKnown/dots" class="nav__github" target="_blank" rel="noopener noreferrer" aria-label="View on GitHub">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M12 2C6.477 2 2 6.477 2 12c0 4.419 2.865 8.166 6.839 9.489.5.09.682-.218.682-.484 0-.236-.009-.866-.013-1.7-2.782.602-3.369-1.34-3.369-1.34-.455-1.157-1.11-1.465-1.11-1.465-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.088 2.91.833.091-.647.349-1.086.635-1.337-2.22-.251-4.555-1.111-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.252-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.026A9.578 9.578 0 0 1 12 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.026 2.747-1.026.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.741 0 .269.18.579.688.481C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/>
-          </svg>
-          GitHub
-        </a>
+<div class="term">
+  <div class="term-bar">
+    <div class="term-dots">
+      <span class="term-dot term-dot--r"></span>
+      <span class="term-dot term-dot--y"></span>
+      <span class="term-dot term-dot--g"></span>
+    </div>
+    <span class="term-title">dots — index</span>
+  </div>
+
+  <div class="term-screen">
+
+    <div class="prompt-line">
+      <span class="prompt-symbol">~ $</span>
+      <span class="prompt-cmd">ls pages/</span>
+    </div>
+    <div class="nav-files">
+      <a href="index.html" class="active">index.html</a>
+      <a href="about.html">about.html</a>
+      <a href="docs.html">docs.html</a>
+      <a href="changelog.html">changelog.html</a>
+    </div>
+
+    <div class="prompt-line">
+      <span class="prompt-symbol">~ $</span>
+      <span class="prompt-cmd">cat README.md</span>
+    </div>
+    <div class="divider-line">── dots ──</div>
+    <div class="hero-logo">dots</div>
+    <div class="hero-logo-sub">cross-platform dotfiles manager</div>
+    <div class="hero-tagline">A dotfiles manager for <strong>macOS</strong> &amp; <strong>Linux</strong>. One script installs everything — symlinks, tools, configs, and a TUI to manage it all.</div>
+
+    <div class="prompt-line">
+      <span class="prompt-symbol">~ $</span>
+      <span class="prompt-cmd">curl -fsSL https://raw.githubusercontent.com/CtrlUserKnown/dots/main/install.sh | sh</span>
+    </div>
+    <div class="install-block">
+      <span class="prompt-symbol">$</span>
+      <code id="install-cmd">curl -fsSL https://raw.githubusercontent.com/CtrlUserKnown/dots/main/install.sh | sh</code>
+      <button class="install-copy" id="copy-btn" onclick="copyInstall()">copy</button>
+    </div>
+
+    <div class="btn-line">
+      <a href="docs.html">docs/quickstart</a>
+      <a href="about.html">about/project</a>
+    </div>
+
+    <div class="prompt-line">
+      <span class="prompt-symbol">~ $</span>
+      <span class="prompt-cmd">dots --features</span>
+    </div>
+    <div class="divider-line">── features ──</div>
+    <div class="feature-list">
+      <div class="feature-item">
+        <span class="feature-bullet">◆</span>
+        <span class="feature-name">Interactive TUI</span>
+        <span class="feature-desc">ratatui dashboard with 6 panes: symlinks, tools, plugins, configs, updates, network</span>
+      </div>
+      <div class="feature-item">
+        <span class="feature-bullet">◆</span>
+        <span class="feature-name">Symlink management</span>
+        <span class="feature-desc">Declare links in <code>links.toml</code> or use GNU Stow folding. Idempotent with backups</span>
+      </div>
+      <div class="feature-item">
+        <span class="feature-bullet">◆</span>
+        <span class="feature-name">Cross-platform installs</span>
+        <span class="feature-desc">One dep list per platform via Homebrew, apt, dnf; required/optional/dev tiers</span>
+      </div>
+      <div class="feature-item">
+        <span class="feature-bullet">◆</span>
+        <span class="feature-name">Premade configs</span>
+        <span class="feature-desc">Ghostty, Neovim, opencode starter configs compiled into the binary</span>
+      </div>
+      <div class="feature-item">
+        <span class="feature-bullet">◆</span>
+        <span class="feature-name">Network monitor</span>
+        <span class="feature-desc">Live pane: connectivity, latency, DNS, VPN status via platform probes</span>
+      </div>
+      <div class="feature-item">
+        <span class="feature-bullet">◆</span>
+        <span class="feature-name">Portable profiles</span>
+        <span class="feature-desc">Export to <code>personal.json</code>, re-import on another machine or from GitHub</span>
       </div>
     </div>
-  </nav>
 
-  <main>
-    <!-- Hero -->
-    <section class="hero" aria-label="Introduction">
-      <div class="container">
-        <div class="hero__content">
+    <div class="prompt-line">
+      <span class="prompt-symbol">~ $</span>
+      <span class="prompt-cmd">dots --stack</span>
+    </div>
+    <div class="divider-line">── stack ──</div>
+    <div class="tool-list">
+      <div class="tool-row"><span class="tool-name">Rust</span><span class="tool-desc">Single static binary with pure-Rust TLS</span></div>
+      <div class="tool-row"><span class="tool-name">ratatui</span><span class="tool-desc">Terminal UI framework for the interactive dashboard</span></div>
+      <div class="tool-row"><span class="tool-name">git</span><span class="tool-desc">Version control and self-updating</span></div>
+      <div class="tool-row"><span class="tool-name">eza</span><span class="tool-desc">Modern ls replacement</span></div>
+      <div class="tool-row"><span class="tool-name">fzf</span><span class="tool-desc">Fuzzy finder</span></div>
+      <div class="tool-row"><span class="tool-name">bat</span><span class="tool-desc">Syntax-highlighted file previewer</span></div>
+      <div class="tool-row"><span class="tool-name">zoxide</span><span class="tool-desc">Smarter cd</span></div>
+      <div class="tool-row"><span class="tool-name">fastfetch</span><span class="tool-desc">System info on shell start</span></div>
+    </div>
 
-          <div class="term-window hero__term">
-            <div class="term-bar">
-              <span class="term-dot term-dot--red" aria-hidden="true"></span>
-              <span class="term-dot term-dot--yellow" aria-hidden="true"></span>
-              <span class="term-dot term-dot--green" aria-hidden="true"></span>
-              <span class="term-title">dots</span>
-            </div>
-            <div class="term-body">
-              <img src="img/svg/dots_logo_alt_color.svg" alt="dots logo" class="hero__logo" width="180" height="70">
-              <p class="hero__name">dots</p>
-              <h1>A dotfiles manager<br>for macOS &amp; Linux.</h1>
-              <p class="hero__tagline">One script installs everything. Symlinks, tools, configs, and a TUI to manage it all.</p>
-              <div class="hero__install" aria-label="Install command">
-                <span class="hero__install-prompt" aria-hidden="true">$</span>
-                <code id="install-cmd">curl -fsSL https://raw.githubusercontent.com/CtrlUserKnown/dots/main/install.sh | sh</code>
-                <button class="hero__install-copy" id="copy-btn" aria-label="Copy install command" onclick="copyInstall()">Copy</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="hero__actions">
-            <a href="docs.html" class="btn btn-primary">Get started</a>
-            <a href="about.html" class="btn btn-secondary">Learn more</a>
-          </div>
-        </div>
+    <div class="prompt-line">
+      <span class="prompt-symbol">~ $</span>
+      <span class="prompt-cmd">dots --demo</span>
+    </div>
+    <div class="divider-line">── demo ──</div>
+    <div class="demo-term">
+      <div class="demo-bar">
+        <span class="term-dot term-dot--r"></span>
+        <span class="term-dot term-dot--y"></span>
+        <span class="term-dot term-dot--g"></span>
+        <span class="term-title">dots</span>
       </div>
-    </section>
+      <div class="demo-body" id="demo-output"></div>
+    </div>
 
-    <hr class="divider">
-
-    <!-- Features -->
-    <section class="section" aria-labelledby="features-heading">
-      <div class="container">
-        <h2 class="section-heading" id="features-heading">What you get</h2>
-        <p class="section-sub">Everything wired up from the first run.</p>
-
-        <div class="grid-3" role="list">
-          <article class="card" role="listitem">
-            <div class="card__icon card__icon--blue" aria-hidden="true">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#89b4fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="16 18 22 12 16 6"></polyline>
-                <polyline points="8 6 2 12 8 18"></polyline>
-              </svg>
-            </div>
-            <h3>Interactive TUI</h3>
-            <p>A ratatui-powered dashboard with 6 panes: symlinks, tools, plugins, configs, updates, and live network status. Supports keyboard and mouse.</p>
-          </article>
-
-          <article class="card" role="listitem">
-            <div class="card__icon card__icon--purple" aria-hidden="true">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#cba6f7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="3" y1="9" x2="21" y2="9"></line>
-                <line x1="9" y1="21" x2="9" y2="9"></line>
-              </svg>
-            </div>
-            <h3>Symlink management</h3>
-            <p>Declare links in <code>links.toml</code> or use GNU Stow-style folding. Create and repair idempotently with automatic backups.</p>
-          </article>
-
-          <article class="card" role="listitem">
-            <div class="card__icon card__icon--green" aria-hidden="true">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a6e3a1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
-                <polyline points="17 6 23 6 23 12"></polyline>
-              </svg>
-            </div>
-            <h3>Cross-platform installs</h3>
-            <p>One dependency list resolved per platform via Homebrew, apt, or dnf. Install required, optional, and dev tiers individually.</p>
-          </article>
-
-          <article class="card" role="listitem">
-            <div class="card__icon card__icon--yellow" aria-hidden="true">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f9e2af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                <line x1="8" y1="21" x2="16" y2="21"></line>
-                <line x1="12" y1="17" x2="12" y2="21"></line>
-              </svg>
-            </div>
-            <h3>Premade configs</h3>
-            <p>Bundled starter configs for Ghostty, Neovim, and opencode. Compiled into the binary — always available offline.</p>
-          </article>
-
-          <article class="card" role="listitem">
-            <div class="card__icon card__icon--cyan" aria-hidden="true">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#89dceb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
-                <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
-                <line x1="6" y1="6" x2="6.01" y2="6"></line>
-                <line x1="6" y1="18" x2="6.01" y2="18"></line>
-              </svg>
-            </div>
-            <h3>Network monitor</h3>
-            <p>Live dashboard pane showing connectivity, latency, network name, DNS servers, and VPN status — platform-specific probes.</p>
-          </article>
-
-          <article class="card" role="listitem">
-            <div class="card__icon card__icon--red" aria-hidden="true">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f38ba8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="4 17 10 11 4 5"></polyline>
-                <line x1="12" y1="19" x2="20" y2="19"></line>
-              </svg>
-            </div>
-            <h3>Portable profiles</h3>
-            <p>Export your setup to <code>personal.json</code> and re-import it on another machine, locally or straight from GitHub.</p>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <hr class="divider">
-
-    <!-- Stack -->
-    <section class="section" aria-labelledby="stack-heading">
-      <div class="container">
-        <h2 class="section-heading" id="stack-heading">The stack</h2>
-        <p class="section-sub">Built in Rust. Tools managed on install.</p>
-
-        <div class="tool-list" role="list">
-          <div class="tool-item" role="listitem">
-            <span class="tool-name">Rust</span>
-            <span class="tool-desc">Single static binary with pure-Rust TLS</span>
-          </div>
-          <div class="tool-item" role="listitem">
-            <span class="tool-name">ratatui</span>
-            <span class="tool-desc">Terminal UI framework for the interactive dashboard</span>
-          </div>
-          <div class="tool-item" role="listitem">
-            <span class="tool-name">git</span>
-            <span class="tool-desc">Version control and self-updating</span>
-          </div>
-          <div class="tool-item" role="listitem">
-            <span class="tool-name">eza</span>
-            <span class="tool-desc">Modern ls replacement</span>
-          </div>
-          <div class="tool-item" role="listitem">
-            <span class="tool-name">fzf</span>
-            <span class="tool-desc">Fuzzy finder</span>
-          </div>
-          <div class="tool-item" role="listitem">
-            <span class="tool-name">bat</span>
-            <span class="tool-desc">Syntax-highlighted file previewer</span>
-          </div>
-          <div class="tool-item" role="listitem">
-            <span class="tool-name">zoxide</span>
-            <span class="tool-desc">Smarter cd</span>
-          </div>
-          <div class="tool-item" role="listitem">
-            <span class="tool-name">fastfetch</span>
-            <span class="tool-desc">System info on shell start</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <hr class="divider">
-
-    <!-- Demo -->
-    <section class="section" aria-labelledby="demo-heading">
-      <div class="container">
-        <h2 class="section-heading" id="demo-heading">See it in action</h2>
-        <p class="section-sub">A quick look at what dots can do.</p>
-
-        <div class="demo-terminal">
-          <div class="term-bar">
-            <span class="term-dot term-dot--red" aria-hidden="true"></span>
-            <span class="term-dot term-dot--yellow" aria-hidden="true"></span>
-            <span class="term-dot term-dot--green" aria-hidden="true"></span>
-            <span class="term-title">dots demo</span>
-          </div>
-          <div class="demo-body" id="demo-output"></div>
-        </div>
-      </div>
-    </section>
-
-    <hr class="divider">
-
-    <!-- CTA -->
-    <section class="section-sm" aria-label="Call to action">
-      <div class="container">
-        <div class="cta-block">
-          <h2>Ready to set it up?</h2>
-          <p>Run the install script and you'll have a working dotfiles setup in a few minutes.</p>
-          <div class="hero__actions">
-            <a href="docs.html" class="btn btn-primary">Read the docs</a>
-            <a href="https://github.com/CtrlUserKnown/dots" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">View on GitHub</a>
-          </div>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <footer class="footer" role="contentinfo">
-    <div class="container">
-      <div class="footer__inner">
-        <div class="footer__brand">
-          <img src="img/svg/dots_icon_color.svg" alt="" aria-hidden="true" width="18" height="18">
-          <span class="footer__copy">dots by CtrlUserKnown</span>
-        </div>
-        <nav class="footer__nav" aria-label="Footer navigation">
-          <a href="about.html">About</a>
-          <a href="docs.html">Docs</a>
-          <a href="changelog.html">Changelog</a>
-          <a href="https://github.com/CtrlUserKnown/dots" target="_blank" rel="noopener noreferrer">GitHub</a>
-        </nav>
+    <div class="prompt-line">
+      <span class="prompt-symbol">~ $</span>
+      <span class="prompt-cmd">dots --help</span>
+    </div>
+    <div class="divider-line">── quick start ──</div>
+    <div class="cta-block">
+      <p>Run the install script and you'll have a working dotfiles setup in a few minutes.</p>
+      <div class="btn-line">
+        <a href="docs.html">docs/readme</a>
+        <a href="https://github.com/CtrlUserKnown/dots" target="_blank" rel="noopener noreferrer">github/repo</a>
       </div>
     </div>
-  </footer>
 
-  <script src="js/nav.js"></script>
-  <script src="js/demo.js"></script>
-  <script>
-    function copyInstall() {
-      var cmd = document.getElementById('install-cmd').textContent;
-      var btn = document.getElementById('copy-btn');
+    <div class="prompt-line">
+      <span class="prompt-symbol">~ $</span>
+      <span class="prompt-cmd" style="animation: blink 1s step-end infinite;">_</span>
+    </div>
 
-      if (navigator.clipboard) {
-        navigator.clipboard.writeText(cmd).then(function () {
-          btn.textContent = 'Copied!';
-          setTimeout(function () { btn.textContent = 'Copy'; }, 2000);
-        });
-      } else {
-        var el = document.createElement('textarea');
-        el.value = cmd;
-        el.style.position = 'fixed';
-        el.style.opacity = '0';
-        document.body.appendChild(el);
-        el.focus();
-        el.select();
-        try { document.execCommand('copy'); } catch (e) {}
-        document.body.removeChild(el);
-        btn.textContent = 'Copied!';
-        setTimeout(function () { btn.textContent = 'Copy'; }, 2000);
-      }
+  </div>
+
+  <div class="statusbar">
+    <span>dots v2.0.0</span>
+    <a href="https://github.com/CtrlUserKnown/dots" target="_blank" rel="noopener noreferrer">github.com/CtrlUserKnown/dots</a>
+    <span>MIT License</span>
+  </div>
+</div>
+
+<script src="js/nav.js"></script>
+<script src="js/demo.js"></script>
+<script>
+  function copyInstall() {
+    var cmd = document.getElementById('install-cmd').textContent;
+    var btn = document.getElementById('copy-btn');
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(cmd).then(function () {
+        btn.textContent = 'copied!';
+        setTimeout(function () { btn.textContent = 'copy'; }, 2000);
+      });
+    } else {
+      var el = document.createElement('textarea');
+      el.value = cmd;
+      el.style.position = 'fixed';
+      el.style.opacity = '0';
+      document.body.appendChild(el);
+      el.focus();
+      el.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(el);
+      btn.textContent = 'copied!';
+      setTimeout(function () { btn.textContent = 'copy'; }, 2000);
     }
-  </script>
+  }
+</script>
 
 </body>
 </html>
