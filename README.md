@@ -22,19 +22,13 @@ Release-by-release history lives in [`CHANGELOG.md`](CHANGELOG.md).
 ## Install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/CtrlUserKnown/dots/main/install.sh | sh
+curl -fsSL https://ctrluserknown.github.io/dots/install.sh | sh
 ```
 
 The installer clones the repo to `~/.dots`, downloads a prebuilt binary for your OS/arch (or builds from source with `cargo` if no release matches), puts `dots` on your `PATH`, and initializes config.
 
 ```
 install.sh [--version <tag>] [--dir <path>]
-```
-
-The same script is mirrored on the site, if you prefer the shorter URL:
-
-```sh
-curl -fsSL https://ctrluserknown.github.io/dots/install.sh | sh
 ```
 
 Prefer to build it yourself? See [`BUILD_MACOS.md`](BUILD_MACOS.md), or from a clone:

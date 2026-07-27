@@ -22,7 +22,7 @@ window.DOTS = (function () {
   var VERSION = '2.2.0';
   var REPO    = 'https://github.com/CtrlUserKnown/dots';
   var SITE    = 'https://ctrluserknown.github.io/dots/';
-  var INSTALL = 'curl -fsSL https://raw.githubusercontent.com/CtrlUserKnown/dots/main/install.sh | sh';
+  var INSTALL = 'curl -fsSL ' + SITE + 'install.sh | sh';
 
   // ── /about ──────────────────────────────────────────────────────────────────
 
@@ -65,8 +65,6 @@ window.DOTS = (function () {
     return [
       { text: 'One line. The installer figures out the rest:' },
       { code: INSTALL, copy: true },
-      { text: 'Same script, shorter URL — mirrored on this site:' },
-      { code: 'curl -fsSL ' + SITE + 'install.sh | sh', copy: true },
       { rule: 'what the installer does' },
       { todo: [
         ['x', 'Detect your OS and architecture'],
