@@ -492,7 +492,12 @@ window.DOTS = (function () {
       if (section && line.indexOf('- ') === 0) section.items.push(line.slice(2).trim());
     });
 
-    return entries.filter(function (e) { return e.sections.length; });
+    // Keep only shipped versions: `[Unreleased]` is a staging area for the next
+    // tag, and letting it through would render a rule reading "vUnreleased" and
+    // report it as the latest release.
+    return entries.filter(function (e) {
+      return e.sections.length && !/^unreleased$/i.test(e.version);
+    });
   }
 
   // Async: term.js awaits the returned promise before streaming.
@@ -648,6 +653,8 @@ window.DOTS = (function () {
     { name: '/changelog', desc: 'release history',                 run: changelog, arg: '[all]' },
     { name: '/theme',     desc: 'the noir-cat palette',            run: theme },
     { name: '/status',    desc: 'version, links, your platform',   run: status },
+    { name: '/hosts',     desc: 'remote hosts and services',        run: hostTable },
+    { name: '/host',      desc: 'open a host page',                run: hostPage, arg: '<name>' },
     { name: '/github',    desc: 'open the repository',             run: function () {
         window.open(REPO, '_blank', 'noopener');
         return [{ ok: 'Opening [' + REPO.replace('https://', '') + '](' + REPO + ')…' }];
@@ -705,6 +712,113 @@ window.DOTS = (function () {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
+  // ── terminal helpers ───────────────────────────────────────────────────────────
+
+  function dim(s)    { return '<span class="dim">' + s + '</span>'; }
+  function green(s)  { return '<span class="c-green">' + s + '</span>'; }
+  function cyan(s)   { return '<span class="c-cyan">' + s + '</span>'; }
+  function yellow(s) { return '<span class="c-yellow">' + s + '</span>'; }
+
+  // ── host data ─────────────────────────────────────────────────────────────────
+
+  var HOSTS = [
+    { name: 'docs',     host: 'docs@prod.userknown.com',         port: '22',   ping: '52',  tags: 'prod web',        desc: 'documentation server for the dots project.' },
+    { name: 'about',    host: 'info@profile.knowlange.org',      port: '8081', ping: '102', tags: 'mange ip',        desc: 'profile and about page hosting.' },
+    { name: 'git',      host: 'gh@dev.source.io',                port: '91',   ping: '4',   tags: 'dev',             desc: 'git repository hosting and code review.' },
+    { name: 'changelog',host: 'logs@alt.changelog.gg',           port: '1738', ping: '33',  tags: 'infra',           desc: 'centralised log and changelog aggregation.' },
+    { name: 'install',  host: 'install@get.dots.git',            port: '77',   ping: '90',  tags: 'get download',    desc: 'install script and release distribution.' },
+  ];
+
+  var HOST_MAP = {};
+  HOSTS.forEach(function (h) { HOST_MAP[h.name] = h; });
+
+  // Generate VA (visualizer animation) HTML
+  function va(num) {
+    var n = Math.min(10, Math.max(3, Math.round(num / 12)));
+    var bars = [];
+    for (var i = 0; i < n; i++) bars.push('<span class="va-bar"></span>');
+    return '<span class="va">' + bars.join('') + '</span>';
+  }
+
+  // ── /hosts ────────────────────────────────────────────────────────────────────
+
+  function hostTable() {
+    var blocks = [
+      { text: '**hosts** — remote machines and services managed by dots.' },
+      { raw: '<div class="host-table blk fade">' +
+        '<div class="host-row"><span class="h-name c-cyan">name</span><span class="h-host c-cyan">host</span><span class="h-port c-cyan">port</span><span class="h-ping c-cyan">ping</span><span class="h-tags c-cyan">tags</span></div>' +
+        '<div class="host-row" style="color:var(--dim)">' + escapeHtml(new Array(54).join('─')) + '</div>' +
+        HOSTS.map(function (h) {
+          return '<div class="host-row">' +
+            '<a class="h-name cmdlink" data-cmd="/host ' + h.name + '">' + escapeHtml(h.name) + '</a>' +
+            '<span class="h-host">' + escapeHtml(h.host) + '</span>' +
+            '<span class="h-port">' + escapeHtml(h.port) + '</span>' +
+            '<span class="h-ping">' + escapeHtml(h.ping) + 'ms' + va(parseInt(h.ping)) + '</span>' +
+            '<span class="h-tags">' + escapeHtml(h.tags) + '</span>' +
+            '</div>';
+        }).join('') +
+        '</div>' },
+      { note: 'Click a name to open its page. Each host has server info, logs, and VA ping status.' },
+    ];
+    return blocks;
+  }
+
+  // ── /host <name> ──────────────────────────────────────────────────────────────
+
+  function hostPage(name) {
+    var h = HOST_MAP[name];
+    if (!h) {
+      return [
+        { err: 'No host `' + name + '`.' },
+        { cmds: HOSTS.map(function (h) { return ['/host ' + h.name, h.desc]; }) },
+      ];
+    }
+
+    return [
+      { tool: 'Read', args: 'hosts/' + h.name + '.md', out: [
+        '<span class="c-mauve">#</span> <span class="c-cyan">' + h.name + '</span>  ' + dim('— ' + h.desc),
+        '',
+        dim('| key    | value'),
+        dim('|--------|-------'),
+        dim('| host') + '   | ' + escapeHtml(h.host),
+        dim('| port') + '   | ' + escapeHtml(h.port),
+        dim('| ping') + '   | ' + escapeHtml(h.ping) + 'ms ' + va(parseInt(h.ping)),
+        dim('| tags') + '   | ' + escapeHtml(h.tags),
+      ], collapse: 0 },
+      { rule: h.name + ' — ' + h.desc },
+      { text: '**' + h.name + '** serves as a ' + h.desc + ' It is reachable at <code>' + escapeHtml(h.host) + '</code> on port <code>' + h.port + '</code>.' },
+      { screen: [
+        dim('# ' + h.name),
+        '',
+        dim('> ') + h.desc.charAt(0).toUpperCase() + h.desc.slice(1),
+        '',
+        dim('## connection'),
+        '',
+        dim('| key ') + '  | ' + dim('value'),
+        dim('|---') + '   | ' + dim('---'),
+        dim('| host') + '   | ' + escapeHtml(h.host),
+        dim('| port') + '   | ' + '<span class="c-yellow">' + escapeHtml(h.port) + '</span>',
+        dim('| ping') + '   | ' + '<span class="c-green">' + escapeHtml(h.ping) + 'ms</span> ' + va(parseInt(h.ping)),
+        dim('| tags') + '   | ' + escapeHtml(h.tags),
+        '',
+        dim('## services'),
+        '',
+        dim('  • ') + '<span class="c-green">sshd</span>  ' + dim('secure shell daemon — port ' + h.port),
+        dim('  • ') + '<span class="c-green">nginx</span> ' + dim('reverse proxy (443)'),
+        dim('  • ') + '<span class="c-green">dots-agent</span>  ' + dim('dots health monitor'),
+        '',
+        dim('## status'),
+        '',
+        dim('  ') + '<span class="c-green">●</span> online   ' + dim('uptime: 99.97%'),
+        dim('  ') + '<span class="c-green">●</span> load     ' + dim('0.42 0.38 0.35'),
+        dim('  ') + '<span class="c-green">●</span> disk     ' + dim('64% · 256G / 400G'),
+      ] },
+      { cmds: [
+        ['/hosts', 'back to host list'],
+      ] },
+    ];
+  }
+
   return {
     VERSION: VERSION,
     REPO:    REPO,
@@ -714,6 +828,8 @@ window.DOTS = (function () {
     SHELL:    SHELL,
     TOPIC_LIST: TOPIC_LIST,
     escapeHtml: escapeHtml,
+    HOSTS: HOSTS,
+    HOST_MAP: HOST_MAP,
   };
 
 })();

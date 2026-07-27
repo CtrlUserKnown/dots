@@ -286,6 +286,7 @@
     [/plugin|lua|extend|pane/i,                   'Panes are pluggable — a few lines of Lua gets you your own.', ['/plugins']],
     [/update|upgrade|version|release/i,           'Self-update is built in, with SHA-256 verified release tarballs.', ['/docs updating', '/changelog']],
     [/tui|dashboard|interface|screen/i,           'The dashboard is five panes over your machine\'s state.', ['/tui']],
+    [/host|server|remote|ssh/i,                   'dots tracks remote hosts and services. View them in the hosts table.', ['/hosts']],
     [/window|wsl/i,                               'dots targets macOS and Linux. WSL works the way any Linux does; native Windows is not supported.', ['/docs requirements']],
     [/rust|cargo|build|source|binary/i,           'Rust, a two-crate Cargo workspace, shipped as one static binary.', ['/about', '/docs dev']],
     [/config|nvim|ghostty|opencode|premade/i,     'Configs are discovered from your dotfiles repo; a few starters ship inside the binary.', ['/docs configs']],
@@ -568,8 +569,8 @@
       '<div class="tips dim">' +
         '<div>Type <code>/</code> for commands, or ask a question.</div>' +
         '<div>Try <a class="cmdlink" data-cmd="/about">/about</a>, ' +
-             '<a class="cmdlink" data-cmd="/install">/install</a>, or ' +
-             '<a class="cmdlink" data-cmd="/tui">/tui</a>.</div>' +
+             '<a class="cmdlink" data-cmd="/hosts">/hosts</a>, or ' +
+             '<a class="cmdlink" data-cmd="/install">/install</a>.</div>' +
       '</div>', 'blk');
   }
 
@@ -662,7 +663,7 @@
   ctxEl.textContent  = 'Context left: ' + ctxLeft + '%';
 
   chips.innerHTML = [
-    ['/install', 'install'], ['/features', 'features'], ['/tui', 'tui'],
+    ['/install', 'install'], ['/features', 'features'], ['/hosts', 'hosts'],
     ['/docs', 'docs'], ['/changelog', 'changelog'], ['/github', 'github'],
   ].map(function (c) {
     return '<button type="button" data-cmd="' + c[0] + '">' + c[1] + '</button>';
