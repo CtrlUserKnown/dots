@@ -1,3 +1,11 @@
+//! The Symlinks and Tools screens.
+//!
+//! These are two separate screens — separate titles, separate rows, separate
+//! bulk actions, and separate cursors — that share one implementation because
+//! the row/cursor/install machinery is identical for both. [`Scope`] selects
+//! which one a [`HealthView`] is currently showing; nothing else here knows the
+//! difference.
+
 use std::path::PathBuf;
 use std::sync::mpsc::Receiver;
 
@@ -5,7 +13,6 @@ use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     Frame,
     layout::Rect,
-    style::Modifier,
     text::{Line, Span},
     widgets::Paragraph,
 };
@@ -13,15 +20,53 @@ use ratatui::{
 use crate::installer::{detect_pm, install_dep};
 use crate::packages::{check_dep, check_plugin, Category, Dep, Plugin, DEPS, PLUGINS};
 use crate::symlinks::{self, SymlinkStatus};
-use crate::tui::{draw_desc, draw_footer, draw_header, FlashKind};
+use crate::tui::{draw_desc, draw_key_bar, draw_screen_nav, FlashKind, Status};
 use crate::tui::app::{App, Screen};
-use crate::tui::theme::{style_dim, style_error, style_select};
+use crate::tui::theme::{style_block_title, style_muted, style_name, style_selected};
+
+// ── scope ─────────────────────────────────────────────────────────────────────
+
+/// Which of the two screens this view is currently showing.
+///
+/// Symlinks and tools are separate screens with separate keys, separate
+/// bulk actions, and separate cursors — they only share this implementation
+/// because the row/cursor/install machinery is identical.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Scope {
+    Symlinks,
+    Tools,
+}
+
+impl Scope {
+    fn index(self) -> usize {
+        match self {
+            Scope::Symlinks => 0,
+            Scope::Tools => 1,
+        }
+    }
+
+    /// The [`Screen`] this scope is, so the nav strip lights the right tab.
+    pub fn screen(self) -> Screen {
+        match self {
+            Scope::Symlinks => Screen::Symlinks,
+            Scope::Tools => Screen::Tools,
+        }
+    }
+
+    /// The scope a screen selects, if it is one of these two.
+    pub fn from_screen(screen: Screen) -> Option<Scope> {
+        match screen {
+            Screen::Symlinks => Some(Scope::Symlinks),
+            Screen::Tools => Some(Scope::Tools),
+            _ => None,
+        }
+    }
+}
 
 // ── display model ─────────────────────────────────────────────────────────────
 
 pub enum DisplayRow {
-    Section(&'static str),
-    /// A nested heading within a section (e.g. "zsh" under "tools").
+    /// A nested heading within a screen (e.g. "zsh" under tools).
     SubSection(&'static str),
     SymlinkItem { link: PathBuf, target: PathBuf, status: SymlinkStatus },
     DepItem     { dep: &'static Dep,    installed: bool },
@@ -29,37 +74,42 @@ pub enum DisplayRow {
 }
 
 fn is_navigable(row: &DisplayRow) -> bool {
-    !matches!(row, DisplayRow::Section(_) | DisplayRow::SubSection(_))
+    !matches!(row, DisplayRow::SubSection(_))
 }
 
 fn row_desc(row: &DisplayRow) -> String {
     match row {
-        DisplayRow::Section(_) | DisplayRow::SubSection(_) => String::new(),
+        DisplayRow::SubSection(_)                     => String::new(),
         DisplayRow::SymlinkItem { target, .. }        => format!("→ {}", home_rel(target)),
         DisplayRow::DepItem     { dep, .. }           => dep.desc.to_string(),
         DisplayRow::PluginItem  { plugin, .. }        => plugin.desc.to_string(),
     }
 }
 
-pub fn build_display_rows() -> Vec<DisplayRow> {
+/// The rows for one screen. Each scope owns its rows entirely — nothing from
+/// the other screen appears here, so the cursor can never wander across.
+pub fn build_display_rows(scope: Scope) -> Vec<DisplayRow> {
     let mut rows: Vec<DisplayRow> = Vec::new();
 
-    rows.push(DisplayRow::Section("symlinks"));
-    for s in symlinks::get_symlinks() {
-        let status = symlinks::check(&s);
-        rows.push(DisplayRow::SymlinkItem { link: s.link, target: s.target, status });
-    }
-
-    rows.push(DisplayRow::Section("tools"));
-    for dep in DEPS {
-        if dep.category == Category::Required || dep.category == Category::Optional {
-            rows.push(DisplayRow::DepItem { dep, installed: check_dep(dep) });
+    match scope {
+        Scope::Symlinks => {
+            for s in symlinks::get_symlinks() {
+                let status = symlinks::check(&s);
+                rows.push(DisplayRow::SymlinkItem { link: s.link, target: s.target, status });
+            }
         }
-    }
+        Scope::Tools => {
+            for dep in DEPS {
+                if dep.category == Category::Required || dep.category == Category::Optional {
+                    rows.push(DisplayRow::DepItem { dep, installed: check_dep(dep) });
+                }
+            }
 
-    rows.push(DisplayRow::SubSection("zsh"));
-    for plugin in PLUGINS {
-        rows.push(DisplayRow::PluginItem { plugin, installed: check_plugin(plugin) });
+            rows.push(DisplayRow::SubSection("zsh"));
+            for plugin in PLUGINS {
+                rows.push(DisplayRow::PluginItem { plugin, installed: check_plugin(plugin) });
+            }
+        }
     }
 
     rows
@@ -76,6 +126,7 @@ enum Pending {
 // ── view state ────────────────────────────────────────────────────────────────
 
 pub struct HealthView {
+    pub scope:       Scope,
     pub cursor:      usize,
     pub scroll:      usize,
     pub flash:       Option<(String, FlashKind)>,
@@ -84,6 +135,10 @@ pub struct HealthView {
     pub nav_count:   usize,
     pending:         Option<Pending>,
     install_rx:      Option<Receiver<anyhow::Result<()>>>,
+    /// `(cursor, scroll)` parked per scope, so leaving a screen and coming back
+    /// lands where you left it rather than at the top — the two screens keep
+    /// their own place the way genuinely separate screens would.
+    saved:           [(usize, usize); 2],
 }
 
 impl Default for HealthView {
@@ -93,6 +148,7 @@ impl Default for HealthView {
 impl HealthView {
     pub fn new() -> Self {
         let mut v = Self {
+            scope:       Scope::Symlinks,
             cursor:      0,
             scroll:      0,
             flash:       None,
@@ -101,13 +157,14 @@ impl HealthView {
             nav_count:   0,
             pending:     None,
             install_rx:  None,
+            saved:       [(0, 0); 2],
         };
         v.rebuild();
         v
     }
 
     pub fn rebuild(&mut self) {
-        self.rows = build_display_rows();
+        self.rows = build_display_rows(self.scope);
         let mut idx = 0usize;
         self.nav_indices = self.rows.iter().map(|row| {
             if is_navigable(row) { let i = idx; idx += 1; Some(i) }
@@ -119,19 +176,18 @@ impl HealthView {
         self.pending = None;
     }
 
-    /// Move the cursor to the first item under the named section and scroll it
-    /// to the top of the list. Used by the dashboard's drill-in.
-    pub fn focus_section(&mut self, label: &str) {
-        let Some(sec_di) = self.rows.iter().position(
-            |r| matches!(r, DisplayRow::Section(l) if *l == label),
-        ) else { return };
-        self.scroll = sec_di;
-        for di in (sec_di + 1)..self.rows.len() {
-            if let Some(nav) = self.nav_indices[di] {
-                self.cursor = nav;
-                break;
-            }
+    /// Switch which screen this view is showing, parking the outgoing screen's
+    /// position and restoring the incoming one's. Used by the dashboard's
+    /// drill-in, which targets one screen or the other.
+    pub fn show(&mut self, scope: Scope) {
+        if scope != self.scope {
+            self.saved[self.scope.index()] = (self.cursor, self.scroll);
+            let (cursor, scroll) = self.saved[scope.index()];
+            self.scope = scope;
+            self.cursor = cursor;
+            self.scroll = scroll;
         }
+        self.rebuild();
     }
 
     fn cursor_display_row(&self) -> usize {
@@ -147,6 +203,12 @@ impl HealthView {
         } else if dr >= self.scroll + visible {
             self.scroll = dr.saturating_sub(visible - 1);
         }
+    }
+
+    /// True while a confirmation prompt is up or an install is running — the
+    /// screen is answering a question and must keep every key.
+    pub fn is_busy(&self) -> bool {
+        self.pending.is_some()
     }
 
     /// Call from the main event loop to poll the background install thread.
@@ -174,12 +236,82 @@ impl HealthView {
 
 // ── rendering ─────────────────────────────────────────────────────────────────
 
-pub fn render(f: &mut Frame, area: Rect, _app: &App, view: &HealthView) {
-    draw_header(f, area, " health ", "");
+/// Width of the name column, so names and their descriptions line up down the
+/// screen regardless of which section a row belongs to.
+const NAME_COL: usize = 22;
 
-    if area.height < 5 { return; }
-    let visible   = (area.height as usize).saturating_sub(5);
-    let content_y = area.y + 1;
+/// One health row: `▶ ● name          description                        meta`.
+///
+/// The cursor and bullet carry the state, the name is the crisp column the eye
+/// scans, the description is muted supporting text, and `meta` is right-aligned
+/// against the row width.
+fn detail_row(cursor: bool, status: Status, name: &str, desc: &str, meta: &str, width: u16) -> Line<'static> {
+    let name = clip(name, NAME_COL);
+    let name_pad = NAME_COL.saturating_sub(name.chars().count()) + 1;
+
+    // 2 cursor + 2 bullet + name column + its padding, then the description
+    // shares what's left with the right-aligned meta.
+    let used = 4 + NAME_COL + 1;
+    let rest = (width as usize).saturating_sub(used);
+    let meta_len = meta.chars().count();
+    let desc_room = rest.saturating_sub(if meta_len > 0 { meta_len + 2 } else { 0 });
+    let desc = clip(desc, desc_room);
+    let gap = rest.saturating_sub(desc.chars().count() + meta_len);
+
+    let mut spans = vec![
+        Span::styled(if cursor { "▶ " } else { "  " }, style_selected()),
+        Span::styled(format!("{} ", status.glyph()), status.style()),
+        Span::styled(name, if cursor { style_selected() } else { style_name() }),
+        Span::styled(" ".repeat(name_pad), style_muted()),
+        Span::styled(desc, style_muted()),
+    ];
+    if meta_len > 0 {
+        spans.push(Span::styled(" ".repeat(gap), style_muted()));
+        spans.push(Span::styled(meta.to_string(), style_muted()));
+    }
+    Line::from(spans)
+}
+
+fn clip(s: &str, max: usize) -> String {
+    if s.chars().count() <= max {
+        return s.to_string();
+    }
+    if max <= 1 {
+        return String::new();
+    }
+    s.chars().take(max - 1).chain(std::iter::once('…')).collect()
+}
+
+pub fn render(f: &mut Frame, area: Rect, _app: &App, view: &HealthView) {
+    draw_screen_nav(f, area, view.scope.screen());
+
+    if area.height < 6 { return; }
+    // A blank row under the title bar, then rows down to just above the desc
+    // bar at height-4 — hence one fewer visible row than the gap costs.
+    let visible   = (area.height as usize).saturating_sub(6);
+    let content_y = area.y + 2;
+
+    // Each screen can now be empty on its own (a machine with no links.toml,
+    // say), where before the other screen's rows always filled the space.
+    if view.rows.is_empty() {
+        let (what, how) = match view.scope {
+            Scope::Symlinks => (
+                "No symlinks declared.",
+                "Adopt a file with 'dots link add <source> <target>'.",
+            ),
+            Scope::Tools => (
+                "No tools to check.",
+                "Tools are declared in the built-in package list.",
+            ),
+        };
+        f.render_widget(
+            Paragraph::new(vec![
+                Line::from(Span::styled(format!("  {what}"), style_name())),
+                Line::from(Span::styled(format!("  {how}"), style_muted())),
+            ]),
+            Rect { x: area.x, y: content_y, width: area.width, height: 2 },
+        );
+    }
 
     for (di, row) in view.rows.iter().enumerate().skip(view.scroll).take(visible) {
         let ry       = content_y + (di - view.scroll) as u16;
@@ -188,67 +320,62 @@ pub fn render(f: &mut Frame, area: Rect, _app: &App, view: &HealthView) {
         let is_cursor = nav_idx == Some(view.cursor);
 
         match row {
-            DisplayRow::Section(label) => {
-                f.render_widget(
-                    Paragraph::new(Line::from(Span::styled(
-                        format!("  {label}"),
-                        style_dim().add_modifier(Modifier::BOLD),
-                    ))),
-                    row_rect,
-                );
-            }
             DisplayRow::SubSection(label) => {
                 f.render_widget(
                     Paragraph::new(Line::from(Span::styled(
-                        format!("    {label}"),
-                        style_dim(),
+                        format!("  {label}"),
+                        style_block_title(),
                     ))),
                     row_rect,
                 );
             }
             DisplayRow::SymlinkItem { link, target, status } => {
-                let ok     = *status == SymlinkStatus::Ok;
-                let cursor = if is_cursor { "▶" } else { " " };
-                let sym    = if ok { "✓" } else { "✗" };
-                let sty    = if ok { style_select() } else { style_error() };
-                let status_str = if ok { home_rel(target) } else { status_label(status).to_string() };
+                let ok = *status == SymlinkStatus::Ok;
+                let (desc, meta) = if ok {
+                    (home_rel(target), String::new())
+                } else {
+                    (String::new(), status_label(status).to_string())
+                };
                 f.render_widget(
-                    Paragraph::new(Line::from(vec![
-                        Span::styled(format!("{cursor} "), sty),
-                        Span::styled(sym.to_string(), sty),
-                        Span::raw(format!("  {:<32} {}", home_rel(link), status_str)),
-                    ])),
+                    Paragraph::new(detail_row(
+                        is_cursor,
+                        if ok { Status::Ok } else { Status::Bad },
+                        &home_rel(link),
+                        &desc,
+                        &meta,
+                        area.width,
+                    )),
                     row_rect,
                 );
             }
             DisplayRow::DepItem { dep, installed } => {
-                let cursor = if is_cursor { "▶" } else { " " };
-                let sym    = if *installed { "✓" } else { "✗" };
-                let sty    = if *installed { style_select() } else { style_error() };
-                let tag    = match dep.category {
-                    Category::Required => "[req]",
-                    Category::Optional => "[opt]",
-                    Category::Dev      => "[dev]",
+                let tag = match dep.category {
+                    Category::Required => "req",
+                    Category::Optional => "opt",
+                    Category::Dev      => "dev",
                 };
                 f.render_widget(
-                    Paragraph::new(Line::from(vec![
-                        Span::styled(format!("{cursor} "), sty),
-                        Span::styled(sym.to_string(), sty),
-                        Span::raw(format!("  {:<14} {}  {}", dep.bin, tag, dep.desc)),
-                    ])),
+                    Paragraph::new(detail_row(
+                        is_cursor,
+                        if *installed { Status::Ok } else { Status::Bad },
+                        dep.bin,
+                        dep.desc,
+                        tag,
+                        area.width,
+                    )),
                     row_rect,
                 );
             }
             DisplayRow::PluginItem { plugin, installed } => {
-                let cursor = if is_cursor { "▶" } else { " " };
-                let sym    = if *installed { "✓" } else { "✗" };
-                let sty    = if *installed { style_select() } else { style_error() };
                 f.render_widget(
-                    Paragraph::new(Line::from(vec![
-                        Span::styled(format!("{cursor} "), sty),
-                        Span::styled(sym.to_string(), sty),
-                        Span::raw(format!("  {:<32} {}", plugin.name, plugin.desc)),
-                    ])),
+                    Paragraph::new(detail_row(
+                        is_cursor,
+                        if *installed { Status::Ok } else { Status::Bad },
+                        plugin.name,
+                        plugin.desc,
+                        if *installed { "" } else { "missing" },
+                        area.width,
+                    )),
                     row_rect,
                 );
             }
@@ -266,16 +393,20 @@ pub fn render(f: &mut Frame, area: Rect, _app: &App, view: &HealthView) {
     };
     draw_desc(f, area, &desc_text, view.flash.as_ref());
 
+    // Bulk actions are per-screen: `r` repairs links, `i` installs tools, and
+    // neither is advertised on the screen it doesn't belong to.
     let any_broken  = view.rows.iter().any(|r| matches!(r, DisplayRow::SymlinkItem { status, .. } if *status != SymlinkStatus::Ok));
     let any_missing = view.rows.iter().any(|r| matches!(r, DisplayRow::DepItem { installed: false, .. }));
-    let can_fix     = can_fix_cursor(view);
-    let mut hints   = Vec::<&str>::new();
-    if can_fix    { hints.push("enter fix/apply"); }
-    if any_broken { hints.push("r repair all"); }
-    if any_missing{ hints.push("i install all"); }
-    hints.push("esc back");
-    hints.push("q quit");
-    draw_footer(f, area, &format!(" j/k navigate  {}  ", hints.join("  ")));
+    let mut hints   = vec![("j/k", "navigate")];
+    if can_fix_cursor(view) { hints.push(("enter", "fix/apply")); }
+    match view.scope {
+        Scope::Symlinks if any_broken  => hints.push(("r", "repair all")),
+        Scope::Tools    if any_missing => hints.push(("i", "install all")),
+        _ => {}
+    }
+    hints.push(("esc", "back"));
+    hints.push(("q", "quit"));
+    draw_key_bar(f, area, &hints);
 }
 
 // ── key handling ──────────────────────────────────────────────────────────────
@@ -320,8 +451,10 @@ pub fn handle_key(app: &mut App, view: &mut HealthView, key: KeyEvent) {
             }
         }
         KeyCode::Enter => activate_cursor(view),
-        KeyCode::Char('r') => repair_all_symlinks(view),
-        KeyCode::Char('i') => install_all_missing(view),
+        // Each bulk action belongs to one screen only, so the same keystroke
+        // can't reach across and act on rows the user isn't looking at.
+        KeyCode::Char('r') if view.scope == Scope::Symlinks => repair_all_symlinks(view),
+        KeyCode::Char('i') if view.scope == Scope::Tools    => install_all_missing(view),
         _ => {}
     }
 }
@@ -454,33 +587,70 @@ fn status_label(s: &SymlinkStatus) -> &'static str {
 mod tests {
     use super::*;
 
+    /// The point of the split: neither screen may contain a row belonging to
+    /// the other. If this ever fails, the two screens have merged again.
     #[test]
-    fn display_list_has_sections() {
-        let rows = build_display_rows();
-        let sections: Vec<_> = rows.iter()
-            .filter(|r| matches!(r, DisplayRow::Section(_)))
-            .collect();
-        assert!(sections.len() >= 2, "expected at least 2 sections, got {}", sections.len());
+    fn the_two_screens_share_no_rows() {
+        let links = build_display_rows(Scope::Symlinks);
+        assert!(
+            links.iter().all(|r| matches!(r, DisplayRow::SymlinkItem { .. })),
+            "the symlinks screen must contain only symlink rows",
+        );
+
+        let tools = build_display_rows(Scope::Tools);
+        assert!(
+            tools.iter().all(|r| matches!(
+                r,
+                DisplayRow::DepItem { .. } | DisplayRow::PluginItem { .. } | DisplayRow::SubSection(_)
+            )),
+            "the tools screen must contain no symlink rows",
+        );
     }
 
     #[test]
-    fn zsh_is_a_subsection_under_tools() {
-        let rows = build_display_rows();
-        let tools_idx = rows.iter().position(
-            |r| matches!(r, DisplayRow::Section(l) if *l == "tools"),
-        ).expect("tools section present");
+    fn each_pane_drills_into_its_own_screen() {
+        use crate::tui::overview::Pane;
+        assert_eq!(Pane::Symlinks.target(), Screen::Symlinks);
+        assert_eq!(Pane::Tools.target(), Screen::Tools);
+        assert_ne!(
+            Pane::Symlinks.target(),
+            Pane::Tools.target(),
+            "symlinks and tools must not open the same screen",
+        );
+    }
+
+    #[test]
+    fn zsh_is_a_subsection_within_tools() {
+        let rows = build_display_rows(Scope::Tools);
         let zsh_idx = rows.iter().position(
             |r| matches!(r, DisplayRow::SubSection(l) if *l == "zsh"),
         ).expect("zsh subsection present");
-        assert!(zsh_idx > tools_idx, "zsh subsection should come after the tools section");
-        let next_section = rows.iter().skip(zsh_idx + 1)
-            .find(|r| matches!(r, DisplayRow::Section(_)));
-        assert!(next_section.is_none(), "zsh subsection should stay within tools (no top-level section follows)");
+        let first_dep = rows.iter().position(|r| matches!(r, DisplayRow::DepItem { .. }))
+            .expect("at least one dep");
+        assert!(zsh_idx > first_dep, "zsh should come after the plain tools");
+        assert!(
+            rows.iter().skip(zsh_idx + 1).all(|r| matches!(r, DisplayRow::PluginItem { .. })),
+            "only zsh plugins follow the zsh subsection",
+        );
     }
 
     #[test]
-    fn dep_items_include_git_as_green() {
-        let rows = build_display_rows();
+    fn switching_scope_keeps_each_screens_place() {
+        let mut v = HealthView::new();
+        v.show(Scope::Tools);
+        assert!(v.nav_count > 2, "tools screen should have rows to move through");
+        v.cursor = 2;
+
+        v.show(Scope::Symlinks);
+        assert_eq!(v.scope, Scope::Symlinks);
+
+        v.show(Scope::Tools);
+        assert_eq!(v.cursor, 2, "returning to tools restores where the cursor was");
+    }
+
+    #[test]
+    fn dep_items_include_git_as_installed() {
+        let rows = build_display_rows(Scope::Tools);
         let git_row = rows.iter().find(|r| {
             matches!(r, DisplayRow::DepItem { dep, .. } if dep.bin == "git")
         });
@@ -491,26 +661,18 @@ mod tests {
     }
 
     #[test]
-    fn missing_dep_shows_as_not_installed() {
-        let rows = build_display_rows();
-        let any_dep_item = rows.iter().find(|r| matches!(r, DisplayRow::DepItem { .. }));
-        assert!(any_dep_item.is_some(), "should have at least one dep item");
-    }
-
-    #[test]
-    fn nav_cursor_never_on_section() {
-        let rows = build_display_rows();
-        let mut nav_idx = 0usize;
-        for row in &rows {
-            if is_navigable(row) {
+    fn nav_cursor_never_lands_on_a_heading() {
+        for scope in [Scope::Symlinks, Scope::Tools] {
+            for row in build_display_rows(scope).iter().filter(|r| is_navigable(r)) {
                 assert!(
-                    !matches!(row, DisplayRow::Section(_)),
-                    "navigable item {} is a Section",
-                    nav_idx
+                    !matches!(row, DisplayRow::SubSection(_)),
+                    "a heading was marked navigable in {scope:?}",
                 );
-                nav_idx += 1;
             }
         }
-        assert!(nav_idx > 0, "no navigable items found");
+        assert!(
+            build_display_rows(Scope::Tools).iter().any(is_navigable),
+            "tools should have navigable items",
+        );
     }
 }

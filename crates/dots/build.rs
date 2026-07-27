@@ -8,19 +8,24 @@
 //! 3. `CARGO_PKG_VERSION` — last-resort fallback (e.g. a tarball build, no git).
 //!
 //! A leading `v` is stripped so display code can add its own (`v{VERSION}`).
+//!
+//! Three vars are emitted, all read through `crate::version`:
+//! `DOTS_VERSION`, `DOTS_COMMIT` (short hash, empty when unknown), and
+//! `DOTS_VERSION_SOURCE` (which rule above won — shown in `--version`'s long
+//! form so a surprising version can be traced back to how it was resolved).
 
 use std::path::Path;
 use std::process::Command;
 
 fn main() {
-    let version = std::env::var("DOTS_VERSION")
-        .ok()
-        .filter(|v| !v.trim().is_empty())
-        .or_else(git_describe)
-        .unwrap_or_else(|| std::env::var("CARGO_PKG_VERSION").unwrap_or_default());
+    let cargo = std::env::var("CARGO_PKG_VERSION").unwrap_or_default();
 
+    let (version, source) = resolve(&cargo);
     let version = version.trim().trim_start_matches('v');
+
     println!("cargo:rustc-env=DOTS_VERSION={version}");
+    println!("cargo:rustc-env=DOTS_VERSION_SOURCE={source}");
+    println!("cargo:rustc-env=DOTS_COMMIT={}", commit().unwrap_or_default());
 
     // Rebuild when the checked-out commit/tag or the override changes.
     for p in ["../../.git/HEAD", "../../.git/packed-refs"] {
@@ -31,11 +36,35 @@ fn main() {
     println!("cargo:rerun-if-env-changed=DOTS_VERSION");
 }
 
-fn git_describe() -> Option<String> {
-    let out = Command::new("git")
-        .args(["describe", "--tags", "--always", "--match", "v*", "--dirty"])
-        .output()
-        .ok()?;
+/// Pick the version string and record which rule produced it.
+fn resolve(cargo: &str) -> (String, &'static str) {
+    if let Some(v) = std::env::var("DOTS_VERSION").ok().filter(|v| !v.trim().is_empty()) {
+        return (v, "env");
+    }
+
+    // `git describe` only yields a usable version when it actually found a tag.
+    // With `--always` and no tag in history it degrades to a bare commit hash,
+    // which must never become the version: it would compare as older than every
+    // release and put self-update into a permanent "update available" state.
+    // In that case keep the manifest version and append the hash as build
+    // metadata, which semver-ish comparison ignores.
+    match describe() {
+        Some(d) if d.starts_with('v') => (d, "git-tag"),
+        Some(hash) => (format!("{cargo}+g{hash}"), "git-untagged"),
+        None => (cargo.to_string(), "cargo"),
+    }
+}
+
+fn describe() -> Option<String> {
+    git(&["describe", "--tags", "--always", "--match", "v*", "--dirty"])
+}
+
+fn commit() -> Option<String> {
+    git(&["rev-parse", "--short", "HEAD"])
+}
+
+fn git(args: &[&str]) -> Option<String> {
+    let out = Command::new("git").args(args).output().ok()?;
     if !out.status.success() {
         return None;
     }

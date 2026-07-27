@@ -14,9 +14,11 @@ permissions:
   pages: write
   id-token: write
 
+# Queue deploys instead of cancelling them: a cancelled run can abort an
+# in-flight deployment and leave Pages serving a half-updated site.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -32,9 +34,15 @@ jobs:
 
       # Mirror the canonical root files into the published site: the installer
       # (so both raw.githubusercontent.com and <pages>/install.sh work) and the
-      # changelog (fetched at runtime by js/changelog.js).
+      # changelog (fetched at runtime by the /changelog command in js/content.js).
+      # index.html doubles as the 404 page so stale links to the pages this site
+      # used to have (docs.html, about.html, changelog.html) land on the terminal.
+      # PROMPT_SITE.md is internal authoring notes and is not published.
       - name: Stage root files
-        run: cp install.sh CHANGELOG.md site/
+        run: |
+          cp install.sh CHANGELOG.md site/
+          cp site/index.html site/404.html
+          rm -f site/PROMPT_SITE.md
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

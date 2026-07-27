@@ -16,8 +16,29 @@ permissions:
   contents: write
 
 jobs:
+  # Fail before any of the four builds start if the tag and the workspace
+  # manifest disagree. A mismatch is silent otherwise: the prebuilt binaries
+  # take their version from DOTS_VERSION, so only builds that fall back to the
+  # manifest (a source tarball with no git) would report the stale number.
+  verify-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tag must match Cargo.toml
+        run: |
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          manifest=$(sed -n 's/^version *= *"\(.*\)"/\1/p' Cargo.toml | head -1)
+          if [ "${tag#v}" != "$manifest" ]; then
+            echo "::error::tag $tag disagrees with Cargo.toml version $manifest"
+            echo "Bump [workspace.package] version in Cargo.toml (and Cargo.lock) to ${tag#v}, or retag."
+            exit 1
+          fi
+          echo "tag $tag matches Cargo.toml $manifest"
+
   build:
     name: ${{ matrix.os }}-${{ matrix.arch }}
+    needs: verify-version
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false

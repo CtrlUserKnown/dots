@@ -12,9 +12,9 @@ use crate::config::profile::{
     apply_personal_config, fetch_github_raw, generate_personal_config,
     load_from_value, personal_config_path, validate_personal_config,
 };
-use crate::tui::{draw_desc, draw_footer, draw_header, FlashKind};
+use crate::tui::{draw_desc, draw_key_bar, draw_screen_nav, FlashKind, Status};
 use crate::tui::app::{App, Screen};
-use crate::tui::theme::{style_dim, style_error, style_select};
+use crate::tui::theme::{style_action, style_error, style_key, style_muted, style_name, style_select};
 
 // ── state ─────────────────────────────────────────────────────────────────────
 
@@ -34,6 +34,11 @@ impl Default for ProfileView {
 }
 
 impl ProfileView {
+    /// True while an import path is being typed.
+    pub fn is_capturing(&self) -> bool {
+        !matches!(self.mode, ProfileMode::Normal)
+    }
+
     pub fn new() -> Self {
         Self { mode: ProfileMode::Normal, flash: None }
     }
@@ -47,20 +52,19 @@ impl ProfileView {
 // ── rendering ─────────────────────────────────────────────────────────────────
 
 pub fn render_profile(f: &mut Frame, area: Rect, _app: &App, view: &ProfileView) {
-    draw_header(f, area, " profile ", "");
+    draw_screen_nav(f, area, Screen::Profile);
     if area.height < 6 { return; }
 
     let path    = personal_config_path();
     let exists  = path.exists();
-    let sym     = if exists { "✓" } else { "✗" };
-    let sty     = if exists { style_select() } else { style_error() };
+    let status  = if exists { Status::Ok } else { Status::Pending };
     let path_label = home_rel(&path);
 
     // Row 2: status + path
     f.render_widget(
         Paragraph::new(Line::from(vec![
-            Span::styled(format!("{sym}  "), sty.add_modifier(Modifier::BOLD)),
-            Span::styled(path_label, style_dim()),
+            Span::styled(format!("{}  ", status.glyph()), status.style()),
+            Span::styled(path_label, style_muted()),
         ])),
         Rect { x: area.x + 2, y: area.y + 2, width: area.width.saturating_sub(4), height: 1 },
     );
@@ -77,7 +81,7 @@ pub fn render_profile(f: &mut Frame, area: Rect, _app: &App, view: &ProfileView)
                       + pkgs["dev"].as_array().map(|a| a.len()).unwrap_or(0);
                 let meta = format!("   generated {}  ·  {} packages  ·  dots {}", gen, n, dver);
                 f.render_widget(
-                    Paragraph::new(Line::from(Span::styled(meta, style_dim()))),
+                    Paragraph::new(Line::from(Span::styled(meta, style_muted()))),
                     Rect { x: area.x + 2, y: area.y + 3, width: area.width.saturating_sub(4), height: 1 },
                 );
             }
@@ -95,8 +99,8 @@ pub fn render_profile(f: &mut Frame, area: Rect, _app: &App, view: &ProfileView)
         if y + 4 >= area.y + area.height { break; }
         f.render_widget(
             Paragraph::new(Line::from(vec![
-                Span::styled(format!("{key}  "), style_select()),
-                Span::styled(*desc, style_dim()),
+                Span::styled(format!("{key}  "), style_key()),
+                Span::styled(*desc, style_action()),
             ])),
             Rect { x: area.x + 2, y, width: area.width.saturating_sub(4), height: 1 },
         );
@@ -112,7 +116,10 @@ pub fn render_profile(f: &mut Frame, area: Rect, _app: &App, view: &ProfileView)
         }
         ProfileMode::Normal => {
             draw_desc(f, area, "", view.flash.as_ref());
-            draw_footer(f, area, " g generate  i import file  G import GitHub  esc back  q quit ");
+            draw_key_bar(f, area, &[
+                ("g", "generate"), ("i", "import file"), ("G", "import GitHub"),
+                ("esc", "back"), ("q", "quit"),
+            ]);
         }
     }
 }
@@ -125,8 +132,8 @@ fn render_input(
     let desc_y = area.y + area.height.saturating_sub(4);
     f.render_widget(
         Paragraph::new(Line::from(vec![
-            Span::styled(format!("  {prompt} "), style_dim()),
-            Span::raw(format!("{input}█")),
+            Span::styled(format!("  {prompt} "), style_muted()),
+            Span::styled(format!("{input}█"), style_name()),
         ])),
         Rect { x: area.x, y: desc_y, width: area.width, height: 1 },
     );
@@ -135,7 +142,7 @@ fn render_input(
         let sty = match kind {
             FlashKind::Error   => style_error(),
             FlashKind::Success => style_select(),
-            FlashKind::Info    => style_dim().add_modifier(Modifier::BOLD),
+            FlashKind::Info    => style_muted().add_modifier(Modifier::BOLD),
         };
         let flash_y = desc_y.saturating_sub(1);
         f.render_widget(
@@ -143,7 +150,7 @@ fn render_input(
             Rect { x: area.x, y: flash_y, width: area.width, height: 1 },
         );
     }
-    draw_footer(f, area, " enter confirm  esc cancel ");
+    draw_key_bar(f, area, &[("enter", "confirm"), ("esc", "cancel")]);
 }
 
 // ── key handling ──────────────────────────────────────────────────────────────

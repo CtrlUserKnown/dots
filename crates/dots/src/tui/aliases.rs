@@ -2,7 +2,6 @@ use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     Frame,
     layout::Rect,
-    style::Modifier,
     text::{Line, Span},
     widgets::Paragraph,
 };
@@ -12,9 +11,9 @@ use crate::aliases::{
 };
 use crate::config::personal::personal_dir;
 use crate::config::settings::dots_dir;
-use crate::tui::{draw_desc, draw_footer, draw_header, FlashKind};
+use crate::tui::{draw_desc, draw_key_bar, draw_screen_nav, draw_top_bar, FlashKind};
 use crate::tui::app::{App, Screen};
-use crate::tui::theme::{style_dim, style_header, style_select};
+use crate::tui::theme::{style_muted, style_name, style_selected, style_text};
 
 // ── modes ─────────────────────────────────────────────────────────────────────
 
@@ -42,6 +41,12 @@ impl Default for AliasView {
 }
 
 impl AliasView {
+    /// True in any mode that consumes typed characters — the add/edit forms,
+    /// the search box, and the delete confirmation.
+    pub fn is_capturing(&self) -> bool {
+        !matches!(self.mode, AliasMode::List)
+    }
+
     pub fn new() -> Self {
         let mut v = Self {
             aliases: Vec::new(),
@@ -102,7 +107,7 @@ pub fn render_aliases(f: &mut Frame, area: Rect, _app: &App, view: &AliasView) {
 }
 
 fn render_list(f: &mut Frame, area: Rect, view: &AliasView) {
-    draw_header(f, area, " aliases ", "");
+    draw_screen_nav(f, area, Screen::Aliases);
     if area.height < 5 { return; }
 
     let visible_rows = (area.height as usize).saturating_sub(5);
@@ -112,7 +117,7 @@ fn render_list(f: &mut Frame, area: Rect, view: &AliasView) {
     f.render_widget(
         Paragraph::new(Line::from(Span::styled(
             format!("  {:<18} {:<36} {}", "NAME", "COMMAND", "TYPE"),
-            style_dim(),
+            style_muted(),
         ))),
         Rect { x: area.x + 2, y: area.y + 1, width: area.width.saturating_sub(4), height: 1 },
     );
@@ -126,20 +131,17 @@ fn render_list(f: &mut Frame, area: Rect, view: &AliasView) {
         let is_user = matches!(alias.source, AliasSource::User);
         let cursor  = if is_sel { "▶ " } else { "  " };
         let badge   = if is_user { "user" } else { "" };
-        let line    = format!(
-            "{cursor}{:<18} {:<36} {badge}",
-            truncate(&alias.name,  18),
-            truncate(&alias.value, 36),
-        );
-        let style = if is_sel {
-            style_select().add_modifier(Modifier::BOLD)
-        } else if is_user {
-            style_header()
-        } else {
-            ratatui::style::Style::default()
-        };
+
+        // Name is the column the eye scans, the command is supporting detail,
+        // and the source badge is right-aligned metadata.
+        let name_style = if is_sel { style_selected() } else { style_name() };
         f.render_widget(
-            Paragraph::new(Line::from(Span::styled(line, style))),
+            Paragraph::new(Line::from(vec![
+                Span::styled(cursor, if is_sel { style_selected() } else { style_muted() }),
+                Span::styled(format!("{:<18} ", truncate(&alias.name, 18)), name_style),
+                Span::styled(format!("{:<36} ", truncate(&alias.value, 36)), style_muted()),
+                Span::styled(badge.to_string(), style_muted()),
+            ])),
             Rect { x: area.x + 2, y, width: area.width.saturating_sub(4), height: 1 },
         );
     }
@@ -159,7 +161,10 @@ fn render_list(f: &mut Frame, area: Rect, view: &AliasView) {
         }
     };
     draw_desc(f, area, &desc, view.flash.as_ref());
-    draw_footer(f, area, " j/k navigate  a add  e edit  d delete (user)  / search  esc back  q quit ");
+    draw_key_bar(f, area, &[
+        ("j/k", "navigate"), ("a", "add"), ("e", "edit"), ("d", "delete"),
+        ("/", "search"), ("esc", "back"), ("q", "quit"),
+    ]);
 }
 
 fn render_form(
@@ -171,13 +176,13 @@ fn render_form(
     field: usize,
     flash: &Option<(String, FlashKind)>,
 ) {
-    draw_header(f, area, &format!(" {title} "), "");
+    draw_top_bar(f, area, title, "", &[("esc", "cancel")]);
 
     for (i, (label, text)) in [("Name", name), ("Value", value)].iter().enumerate() {
         let y       = area.y + 2 + i as u16 * 2;
         let is_sel  = i == field;
-        let l_style = if is_sel { style_select().add_modifier(Modifier::BOLD) } else { style_dim() };
-        let v_style = if is_sel { ratatui::style::Style::default().add_modifier(Modifier::BOLD) } else { ratatui::style::Style::default() };
+        let l_style = if is_sel { style_selected() } else { style_muted() };
+        let v_style = if is_sel { style_name() } else { style_text() };
         let cursor  = if is_sel { "▶ " } else { "  " };
         f.render_widget(
             Paragraph::new(Line::from(vec![
@@ -190,7 +195,9 @@ fn render_form(
     }
 
     draw_desc(f, area, "tab next  enter save", flash.as_ref());
-    draw_footer(f, area, " tab next  shift-tab prev  enter save  esc cancel ");
+    draw_key_bar(f, area, &[
+        ("tab", "next"), ("shift-tab", "prev"), ("enter", "save"), ("esc", "cancel"),
+    ]);
 }
 
 // ── key handling ──────────────────────────────────────────────────────────────

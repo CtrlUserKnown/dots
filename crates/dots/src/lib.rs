@@ -13,3 +13,5 @@ pub mod system;
 pub mod tui;
 pub mod update;
 pub mod user_packages;
+pub mod version;
+pub mod zones;

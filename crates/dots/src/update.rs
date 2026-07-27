@@ -19,7 +19,7 @@ use anyhow::{bail, Context, Result};
 /// `owner/repo` the releases are published under.
 const REPO: &str = "CtrlUserKnown/dots";
 /// Version baked in at build time by `build.rs` (git tag → git describe → Cargo).
-pub const CURRENT: &str = env!("DOTS_VERSION");
+pub use crate::version::VERSION as CURRENT;
 /// GitHub requires a User-Agent on every API request.
 const UA: &str = "dots-updater";
 

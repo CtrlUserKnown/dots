@@ -41,7 +41,18 @@ To remove it: [`uninstall.sh`](uninstall.sh).
 
 ## Usage
 
-Run `dots` with no arguments to open the TUI. The dashboard's panes — **Symlinks**, **Tools**, **Zsh**, **Configs**, **Update**, **Network** — drill into full-screen views for health checks, aliases, profile, theme, and settings. [Lua plugins](#plugins-lua) can add their own panes here.
+Run `dots` with no arguments to open the TUI. The dashboard's panes — **Symlinks**, **Tools**, **Configs**, **Plugins**, **Network** — each drill into their own screen with <kbd>enter</kbd>.
+
+Every screen carries the same nav strip, and you move between them from anywhere:
+
+| Key | Does |
+|---|---|
+| <kbd>1</kbd>–<kbd>6</kbd> | Jump straight to symlinks / tools / configs / aliases / profile / theme |
+| <kbd>[</kbd> <kbd>]</kbd> or <kbd>tab</kbd> | Previous / next screen, wrapping at both ends |
+| <kbd>esc</kbd> | Back to the dashboard |
+| <kbd>space</kbd> | Settings (a popup, including the update check) |
+
+A screen holding a prompt open — a search box, a path entry, a confirmation, the settings popup — keeps every key for itself, so navigation never fires mid-edit. [Lua plugins](#plugins-lua) can add their own panes, and the whole thing is rearrangeable into [zones](#dashboard-layout-zones) you define.
 
 Everything is also scriptable via subcommands:
 
@@ -61,8 +72,9 @@ Everything is also scriptable via subcommands:
 | `dots profile import <path>` | Import a `personal.json` from a local file |
 | `dots profile import-git <user/repo/path.json>` | Import a `personal.json` from GitHub |
 | `dots plugins list \| new <name> \| dir` | Manage [Lua plugins](#plugins-lua) that add dashboard panes |
+| `dots layout show \| init [--force] \| path` | Inspect or scaffold the [dashboard layout](#dashboard-layout-zones) |
 | `dots init [--quiet]` | Initialize config (idempotent; run automatically by the installer) |
-| `dots --version` | Print the version |
+| `dots -V` / `dots --version` | Print the version; `--version` adds the commit and how the version was resolved |
 
 ### Dependencies
 
@@ -89,6 +101,46 @@ The dependency list is defined in [`crates/dots/src/packages.rs`](crates/dots/sr
 
 - `~/.personal/` — your personal, machine-local layer: `aliases.zsh` (sourced after the built-in aliases), `apps/`, and an optional `config.toml` that overrides `settings.toml`.
 
+## Dashboard layout (zones)
+
+The dashboard is a set of **zones**, each holding an ordered list of **widgets**. A widget is either a built-in tile — `symlinks`, `tools`, `configs`, `plugins`, `network` — or a pane registered by a [Lua plugin](#plugins-lua). Zones are yours to arrange: `dots layout init` writes the current layout to `~/.dots/layout.toml`, and `dots layout show` prints where every widget ended up (plugins included) without opening the TUI.
+
+With no layout file you get the default — one untitled zone holding the five built-ins in two columns, exactly the dashboard dots has always drawn. Delete `layout.toml` to return to it.
+
+| Key | Scope | Meaning |
+|---|---|---|
+| `columns` | top level | Columns that zones are arranged in |
+| `id` | zone | Stable name — what `ui.pane{ zone = … }` targets |
+| `title` | zone | Draws a labelled border around the zone; omit for an invisible region |
+| `span` | zone | Top-level columns the zone occupies |
+| `weight` | zone | Zone height, relative to the other zones |
+| `columns` | zone | Columns the zone's own widgets are arranged in |
+| `widgets` | zone | Widget ids, in draw order |
+| `catch_all` | zone | Plugin panes that name no zone land here |
+
+```toml
+columns = 2
+
+[[zones]]
+id      = "system"
+title   = "System"
+span    = 2          # full width
+weight  = 2          # twice the height of the row below
+columns = 3          # three tiles across
+widgets = ["symlinks", "tools", "configs"]
+
+[[zones]]
+id        = "cloud"
+widgets   = ["github"]   # a plugin pane, pinned by its id
+catch_all = true         # …and anything else a plugin registers
+
+[[zones]]
+id      = "misc"
+widgets = ["network"]
+```
+
+Listing a plugin pane in `widgets` pins it there and overrides the pane's own `zone` hint — your file always wins. Anything that can't be placed (a typo'd id, a pane naming a zone that doesn't exist) is reported by `dots layout show` and skipped rather than silently dropped.
+
 ## Plugins (Lua)
 
 Drop `*.lua` files in `~/.dots/plugins/` to add your own panes to the dashboard — GitHub, AWS, or anything a shell command can report. Plugins are loaded at startup, run on the TUI thread, and each pane refreshes on its own interval. A plugin that fails to load is reported by `dots plugins list` and skipped; it never crashes the TUI.
@@ -100,7 +152,8 @@ Scaffold one with `dots plugins new <name>`, then edit it. Two globals are avail
 | Call | Purpose |
 |---|---|
 | `ui.pane{ … }` | Register a dashboard pane (see fields below) |
-| `ui.layout{ columns = N }` | Set the dashboard's column count (default 2) |
+| `ui.zone{ … }` | Declare a [zone](#dashboard-layout-zones) for panes to live in — same keys as a `layout.toml` zone (`id` required, `size` for its weight) |
+| `ui.layout{ columns = N }` | Set the tile column count, honoured while you have no `layout.toml` of your own |
 
 `ui.pane` fields — `render` is the only one you always want:
 
@@ -110,9 +163,12 @@ Scaffold one with `dots plugins new <name>`, then edit it. Two globals are avail
 | `title` | `id` | Pane title |
 | `render` | — | `function() → lines` returning a string (split on newlines) or a table of strings |
 | `size` | `1` | Row-height weight — **`2` makes the pane twice as tall** |
-| `span` | `1` | Columns spanned — **`2` makes it full-width in a 2-col grid** |
+| `span` | `1` | Columns spanned — **`2` makes it full-width in a 2-col zone** |
+| `zone` | catch-all | Which [zone](#dashboard-layout-zones) the pane belongs in |
 | `refresh` | `30` | Seconds between `render()` calls |
 | `on_enter` | — | `function()` run when the pane is selected with <kbd>enter</kbd> / click |
+
+A zone a plugin declares is a suggestion: if your `layout.toml` already defines that `id`, yours is used unchanged.
 
 **`dots`** — helpers for integrations:
 
@@ -141,7 +197,7 @@ Ready-to-use examples live in [`examples/plugins/`](examples/plugins/) (`github.
 
 A Cargo workspace with two crates:
 
-- [`crates/dots/`](crates/dots/) — the `dots` binary: CLI, TUI screens, installer, symlink/link engine, config, the [Lua plugin host](crates/dots/src/plugins/), and bundled premade `assets/`.
+- [`crates/dots/`](crates/dots/) — the `dots` binary: CLI, TUI screens, installer, symlink/link engine, config, the [Lua plugin host](crates/dots/src/plugins/), the [zone layout](crates/dots/src/zones.rs), and bundled premade `assets/`.
 - [`crates/tui-core/`](crates/tui-core/) — shared TUI chrome (header/footer/description bars, color theme, flash model) used by the `dots` screens.
 
 ## Development

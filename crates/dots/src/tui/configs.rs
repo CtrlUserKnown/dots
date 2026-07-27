@@ -10,7 +10,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     Frame,
     layout::Rect,
-    style::{Modifier, Style},
+    style::Style,
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
 };
@@ -18,8 +18,12 @@ use ratatui::{
 use crate::configs::{self, Config, ConfigStatus};
 use crate::symlinks::{self, SymlinkStatus};
 use crate::tui::app::{App, Screen};
-use crate::tui::theme::{style_dim, style_error, style_header, style_select, style_warn};
-use crate::tui::{draw_desc, draw_footer, draw_header, FlashKind};
+use crate::tui::theme::{
+    style_block_title, style_block_title_focus, style_border, style_border_focus, style_muted,
+    style_name, style_ok, style_selected, style_text, style_warn_soft, DOT_OK, DOT_PARTIAL,
+    DOT_PENDING,
+};
+use crate::tui::{draw_desc, draw_key_bar, draw_screen_nav, FlashKind, Status};
 
 // ── view state ────────────────────────────────────────────────────────────────
 
@@ -85,6 +89,12 @@ impl ConfigsView {
 
     fn selected(&self) -> Option<&Config> {
         self.configs.get(self.cursor)
+    }
+
+    /// True while the add-path prompt or the file pager is open, both of which
+    /// consume keys that would otherwise navigate between screens.
+    pub fn is_capturing(&self) -> bool {
+        self.adding.is_some() || self.pager.is_some()
     }
 
     /// Number of file rows for the selected config.
@@ -196,40 +206,44 @@ fn counts(configs: &[Config]) -> Counts {
 
 fn status_style(s: ConfigStatus) -> Style {
     match s {
-        ConfigStatus::Installed    => style_select(),
-        ConfigStatus::Partial      => style_warn(),
-        ConfigStatus::NotInstalled => style_dim(),
-        ConfigStatus::Empty        => style_dim(),
+        ConfigStatus::Installed    => style_ok(),
+        ConfigStatus::Partial      => style_warn_soft(),
+        ConfigStatus::NotInstalled => style_muted(),
+        ConfigStatus::Empty        => style_muted(),
     }
 }
 
 // ── rendering ─────────────────────────────────────────────────────────────────
 
 pub fn render(f: &mut Frame, area: Rect, _app: &App, view: &ConfigsView) {
-    draw_header(f, area, " configs ", "");
+    draw_screen_nav(f, area, Screen::Configs);
     if area.height < 6 { return; }
 
-    // Summary line.
+    // Summary line: counts keep their status colors, separators recede.
     let c = counts(&view.configs);
+    let dot = Span::styled("  ·  ", style_muted());
     let summary = Line::from(vec![
-        Span::styled(format!("{} configs", c.total), style_header()),
-        Span::raw("  ·  "),
-        Span::styled(format!("{} installed", c.installed), style_select()),
-        Span::raw("  ·  "),
-        Span::styled(format!("{} partial", c.partial), style_warn()),
-        Span::raw("  ·  "),
-        Span::styled(format!("{} missing", c.missing), style_dim()),
+        Span::styled(format!("{} configs", c.total), style_text()),
+        dot.clone(),
+        Span::styled(format!("{DOT_OK} {} installed", c.installed), style_ok()),
+        dot.clone(),
+        Span::styled(format!("{DOT_PARTIAL} {} partial", c.partial), style_warn_soft()),
+        dot,
+        Span::styled(format!("{DOT_PENDING} {} missing", c.missing), style_muted()),
     ]);
     f.render_widget(
         Paragraph::new(summary),
         Rect { x: area.x + 1, y: area.y + 1, width: area.width.saturating_sub(2), height: 1 },
     );
 
+    // Body runs from under the summary down to the row above the desc bar
+    // (which lives at height-4), so the files column's rule stops short of it.
+    let body_top = area.y + 3;
     let body = Rect {
         x:      area.x + 1,
-        y:      area.y + 3,
+        y:      body_top,
         width:  area.width.saturating_sub(2),
-        height: area.height.saturating_sub(3 + 3), // leave desc+footer room
+        height: (area.y + area.height).saturating_sub(4 + body_top),
     };
 
     if view.configs.is_empty() {
@@ -258,13 +272,18 @@ pub fn render(f: &mut Frame, area: Rect, _app: &App, view: &ConfigsView) {
         draw_desc(f, area, &where_from, view.flash.as_ref());
     }
 
-    let footer = match view.focus {
-        _ if view.adding.is_some() => " type a path  enter add  esc cancel ",
-        _ if view.pager.is_some()  => " j/k scroll  esc close ",
-        Focus::List  => " j/k move  space install/remove  a add  s sync  l/→ files  r rescan  q quit ",
-        Focus::Files => " j/k move  v/enter view file  h/← back  esc back  q quit ",
+    let footer: &[(&str, &str)] = match view.focus {
+        _ if view.adding.is_some() => &[("type a path", ""), ("enter", "add"), ("esc", "cancel")],
+        _ if view.pager.is_some()  => &[("j/k", "scroll"), ("esc", "close")],
+        Focus::List => &[
+            ("j/k", "move"), ("space", "install/remove"), ("a", "add"), ("s", "sync"),
+            ("l/→", "files"), ("r", "rescan"), ("q", "quit"),
+        ],
+        Focus::Files => &[
+            ("j/k", "move"), ("v/enter", "view file"), ("h/←", "back"), ("esc", "back"), ("q", "quit"),
+        ],
     };
-    draw_footer(f, area, footer);
+    draw_key_bar(f, area, footer);
 
     // Pager overlay sits on top of everything.
     if let Some(pager) = &view.pager {
@@ -275,12 +294,12 @@ pub fn render(f: &mut Frame, area: Rect, _app: &App, view: &ConfigsView) {
 fn render_empty(f: &mut Frame, area: Rect, view: &ConfigsView) {
     let msg = match &view.root {
         Some(root) => vec![
-            Line::from(Span::styled(format!("No config directories in {}", home_rel(root)), style_dim())),
-            Line::from(Span::styled("Add a directory per app (e.g. nvim/, git/) to populate this list.", style_dim())),
+            Line::from(Span::styled(format!("No config directories in {}", home_rel(root)), style_muted())),
+            Line::from(Span::styled("Add a directory per app (e.g. nvim/, git/) to populate this list.", style_muted())),
         ],
         None => vec![
-            Line::from(Span::styled("No dotfiles configs directory found.", style_dim())),
-            Line::from(Span::styled("Pull a repo with 'dots gc -u=<user/repo>', or press 'a' to add a config.", style_dim())),
+            Line::from(Span::styled("No dotfiles configs directory found.", style_muted())),
+            Line::from(Span::styled("Pull a repo with 'dots gc -u=<user/repo>', or press 'a' to add a config.", style_muted())),
         ],
     };
     f.render_widget(Paragraph::new(msg), Rect { x: area.x + 1, y: area.y, width: area.width.saturating_sub(1), height: 2 });
@@ -303,11 +322,11 @@ fn render_list(f: &mut Frame, area: Rect, view: &ConfigsView) {
         let name = truncate(&cfg.name, name_field);
         let pad  = name_field.saturating_sub(name.chars().count());
 
-        let name_style = if sel { Style::default().add_modifier(Modifier::BOLD) } else { Style::default() };
+        let name_style = if sel { style_selected() } else { style_name() };
         let line = Line::from(vec![
-            Span::styled(cursor, if sel { style_select() } else { style_dim() }),
+            Span::styled(cursor, if sel { style_selected() } else { style_muted() }),
             Span::styled(name, name_style),
-            Span::raw(" ".repeat(pad + 1)),
+            Span::styled(" ".repeat(pad + 1), style_muted()),
             Span::styled(badge, bstyle),
         ]);
         f.render_widget(
@@ -319,18 +338,22 @@ fn render_list(f: &mut Frame, area: Rect, view: &ConfigsView) {
 
 fn render_detail(f: &mut Frame, area: Rect, view: &ConfigsView) {
     let active = view.focus == Focus::Files && view.pager.is_none();
-    let title_style = if active { style_select() } else { style_header() };
+    // A single left rule rather than a full box: the file list is a companion
+    // column to the config list, not a separate panel.
     let block = Block::default()
         .borders(Borders::LEFT)
-        .border_style(style_dim())
-        .title(Span::styled(" files ", title_style.add_modifier(Modifier::BOLD)));
+        .border_style(if active { style_border_focus() } else { style_border() })
+        .title(Span::styled(
+            " files ",
+            if active { style_block_title_focus() } else { style_block_title() },
+        ));
     let inner = block.inner(area);
     f.render_widget(block, area);
 
     let Some(cfg) = view.selected() else { return };
     if cfg.links.is_empty() {
         f.render_widget(
-            Paragraph::new(Line::from(Span::styled("(no linkable files)", style_dim()))),
+            Paragraph::new(Line::from(Span::styled("(no linkable files)", style_muted()))),
             Rect { x: inner.x + 1, y: inner.y, width: inner.width.saturating_sub(1), height: 1 },
         );
         return;
@@ -341,18 +364,18 @@ fn render_detail(f: &mut Frame, area: Rect, view: &ConfigsView) {
         let link   = &cfg.links[i];
         let st     = symlinks::check(link);
         let sel    = active && i == view.file_cursor;
-        let (mark, mstyle) = match st {
-            SymlinkStatus::Ok => ("✓", style_select()),
-            SymlinkStatus::Missing => ("·", style_dim()),
-            _ => ("✗", style_error()),
+        let status = match st {
+            SymlinkStatus::Ok => Status::Ok,
+            SymlinkStatus::Missing => Status::Pending,
+            _ => Status::Bad,
         };
         let cursor = if sel { "▶ " } else { "  " };
         let rel    = rel_to(&cfg.dir, &link.target);
         let name   = truncate(&rel, inner.width.saturating_sub(5) as usize);
         let line = Line::from(vec![
-            Span::styled(cursor, style_select()),
-            Span::styled(format!("{mark} "), mstyle),
-            Span::styled(name, if sel { Style::default().add_modifier(Modifier::BOLD) } else { Style::default() }),
+            Span::styled(cursor, style_selected()),
+            Span::styled(format!("{} ", status.glyph()), status.style()),
+            Span::styled(name, if sel { style_selected() } else { style_name() }),
         ]);
         f.render_widget(
             Paragraph::new(line),
@@ -371,11 +394,8 @@ fn render_pager(f: &mut Frame, area: Rect, pager: &Pager) {
         width: w,
         height: h,
     };
-    let title = format!(" {} ", truncate(&pager.title, w.saturating_sub(4) as usize));
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(style_header())
-        .title(Span::styled(title, style_header().add_modifier(Modifier::BOLD)));
+    let title = truncate(&pager.title, w.saturating_sub(4) as usize);
+    let block = tui_core::block(&title, true);
     let inner = block.inner(box_rect);
     // Clear behind the box so underlying content doesn't bleed through.
     f.render_widget(ratatui::widgets::Clear, box_rect);
@@ -395,7 +415,7 @@ fn render_pager(f: &mut Frame, area: Rect, pager: &Pager) {
         let plen  = pos.len() as u16;
         let px    = box_rect.x + box_rect.width.saturating_sub(plen + 2);
         f.render_widget(
-            Paragraph::new(Line::from(Span::styled(pos, style_dim()))),
+            Paragraph::new(Line::from(Span::styled(pos, style_muted()))),
             Rect { x: px, y: box_rect.y + box_rect.height - 1, width: plen, height: 1 },
         );
     }

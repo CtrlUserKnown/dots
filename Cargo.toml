@@ -3,7 +3,10 @@ resolver = "2"
 members = ["crates/tui-core", "crates/dots"]
 
 [workspace.package]
-version = "2.0.0"
+# The version under development — the release workflow refuses to build a tag
+# that disagrees with this, so the fallback baked into a no-git tarball build
+# can never drift behind the real releases again.
+version = "2.3.0"
 edition = "2021"
 
 [workspace.dependencies]

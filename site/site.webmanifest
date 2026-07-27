@@ -2,7 +2,7 @@
   "name": "dots",
   "short_name": "dots",
   "description": "A fast, cross-platform dotfiles manager with an interactive TUI, written in Rust.",
-  "start_url": "/dots/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#1a1a1a",
   "theme_color": "#1a1a1a",

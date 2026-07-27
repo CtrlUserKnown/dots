@@ -5,17 +5,20 @@ use ratatui::{
     layout::Rect,
     style::Modifier,
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::{Clear, Paragraph},
 };
 use std::path::Path;
 
 use crate::config::settings::{self, dots_dir, Settings};
 use crate::tui::update::UpdateScreen;
-use crate::tui::{draw_desc, draw_footer, draw_header, FlashKind};
+use crate::tui::{draw_desc, draw_key_bar, draw_screen_nav, FlashKind};
 use crate::tui::app::{App, Screen};
-use crate::tui::theme::{style_dim, style_error, style_header, style_select};
+use crate::tui::theme::{
+    style_error, style_key, style_muted, style_name, style_ok, style_select, style_selected,
+    style_text, style_warn_soft,
+};
 
-const VERSION: &str = env!("DOTS_VERSION");
+use crate::version::VERSION;
 
 // ── frequency cycle ───────────────────────────────────────────────────────────
 
@@ -143,7 +146,7 @@ fn bool_display(v: bool) -> (String, bool) {
 /// (the dashboard), mirroring ssm's which-key popup: a small bordered box,
 /// cleared and drawn in the bottom-right, rather than a full-screen takeover.
 pub fn render_settings(f: &mut Frame, area: Rect, app: &App, view: &SettingsView, update: &UpdateScreen) {
-    let title = format!(" settings v{VERSION} ");
+    let title = format!("settings v{VERSION}");
     let hint  = "space/enter toggle  esc back  q quit";
 
     let rows: Vec<(String, String, bool)> = view.fields.iter().map(|&k| {
@@ -169,13 +172,8 @@ pub fn render_settings(f: &mut Frame, area: Rect, app: &App, view: &SettingsView
     let rect = Rect { x, y, width: box_w, height: box_h };
 
     f.render_widget(Clear, rect);
-    f.render_widget(
-        Block::default()
-            .borders(Borders::ALL)
-            .border_style(style_header())
-            .title(Span::styled(title, style_header())),
-        rect,
-    );
+    // The popup is what the user is acting on, so it draws as focused chrome.
+    f.render_widget(tui_core::block(&title, true), rect);
 
     let inner_x = rect.x + 2;
     let inner_w = rect.width.saturating_sub(3);
@@ -185,14 +183,14 @@ pub fn render_settings(f: &mut Frame, area: Rect, app: &App, view: &SettingsView
         let is_sel = i == view.cursor;
         let cursor = if is_sel { "▶" } else { " " };
 
-        let cursor_style = if is_sel { style_select().add_modifier(Modifier::BOLD) } else { style_dim() };
-        let label_style  = if is_sel { ratatui::style::Style::default().add_modifier(Modifier::BOLD) } else { ratatui::style::Style::default() };
+        let cursor_style = if is_sel { style_selected() } else { style_muted() };
+        let label_style  = if is_sel { style_selected() } else { style_name() };
         let val_style    = if val.is_empty() {
-            style_header()
+            style_muted()
         } else if *pos {
-            style_select()
+            style_ok()
         } else {
-            style_error()
+            style_warn_soft()
         };
 
         f.render_widget(
@@ -212,13 +210,13 @@ pub fn render_settings(f: &mut Frame, area: Rect, app: &App, view: &SettingsView
         Some((msg, kind)) => (msg.clone(), match kind {
             FlashKind::Success => style_select(),
             FlashKind::Error   => style_error(),
-            FlashKind::Info    => style_dim().add_modifier(Modifier::BOLD),
+            FlashKind::Info    => style_muted().add_modifier(Modifier::BOLD),
         }),
         None => {
             let desc = view.fields.get(view.cursor).copied()
                 .map(|k| field_desc(k, app, update))
                 .unwrap_or_default();
-            (desc, style_dim())
+            (desc, style_muted())
         }
     };
     f.render_widget(
@@ -227,7 +225,7 @@ pub fn render_settings(f: &mut Frame, area: Rect, app: &App, view: &SettingsView
     );
 
     f.render_widget(
-        Paragraph::new(Line::from(Span::styled(hint, style_dim()))),
+        Paragraph::new(Line::from(Span::styled(hint, style_key()))),
         Rect { x: inner_x, y: desc_y + 1, width: inner_w, height: 1 },
     );
 }
@@ -328,18 +326,21 @@ impl ThemeView {
 }
 
 pub fn render_theme(f: &mut Frame, area: Rect, _app: &App, view: &ThemeView) {
-    draw_header(f, area, " theme ", "");
+    draw_screen_nav(f, area, Screen::Theme);
 
     if view.themes.is_empty() {
         let rect = Rect { x: area.x + 2, y: area.y + 2, width: area.width.saturating_sub(4), height: 2 };
         f.render_widget(
             Paragraph::new(vec![
-                Line::from("Ghostty is not installed — theme picker requires Ghostty."),
-                Line::from(Span::styled("Press esc to go back.", style_dim())),
+                Line::from(Span::styled(
+                    "Ghostty is not installed — theme picker requires Ghostty.",
+                    style_text(),
+                )),
+                Line::from(Span::styled("Press esc to go back.", style_muted())),
             ]),
             rect,
         );
-        draw_footer(f, area, " esc back  q quit ");
+        draw_key_bar(f, area, &[("esc", "back"), ("q", "quit")]);
         return;
     }
 
@@ -357,15 +358,18 @@ pub fn render_theme(f: &mut Frame, area: Rect, _app: &App, view: &ThemeView) {
         if is_sel {
             f.render_widget(
                 Paragraph::new(Line::from(vec![
-                    Span::styled(cursor, style_select().add_modifier(Modifier::BOLD)),
-                    Span::styled(format!(" {theme}{suffix}"), ratatui::style::Style::default().add_modifier(Modifier::BOLD)),
+                    Span::styled(cursor, style_selected()),
+                    Span::styled(format!(" {theme}"), style_selected()),
+                    Span::styled(suffix.to_string(), style_muted()),
                 ])),
                 rect,
             );
         } else {
-            let style = if is_cur { style_dim() } else { ratatui::style::Style::default() };
             f.render_widget(
-                Paragraph::new(Line::from(Span::styled(format!("   {theme}{suffix}"), style))),
+                Paragraph::new(Line::from(vec![
+                    Span::styled(format!("   {theme}"), if is_cur { style_ok() } else { style_text() }),
+                    Span::styled(suffix.to_string(), style_muted()),
+                ])),
                 rect,
             );
         }
@@ -373,7 +377,9 @@ pub fn render_theme(f: &mut Frame, area: Rect, _app: &App, view: &ThemeView) {
 
     let desc = format!("enter to apply  current: {}", view.current);
     draw_desc(f, area, &desc, view.flash.as_ref());
-    draw_footer(f, area, " j/k navigate  enter apply  esc back  q quit ");
+    draw_key_bar(f, area, &[
+        ("j/k", "navigate"), ("enter", "apply"), ("esc", "back"), ("q", "quit"),
+    ]);
 }
 
 pub fn handle_theme_key(app: &mut App, view: &mut ThemeView, key: KeyEvent) {

@@ -6,7 +6,10 @@
 //!
 //! * **`ui`** — the UI package. `ui.pane{…}` adds a dashboard pane (with a
 //!   `size` height-weight and `span` column-width, so a plugin can make its
-//!   pane bigger); `ui.layout{ columns = N }` sets the grid's column count.
+//!   pane bigger, and a `zone` naming which region of the dashboard it belongs
+//!   in); `ui.zone{…}` declares a zone for panes to land in, for plugins that
+//!   want their own region rather than a tile in the user's; `ui.layout{
+//!   columns = N }` sets the grid's column count.
 //! * **`dots`** — integration helpers. `dots.sh(cmd)` runs a shell command and
 //!   returns its trimmed stdout (this is what drives `gh`, `aws`, …);
 //!   `dots.env(name)` and `dots.dir()` expose the environment and the `~/.dots`
@@ -42,6 +45,9 @@ pub fn plugins_dir() -> PathBuf {
 struct PaneState {
     id: String,
     title: String,
+    /// The zone this pane asked for, if any. Unset means "wherever the layout's
+    /// catch-all zone is".
+    zone: Option<String>,
     span: u16,
     weight: u16,
     refresh: Duration,
@@ -57,6 +63,9 @@ struct PaneState {
 pub struct PluginPaneView {
     pub id: String,
     pub title: String,
+    /// Zone this pane asked for; see [`crate::zones::resolve`] for how it is
+    /// honoured (and what happens when it names a zone nobody defined).
+    pub zone: Option<String>,
     pub span: u16,
     pub weight: u16,
     pub lines: Vec<String>,
@@ -75,8 +84,16 @@ pub struct PluginInfo {
 pub struct PluginHost {
     lua: Lua,
     panes: Vec<PaneState>,
+    zones: Vec<crate::zones::Zone>,
     columns: Option<u16>,
     infos: Vec<PluginInfo>,
+}
+
+/// The mutable state the Lua API writes into while plugins load.
+#[derive(Default)]
+struct Collector {
+    panes: Vec<PaneState>,
+    zones: Vec<crate::zones::Zone>,
 }
 
 impl PluginHost {
@@ -84,7 +101,7 @@ impl PluginHost {
     /// errors are captured per-file in [`PluginHost::plugins`].
     pub fn load() -> Self {
         let lua = Lua::new();
-        let collector: Rc<RefCell<Vec<PaneState>>> = Rc::new(RefCell::new(Vec::new()));
+        let collector: Rc<RefCell<Collector>> = Rc::new(RefCell::new(Collector::default()));
         let columns: Rc<Cell<Option<u16>>> = Rc::new(Cell::new(None));
 
         if let Err(e) = install_api(&lua, &collector, &columns) {
@@ -92,6 +109,7 @@ impl PluginHost {
             return Self {
                 lua,
                 panes: Vec::new(),
+                zones: Vec::new(),
                 columns: None,
                 infos: vec![PluginInfo { name: "<api>".into(), pane_ids: vec![], error: Some(e.to_string()) }],
             };
@@ -109,11 +127,11 @@ impl PluginHost {
 
         for path in files {
             let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("plugin").to_string();
-            let before = collector.borrow().len();
+            let before = collector.borrow().panes.len();
             let info = match std::fs::read_to_string(&path) {
                 Ok(code) => match lua.load(&code).set_name(&name).exec() {
                     Ok(()) => {
-                        let ids = collector.borrow()[before..].iter().map(|p| p.id.clone()).collect();
+                        let ids = collector.borrow().panes[before..].iter().map(|p| p.id.clone()).collect();
                         PluginInfo { name, pane_ids: ids, error: None }
                     }
                     Err(e) => PluginInfo { name, pane_ids: vec![], error: Some(e.to_string()) },
@@ -123,8 +141,15 @@ impl PluginHost {
             infos.push(info);
         }
 
-        let panes = std::mem::take(&mut *collector.borrow_mut());
-        Self { lua, panes, columns: columns.get(), infos }
+        let Collector { panes, zones } = std::mem::take(&mut *collector.borrow_mut());
+        Self { lua, panes, zones, columns: columns.get(), infos }
+    }
+
+    /// Zones plugins declared via `ui.zone{…}`, in declaration order. The
+    /// user's `layout.toml` wins on id collisions — see
+    /// [`crate::zones::Layout::merge_plugin_zones`].
+    pub fn zones(&self) -> &[crate::zones::Zone] {
+        &self.zones
     }
 
     /// Number of registered panes.
@@ -167,6 +192,7 @@ impl PluginHost {
             .map(|p| PluginPaneView {
                 id: p.id.clone(),
                 title: p.title.clone(),
+                zone: p.zone.clone(),
                 span: p.span,
                 weight: p.weight,
                 lines: p.lines.clone(),
@@ -235,7 +261,7 @@ fn first_line(s: &str) -> String {
 /// Install the `ui` and `dots` global tables into `lua`.
 fn install_api(
     lua: &Lua,
-    collector: &Rc<RefCell<Vec<PaneState>>>,
+    collector: &Rc<RefCell<Collector>>,
     columns: &Rc<Cell<Option<u16>>>,
 ) -> mlua::Result<()> {
     let globals = lua.globals();
@@ -248,8 +274,9 @@ fn install_api(
         let id: String = spec
             .get::<Option<String>>("id")?
             .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| format!("pane{}", sink.borrow().len() + 1));
+            .unwrap_or_else(|| format!("pane{}", sink.borrow().panes.len() + 1));
         let title: String = spec.get::<Option<String>>("title")?.unwrap_or_else(|| id.clone());
+        let zone = spec.get::<Option<String>>("zone")?.filter(|s| !s.is_empty());
         let span = spec.get::<Option<u16>>("span")?.unwrap_or(1).max(1);
         let weight = spec.get::<Option<u16>>("size")?.unwrap_or(1).max(1);
         let refresh = spec.get::<Option<u64>>("refresh")?.unwrap_or(DEFAULT_REFRESH).max(1);
@@ -263,9 +290,10 @@ fn install_api(
             None => None,
         };
 
-        sink.borrow_mut().push(PaneState {
+        sink.borrow_mut().panes.push(PaneState {
             id,
             title,
+            zone,
             span,
             weight,
             refresh: Duration::from_secs(refresh),
@@ -277,6 +305,27 @@ fn install_api(
         Ok(())
     })?;
     ui.set("pane", pane)?;
+
+    // `ui.zone{ id = "…", … }` — declare a region of the dashboard. Purely a
+    // suggestion: a zone the user's layout.toml already defines wins, so a
+    // plugin can never rearrange a dashboard its owner has laid out by hand.
+    let sink = Rc::clone(collector);
+    let zone = lua.create_function(move |_, spec: mlua::Table| {
+        let Some(id) = spec.get::<Option<String>>("id")?.filter(|s| !s.is_empty()) else {
+            return Err(mlua::Error::runtime("ui.zone requires a non-empty `id`"));
+        };
+        sink.borrow_mut().zones.push(crate::zones::Zone {
+            id,
+            title: spec.get::<Option<String>>("title")?.filter(|s| !s.is_empty()),
+            span: spec.get::<Option<u16>>("span")?.unwrap_or(1).max(1),
+            weight: spec.get::<Option<u16>>("size")?.unwrap_or(1).max(1),
+            columns: spec.get::<Option<u16>>("columns")?.unwrap_or(1).max(1),
+            widgets: spec.get::<Option<Vec<String>>>("widgets")?.unwrap_or_default(),
+            catch_all: spec.get::<Option<bool>>("catch_all")?.unwrap_or(false),
+        });
+        Ok(())
+    })?;
+    ui.set("zone", zone)?;
 
     let cols = Rc::clone(columns);
     let layout = lua.create_function(move |_, spec: mlua::Table| {
@@ -319,15 +368,15 @@ mod tests {
     /// Build a host from Lua source directly (bypassing the plugins dir).
     fn host_from(src: &str) -> PluginHost {
         let lua = Lua::new();
-        let collector: Rc<RefCell<Vec<PaneState>>> = Rc::new(RefCell::new(Vec::new()));
+        let collector: Rc<RefCell<Collector>> = Rc::new(RefCell::new(Collector::default()));
         let columns: Rc<Cell<Option<u16>>> = Rc::new(Cell::new(None));
         install_api(&lua, &collector, &columns).unwrap();
         let info = match lua.load(src).set_name("test").exec() {
             Ok(()) => PluginInfo { name: "test".into(), pane_ids: vec![], error: None },
             Err(e) => PluginInfo { name: "test".into(), pane_ids: vec![], error: Some(e.to_string()) },
         };
-        let panes = std::mem::take(&mut *collector.borrow_mut());
-        PluginHost { lua, panes, columns: columns.get(), infos: vec![info] }
+        let Collector { panes, zones } = std::mem::take(&mut *collector.borrow_mut());
+        PluginHost { lua, panes, zones, columns: columns.get(), infos: vec![info] }
     }
 
     #[test]
@@ -397,5 +446,47 @@ mod tests {
         assert_eq!(v.weight, 1);
         assert_eq!(v.id, "pane1");
         assert_eq!(v.title, "pane1");
+        assert_eq!(v.zone, None, "an unplaced pane goes to the catch-all zone");
+    }
+
+    #[test]
+    fn a_pane_can_name_its_zone() {
+        let h = host_from(r#"ui.pane{ id="gh", zone="side", render = function() return "x" end }"#);
+        assert_eq!(h.views()[0].zone.as_deref(), Some("side"));
+    }
+
+    #[test]
+    fn an_empty_zone_name_is_treated_as_unset() {
+        let h = host_from(r#"ui.pane{ id="gh", zone="" }"#);
+        assert_eq!(h.views()[0].zone, None);
+    }
+
+    #[test]
+    fn declares_a_zone() {
+        let h = host_from(
+            r#"ui.zone{ id="side", title="Cloud", span=2, size=3, columns=2, widgets={"network"} }"#,
+        );
+        assert!(h.plugins()[0].error.is_none());
+        let z = &h.zones()[0];
+        assert_eq!(z.id, "side");
+        assert_eq!(z.title.as_deref(), Some("Cloud"));
+        assert_eq!((z.span, z.weight, z.columns), (2, 3, 2));
+        assert_eq!(z.widgets, vec!["network"]);
+        assert!(!z.catch_all);
+    }
+
+    #[test]
+    fn a_zone_without_an_id_is_an_error_not_a_silent_drop() {
+        let h = host_from(r#"ui.zone{ title = "nameless" }"#);
+        assert!(h.plugins()[0].error.is_some());
+        assert!(h.zones().is_empty());
+    }
+
+    #[test]
+    fn zone_geometry_defaults_to_one() {
+        let h = host_from(r#"ui.zone{ id="z" }"#);
+        let z = &h.zones()[0];
+        assert_eq!((z.span, z.weight, z.columns), (1, 1, 1));
+        assert!(z.widgets.is_empty());
     }
 }

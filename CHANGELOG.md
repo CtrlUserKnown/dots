@@ -4,6 +4,35 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Modular dashboard **zones** — the dashboard is now a set of user-defined regions, each holding an ordered list of widgets (built-in tiles or plugin panes). Zones live in `~/.dots/layout.toml`; with no file the default reproduces the previous fixed grid exactly
+- `dots layout show | init [--force] | path` — resolve the layout the way the TUI does (plugins included), scaffold a commented `layout.toml`, or print its path
+- Plugin API: `ui.zone{…}` declares a zone, and `ui.pane{ zone = "…" }` places a pane in one. A zone the user's `layout.toml` already defines always wins over a plugin's
+- `examples/plugins/zones.lua` — a plugin that groups its panes into its own region
+- Lua plugin system with TUI panes, CLI, and examples (`ui.pane`, `ui.layout`, `dots.sh/env/dir`)
+- Config commands `add`, `sync`, `get-config`, `config install --all`, TUI add/sync, and a unified manifest
+- `dots --version` now prints the commit and how the version was resolved; `-V` keeps the short form
+
+### Changed
+- **One navigation model across the whole TUI.** Every screen now carries the same nav strip showing its siblings with the current one lit, and you move between them from anywhere: `1`–`6` jump directly, `[` / `]` / `tab` cycle with wrapping, `esc` returns to the dashboard. A single `NAV` table drives the strip, the digits, and the cycling, so they cannot disagree. Screens holding a prompt — search box, path entry, confirmation, settings popup — keep every key, so navigation never fires mid-edit
+- **Symlinks and Tools are now separate screens.** Both dashboard panes used to open the same Health screen scrolled to a different section; each now drills into its own screen with its own rows, title, and cursor position. `r` (repair all) is available only on Symlinks and `i` (install all) only on Tools, so neither key can act on rows you aren't looking at
+- **TUI restyled** to a minimal, low-contrast terminal theme — thin rounded borders in muted grey (`#3B4252`), block titles inlined into the top border, cyan reserved for the focused block and screen titles, and status carried by `●` green / `◐` `○` amber / `✗` red bullets that read even without color
+- Dashboard tiles now list their items — name left-aligned, status metadata right-aligned, problems sorted to the top so they survive truncation — above a dim summary footer (`4 links · 3 ok · 1 missing`)
+- Top bar shows a cyan title with a muted subtitle and right-aligned hints; the bottom bar renders keys dimmed against lighter action text
+- The palette moved into named roles in `tui-core::theme` (borders, titles, keys, status), so a screen picks a role rather than a color. The original five style functions remain as aliases
+- The configs detail column no longer paints over the description bar's row
+
+- Version resolution hardened: `git describe` on an untagged checkout no longer becomes the version (it degraded to a bare commit hash, which compares as older than every release and pinned self-update to a permanent "update available")
+- `crate::version` is the single place the binary's own version is read from, replacing `env!("DOTS_VERSION")` scattered across the CLI, settings header, and updater
+- Release workflow gained a `verify-version` job that fails a tag disagreeing with `Cargo.toml` before any binary is built
+- Workspace version synced to the version under development — it had drifted to `2.0.0` while `v2.2.0` shipped, so any build without git reported the wrong number
+- `ui.layout{ columns = N }` now reflows tiles within zones, and is honoured only while you have no `layout.toml` of your own
+- Settings rebound to the space key and dropped from the number menu; update folded into the settings popup
+- Site: neofetch-style hero with ASCII art, consolidated CSS/JS with terminal components, legacy pages dropped, install URL normalized to `ctrluserknown.github.io`, `base href` fixed for the GitHub Pages subdirectory
+
+### Removed
+- rustfmt from the CI workflow
+
 ## [2.2.0] - 2026-07-23
 
 ### Added

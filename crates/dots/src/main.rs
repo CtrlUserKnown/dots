@@ -10,7 +10,12 @@ use crossterm::{
 use ratatui::{backend::CrosstermBackend, Terminal};
 
 #[derive(Parser)]
-#[command(name = "dots", version = env!("DOTS_VERSION"), about = "dots dotfiles manager")]
+#[command(
+    name = "dots",
+    version = dots::version::VERSION,
+    long_version = dots::version::long(),
+    about = "dots dotfiles manager",
+)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Command>,
@@ -87,6 +92,11 @@ enum Command {
     Plugins {
         #[command(subcommand)]
         action: PluginsAction,
+    },
+    /// Inspect and scaffold the dashboard zone layout (~/.dots/layout.toml)
+    Layout {
+        #[command(subcommand)]
+        action: LayoutAction,
     },
     /// Initialize dots config (idempotent)
     Init {
@@ -177,6 +187,20 @@ enum PackagesAction {
 }
 
 #[derive(Subcommand)]
+enum LayoutAction {
+    /// Show the resolved dashboard: zones, the widgets in each, and any warnings
+    Show,
+    /// Write the current layout to ~/.dots/layout.toml so it can be edited
+    Init {
+        /// Overwrite an existing layout.toml
+        #[arg(long)]
+        force: bool,
+    },
+    /// Print the layout file path
+    Path,
+}
+
+#[derive(Subcommand)]
 enum PluginsAction {
     /// List discovered plugins, the panes they register, and any load errors
     List,
@@ -219,6 +243,7 @@ fn main() -> anyhow::Result<()> {
             cli_get_config(url, apply, yes, force)?
         }
         Some(Command::Plugins { action }) => cli_plugins(action)?,
+        Some(Command::Layout { action }) => cli_layout(action)?,
         Some(Command::Init { quiet }) => cli_init(quiet)?,
     }
     Ok(())
@@ -591,15 +616,21 @@ ui.pane{
   id      = "{name}",
   title   = "{title}",
   size    = 1,        -- row-height weight (2 = twice as tall)
-  span    = 1,        -- columns spanned (2 = full width in a 2-col grid)
+  span    = 1,        -- columns spanned (2 = full width in a 2-col zone)
   refresh = 30,       -- seconds between render() calls
   render  = function()
     return { "hello from {name}", "edit ~/.dots/plugins/{name}.lua" }
   end,
 }
 
--- Optionally change the whole dashboard layout:
--- ui.layout{ columns = 3 }
+-- Panes land in the dashboard's catch-all zone unless they name one. To give
+-- this plugin its own region instead, declare a zone and point the pane at it:
+--
+-- ui.zone{ id = "{name}", title = "{title}", span = 2, columns = 2 }
+-- ui.pane{ id = "{name}", zone = "{name}", render = ... }
+--
+-- Run 'dots layout show' to see where every pane ended up, and
+-- 'dots layout init' to arrange the zones yourself in ~/.dots/layout.toml.
 "#;
 
 fn cli_plugins(action: PluginsAction) -> anyhow::Result<()> {
@@ -647,6 +678,79 @@ fn cli_plugins(action: PluginsAction) -> anyhow::Result<()> {
             println!("  Edit it, then run 'dots' to see your pane on the dashboard.");
         }
         PluginsAction::Dir => println!("{}", plugins_dir().display()),
+    }
+    Ok(())
+}
+
+/// `dots layout` — inspect and scaffold the dashboard zone layout.
+///
+/// `show` resolves the layout the same way the TUI does, plugins included, so
+/// what it prints is what the dashboard will draw — including the warnings for
+/// widgets it could not place, which the TUI has nowhere to put.
+fn cli_layout(action: LayoutAction) -> anyhow::Result<()> {
+    use dots::plugins::PluginHost;
+    use dots::zones::{layout_path, resolve, Layout, PanePlacement, Widget};
+
+    match action {
+        LayoutAction::Show => {
+            let from_file = Layout::try_load()?;
+            let mut layout = from_file.clone().unwrap_or_default();
+
+            let mut host = PluginHost::load();
+            host.tick();
+            layout.merge_plugin_zones(host.zones());
+            let panes = host.views();
+            let placements: Vec<PanePlacement> = panes
+                .iter()
+                .map(|p| PanePlacement { id: &p.id, zone: p.zone.as_deref() })
+                .collect();
+            let dash = resolve(&layout, &placements);
+
+            match from_file {
+                Some(_) => println!("layout: {}", layout_path().display()),
+                None => println!("layout: default (no {} — run 'dots layout init' to customize)", layout_path().display()),
+            }
+            println!("columns: {}\n", dash.columns);
+
+            for zone in &dash.zones {
+                let title = zone.title.as_deref().unwrap_or("(untitled)");
+                println!(
+                    "  {} — {title}  span {} · size {} · {} column(s)",
+                    zone.id, zone.span, zone.weight, zone.columns
+                );
+                if zone.widgets.is_empty() {
+                    println!("      (empty)");
+                }
+                for w in &zone.widgets {
+                    match w {
+                        Widget::Builtin(id) => println!("      • {id}  (built-in)"),
+                        Widget::Plugin(i) => {
+                            let p = &panes[*i];
+                            println!("      • {}  (plugin: {})", p.id, p.title);
+                        }
+                    }
+                }
+                println!();
+            }
+
+            for w in &dash.warnings {
+                println!("warning: {w}");
+            }
+        }
+        LayoutAction::Init { force } => {
+            let path = layout_path();
+            if path.exists() && !force {
+                anyhow::bail!("{} already exists — pass --force to overwrite", path.display());
+            }
+            // Seed from whatever is in effect now, so `init` after hand-editing
+            // is a no-op rather than a silent reset to defaults.
+            let layout = Layout::try_load().unwrap_or_default().unwrap_or_default();
+            layout.save()?;
+            println!("✓ Wrote {}", path.display());
+            println!("  Zones hold widgets by id: {}.", dots::zones::BUILTIN_WIDGETS.join(", "));
+            println!("  Plugin panes join by their own id, or via ui.pane{{ zone = \"...\" }}.");
+        }
+        LayoutAction::Path => println!("{}", layout_path().display()),
     }
     Ok(())
 }

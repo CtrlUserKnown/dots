@@ -16,12 +16,13 @@ use ratatui::{
 use crate::config::settings::Settings;
 use crate::plugins::{PluginHost, PluginPaneView};
 use crate::tui::theme::style_error;
-use crate::tui::{draw_desc, draw_footer, draw_header_right, FlashKind};
+use crate::tui::{draw_desc, draw_key_bar, draw_top_bar, FlashKind};
 use crate::update::{self, InstallSource, UpdateInfo};
+use crate::zones::{self, Layout, PanePlacement, Resolved};
 
 use super::aliases::{handle_alias_key, render_aliases, AliasView};
 use super::configs::ConfigsView;
-use super::health::HealthView;
+use super::health::{HealthView, Scope as HealthScope};
 use super::profile::{handle_profile_key, render_profile, ProfileView};
 use super::settings::{handle_settings_key, render_settings, render_theme, handle_theme_key, SettingsView, ThemeView};
 use super::update::UpdateScreen;
@@ -31,7 +32,11 @@ use super::update::UpdateScreen;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Screen {
     Main,
-    Health,
+    /// Managed links into `$HOME`.
+    Symlinks,
+    /// CLI dependencies and zsh plugins. Separate from [`Screen::Symlinks`]:
+    /// the two drill-downs share an implementation, not a screen.
+    Tools,
     Aliases,
     Configs,
     Profile,
@@ -46,7 +51,6 @@ pub struct App {
     pub should_quit:    bool,
     pub screen:         Screen,
     pub flash:          Option<(String, FlashKind)>,
-    pub menu_idx:       usize,
     pub dash_focus:     usize,
     /// The newest release, if a background check found one newer than us.
     pub update_info:    Option<UpdateInfo>,
@@ -60,8 +64,11 @@ pub struct App {
     /// Per-file load report for the Lua plugins in `~/.dots/plugins/` — static
     /// for the session, snapshotted once at startup. Drives the Plugins tile.
     pub plugin_infos:   Vec<crate::plugins::PluginInfo>,
-    /// Dashboard column count (a plugin's `ui.layout{columns=N}` overrides the default).
-    pub grid_cols:      usize,
+    /// The dashboard's zone layout, from `~/.dots/layout.toml` or the default.
+    pub layout:         Layout,
+    /// [`App::layout`] resolved against the current plugin panes — the concrete
+    /// zone/widget arrangement the dashboard draws and navigates.
+    pub dash:           Resolved,
     /// Set when a plugin pane is activated; the event loop runs its `on_enter`.
     pub pending_plugin_enter: Option<usize>,
 }
@@ -72,7 +79,6 @@ impl App {
             should_quit:    false,
             screen:         start,
             flash:          None,
-            menu_idx:       0,
             dash_focus:     0,
             update_info:    None,
             update_error:   None,
@@ -81,22 +87,63 @@ impl App {
             settings,
             plugin_panes:   Vec::new(),
             plugin_infos:   Vec::new(),
-            grid_cols:      super::overview::DEFAULT_COLS,
+            layout:         Layout::default(),
+            dash:           Resolved::default(),
             pending_plugin_enter: None,
         }
     }
+
+    /// Re-resolve the layout against the current plugin panes. Called whenever
+    /// either side changes — at startup, and after a plugin tick adds or
+    /// renames panes — because a pane's zone placement is decided here, not at
+    /// draw time.
+    pub fn rebuild_dashboard(&mut self) {
+        let placements: Vec<PanePlacement> = self
+            .plugin_panes
+            .iter()
+            .map(|p| PanePlacement { id: &p.id, zone: p.zone.as_deref() })
+            .collect();
+        self.dash = zones::resolve(&self.layout, &placements);
+        // Keep focus addressable when the widget count shrinks (a plugin whose
+        // pane disappeared, say) rather than pointing past the end.
+        let last = self.dash.len().saturating_sub(1);
+        self.dash_focus = self.dash_focus.min(last);
+    }
 }
 
-// ── main menu ─────────────────────────────────────────────────────────────────
+// ── navigation ────────────────────────────────────────────────────────────────
 
-/// Screens reachable by number key from the dashboard (1 = first). Health and
-/// Update are omitted here because they are opened by drilling into their panes.
-/// Settings is reachable via the space key instead, handled separately below.
-const MAIN_MENU: &[Screen] = &[
-    Screen::Aliases,
-    Screen::Profile,
-    Screen::Theme,
+/// The sibling screens, in the order they appear in the nav strip and answer to
+/// the number keys. One ordered list drives the tab strip, `[`/`]` cycling, and
+/// the digit shortcuts, so those three can never disagree about what screen 3 is.
+///
+/// The dashboard is not a member: it is the home you `esc` back to, not a tab.
+/// Settings is not either — it is a popup over whatever is behind it.
+pub const NAV: &[(Screen, &str)] = &[
+    (Screen::Symlinks, "symlinks"),
+    (Screen::Tools,    "tools"),
+    (Screen::Configs,  "configs"),
+    (Screen::Aliases,  "aliases"),
+    (Screen::Profile,  "profile"),
+    (Screen::Theme,    "theme"),
 ];
+
+/// The nav strip for `screen`, as `(label, is_active)` pairs.
+pub fn nav_tabs(screen: Screen) -> Vec<(&'static str, bool)> {
+    NAV.iter().map(|&(s, label)| (label, s == screen)).collect()
+}
+
+fn nav_index(screen: Screen) -> Option<usize> {
+    NAV.iter().position(|&(s, _)| s == screen)
+}
+
+/// The screen `delta` steps away in the nav ring, wrapping at both ends. From
+/// the dashboard, stepping forward enters the ring at its first screen.
+fn nav_step(screen: Screen, delta: isize) -> Screen {
+    let n = NAV.len() as isize;
+    let cur = nav_index(screen).map(|i| i as isize).unwrap_or(if delta > 0 { -1 } else { 0 });
+    NAV[(((cur + delta) % n + n) % n) as usize].0
+}
 
 // ── event loop ────────────────────────────────────────────────────────────────
 
@@ -114,13 +161,39 @@ pub fn run(
     let mut settings_view = SettingsView::new();
     let mut theme_view    = ThemeView::new();
 
-    // Load Lua plugins and seed the dashboard with their panes + column count.
-    // The host stays on this thread (its Lua state is not Send).
+    // Load Lua plugins and seed the dashboard with their panes and zones. The
+    // host stays on this thread (its Lua state is not Send).
     let mut plugin_host = PluginHost::load();
     plugin_host.tick();
     app.plugin_panes = plugin_host.views();
     app.plugin_infos = plugin_host.plugins().to_vec();
-    app.grid_cols    = plugin_host.columns().unwrap_or(super::overview::DEFAULT_COLS);
+
+    // The layout file is the user's; plugin-declared zones only fill gaps in it.
+    // A layout that won't parse is reported and skipped: the user needs a
+    // working dashboard in order to go fix it.
+    let user_layout = match Layout::try_load() {
+        Ok(l) => l,
+        Err(e) => {
+            app.flash = Some((
+                format!("layout.toml: {e} — using the default layout"),
+                FlashKind::Error,
+            ));
+            None
+        }
+    };
+    app.layout = user_layout.clone().unwrap_or_default();
+    app.layout.merge_plugin_zones(plugin_host.zones());
+
+    // `ui.layout{columns=N}` predates zones, where it meant "columns of dashboard
+    // tiles". Zones took that meaning over, so honour the old call only while the
+    // user has not written a layout of their own — then it still reflows the
+    // default zone's tiles, and a hand-written layout is never overridden.
+    if let (None, Some(n)) = (&user_layout, plugin_host.columns()) {
+        for z in &mut app.layout.zones {
+            z.columns = n as u16;
+        }
+    }
+    app.rebuild_dashboard();
 
     if start == Screen::Settings {
         settings_view.load_from(&app.settings);
@@ -152,6 +225,7 @@ pub fn run(
         // Refresh any plugin panes whose interval has elapsed.
         if plugin_host.tick() {
             app.plugin_panes = plugin_host.views();
+            app.rebuild_dashboard();
         }
 
         // Drain the latest network snapshot (keep only the freshest).
@@ -218,6 +292,7 @@ pub fn run(
             plugin_host.on_enter(i);
             plugin_host.tick();
             app.plugin_panes = plugin_host.views();
+            app.rebuild_dashboard();
         }
 
         if app.should_quit { break; }
@@ -247,7 +322,7 @@ fn render(
     }
     match app.screen {
         Screen::Main     => render_main(f, area, app),
-        Screen::Health   => super::health::render(f, area, app, health),
+        Screen::Symlinks | Screen::Tools => super::health::render(f, area, app, health),
         Screen::Configs  => super::configs::render(f, area, app, configs),
         Screen::Aliases  => render_aliases(f, area, app, aliases),
         Screen::Profile  => render_profile(f, area, app, profile),
@@ -265,8 +340,9 @@ fn render(
 /// The dashboard pane-grid region within the full terminal `area`. Shared by
 /// rendering and mouse hit-testing so clicks land on what's drawn.
 fn dashboard_grid(area: Rect) -> Rect {
-    // Content region sits below the header line and above the desc/footer bars.
-    let top    = area.y + 1;
+    // Content region sits below the top bar and above the desc/footer bars.
+    // One blank row under the bar keeps the tiles off the title.
+    let top    = area.y + 2;
     let bottom = area.y + area.height - 4; // desc bar lives at height-4
     Rect {
         x:      area.x + 1,
@@ -276,17 +352,26 @@ fn dashboard_grid(area: Rect) -> Rect {
     }
 }
 
+/// Keybindings shown in the dashboard's bottom bar.
+const MAIN_KEYS: &[(&str, &str)] = &[
+    ("↑↓←→/hjkl", "move"),
+    ("enter", "open"),
+    ("1-6", "screen"),
+    ("space", "settings"),
+    ("q", "quit"),
+];
+
 fn render_main(f: &mut Frame, area: Rect, app: &App) {
     use super::overview;
 
-    draw_header_right(f, area, " dots ", "hjkl move  q quit");
+    draw_top_bar(f, area, "dots", "dotfiles manager", &[("q", "quit"), ("space", "settings")]);
 
     let grid = dashboard_grid(area);
     overview::render_grid(f, grid, app, app.dash_focus);
 
     let hint = overview::focus_hint(app, app.dash_focus);
     draw_desc(f, area, &hint, app.flash.as_ref());
-    draw_footer(f, area, " enter open  1 aliases 2 profile 3 theme  space settings ");
+    draw_key_bar(f, area, MAIN_KEYS);
 }
 
 fn render_too_small(f: &mut Frame, area: Rect) {
@@ -316,9 +401,28 @@ fn handle_key(
         app.should_quit = true;
         return;
     }
+
+    // Cross-screen navigation, handled before the screen sees the key — but
+    // only when the screen isn't holding a prompt open. A screen mid-edit owns
+    // every keystroke, or typing "3" into a path would teleport you to configs.
+    if !is_modal(app, health, configs, aliases, profile) {
+        let target = match key.code {
+            KeyCode::Char(']') | KeyCode::Tab      => Some(nav_step(app.screen, 1)),
+            KeyCode::Char('[') | KeyCode::BackTab  => Some(nav_step(app.screen, -1)),
+            KeyCode::Char(c @ '1'..='9') => {
+                NAV.get(c as usize - '1' as usize).map(|&(s, _)| s)
+            }
+            _ => None,
+        };
+        if let Some(screen) = target {
+            navigate_to(app, health, configs, aliases, profile, update, settings, theme, screen);
+            return;
+        }
+    }
+
     match app.screen {
         Screen::Main     => handle_main_key(app, health, configs, aliases, profile, update, settings, theme, key),
-        Screen::Health   => super::health::handle_key(app, health, key),
+        Screen::Symlinks | Screen::Tools => super::health::handle_key(app, health, key),
         Screen::Configs  => super::configs::handle_key(app, configs, key),
         Screen::Aliases  => handle_alias_key(app, aliases, key),
         Screen::Profile  => handle_profile_key(app, profile, key),
@@ -339,7 +443,7 @@ fn handle_main_key(
     theme:    &mut ThemeView,
     key:      KeyEvent,
 ) {
-    use super::overview::{self, Dir, PANES};
+    use super::overview::{self, Dir};
 
     match key.code {
         KeyCode::Char('q') => app.should_quit = true,
@@ -347,28 +451,63 @@ fn handle_main_key(
         KeyCode::Char('l') | KeyCode::Right => app.dash_focus = overview::move_focus(app, app.dash_focus, Dir::Right),
         KeyCode::Char('j') | KeyCode::Down  => app.dash_focus = overview::move_focus(app, app.dash_focus, Dir::Down),
         KeyCode::Char('k') | KeyCode::Up    => app.dash_focus = overview::move_focus(app, app.dash_focus, Dir::Up),
-        KeyCode::Char(c) if ('1'..='9').contains(&c) => {
-            let idx = (c as u8 - b'1') as usize;
-            if idx < MAIN_MENU.len() {
-                app.menu_idx = idx;
-                navigate_to(app, health, configs, aliases, profile, update, settings, theme, MAIN_MENU[idx]);
-            }
-        }
+        // Digits and `[`/`]` are handled globally in `handle_key`, so the
+        // dashboard doesn't bind them itself — one table drives them everywhere.
         KeyCode::Char(' ') => {
             navigate_to(app, health, configs, aliases, profile, update, settings, theme, Screen::Settings);
         }
         KeyCode::Enter => {
-            if let Some(&pane) = PANES.get(app.dash_focus) {
-                navigate_to(app, health, configs, aliases, profile, update, settings, theme, pane.target());
-                if let Some(section) = pane.section() {
-                    health.focus_section(section);
-                }
-            } else {
-                // A plugin pane — hand off to the host in the event loop.
-                app.pending_plugin_enter = Some(app.dash_focus - PANES.len());
-            }
+            activate_focus(app, health, configs, aliases, profile, update, settings, theme, app.dash_focus);
         }
         _ => {}
+    }
+}
+
+/// True when the active screen owns every keystroke and global navigation must
+/// keep its hands off: a text prompt, a confirmation, an open pager, or the
+/// settings popup (which holds unsaved edits until `esc` writes them).
+fn is_modal(
+    app:      &App,
+    health:   &HealthView,
+    configs:  &ConfigsView,
+    aliases:  &AliasView,
+    profile:  &ProfileView,
+) -> bool {
+    if app.screen == Screen::Settings {
+        return true;
+    }
+    match app.screen {
+        Screen::Symlinks | Screen::Tools => health.is_busy(),
+        Screen::Configs => configs.is_capturing(),
+        Screen::Aliases => aliases.is_capturing(),
+        Screen::Profile => profile.is_capturing(),
+        _ => false,
+    }
+}
+
+/// Open whatever dashboard widget sits at `focus`: drill into a built-in's
+/// screen, or hand a plugin pane off to the host in the event loop. Shared by
+/// the enter key and left-click so both do exactly the same thing.
+#[allow(clippy::too_many_arguments)]
+fn activate_focus(
+    app:      &mut App,
+    health:   &mut HealthView,
+    configs:  &mut ConfigsView,
+    aliases:  &mut AliasView,
+    profile:  &mut ProfileView,
+    update:   &mut UpdateScreen,
+    settings: &mut SettingsView,
+    theme:    &mut ThemeView,
+    focus:    usize,
+) {
+    use super::overview::{focused, Focus};
+
+    match focused(app, focus) {
+        Some(Focus::Builtin(pane)) => {
+            navigate_to(app, health, configs, aliases, profile, update, settings, theme, pane.target());
+        }
+        Some(Focus::Plugin(i)) => app.pending_plugin_enter = Some(i),
+        None => {}
     }
 }
 
@@ -385,7 +524,7 @@ fn handle_mouse(
     me:       MouseEvent,
     area:     Rect,
 ) {
-    use super::overview::{self, PANES};
+    use super::overview;
 
     match me.kind {
         // Wheel scroll drives vertical navigation on whatever screen is up,
@@ -403,14 +542,7 @@ fn handle_mouse(
             let grid = dashboard_grid(area);
             if let Some(i) = overview::pane_at(grid, app, me.column, me.row) {
                 app.dash_focus = i;
-                if let Some(&pane) = PANES.get(i) {
-                    navigate_to(app, health, configs, aliases, profile, update, settings, theme, pane.target());
-                    if let Some(section) = pane.section() {
-                        health.focus_section(section);
-                    }
-                } else {
-                    app.pending_plugin_enter = Some(i - PANES.len());
-                }
+                activate_focus(app, health, configs, aliases, profile, update, settings, theme, i);
             }
         }
         _ => {}
@@ -430,9 +562,14 @@ fn navigate_to(
     screen:   Screen,
 ) {
     match screen {
-        Screen::Health => {
-            health.rebuild();
-            app.screen = Screen::Health;
+        Screen::Symlinks => {
+            health.show(HealthScope::Symlinks);
+            app.screen = Screen::Symlinks;
+            app.flash  = None;
+        }
+        Screen::Tools => {
+            health.show(HealthScope::Tools);
+            app.screen = Screen::Tools;
             app.flash  = None;
         }
         Screen::Configs => {
@@ -465,5 +602,76 @@ fn navigate_to(
             app.screen = other;
             app.flash  = None;
         }
+    }
+}
+
+// ── tests ─────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn views() -> (HealthView, ConfigsView, AliasView, ProfileView) {
+        (HealthView::new(), ConfigsView::new(), AliasView::new(), ProfileView::new())
+    }
+
+    /// The nav strip, the digit keys, and `[`/`]` all read the same table, so
+    /// they can never disagree about which screen is which.
+    #[test]
+    fn nav_table_drives_every_route_into_it() {
+        for (i, &(screen, label)) in NAV.iter().enumerate() {
+            let tabs = nav_tabs(screen);
+            assert_eq!(tabs.len(), NAV.len());
+            assert!(tabs[i].1, "{label} should be the active tab on its own screen");
+            assert_eq!(tabs.iter().filter(|(_, active)| *active).count(), 1);
+        }
+    }
+
+    #[test]
+    fn stepping_wraps_in_both_directions() {
+        let first = NAV[0].0;
+        let last = NAV[NAV.len() - 1].0;
+        assert_eq!(nav_step(first, -1), last, "stepping back from the first wraps to the last");
+        assert_eq!(nav_step(last, 1), first, "stepping past the last wraps to the first");
+        assert_eq!(nav_step(first, 1), NAV[1].0);
+    }
+
+    /// The dashboard isn't a tab, so stepping forward from it enters the ring
+    /// at the start rather than falling off it.
+    #[test]
+    fn stepping_from_the_dashboard_enters_the_ring() {
+        assert_eq!(nav_step(Screen::Main, 1), NAV[0].0);
+        assert_eq!(nav_step(Screen::Main, -1), NAV[NAV.len() - 1].0);
+        assert!(nav_tabs(Screen::Main).iter().all(|(_, active)| !active));
+    }
+
+    /// The load-bearing guard: a screen holding a prompt owns every key, or
+    /// typing a digit into a path would teleport the user mid-edit.
+    #[test]
+    fn a_prompt_is_modal_and_global_nav_stays_out() {
+        let mut app = App::new(Screen::Aliases, crate::config::settings::Settings::default());
+        let (health, configs, mut aliases, profile) = views();
+        assert!(!is_modal(&app, &health, &configs, &aliases, &profile), "the list is not modal");
+
+        aliases.mode = super::super::aliases::AliasMode::Search { query: "3".into() };
+        assert!(
+            is_modal(&app, &health, &configs, &aliases, &profile),
+            "a search box must keep its keys",
+        );
+
+        // The settings popup holds unsaved edits until esc writes them.
+        app.screen = Screen::Settings;
+        let (health, configs, aliases, profile) = views();
+        assert!(is_modal(&app, &health, &configs, &aliases, &profile));
+    }
+
+    #[test]
+    fn every_nav_screen_is_reachable_by_its_digit() {
+        for (i, &(screen, _)) in NAV.iter().enumerate() {
+            let digit = char::from_digit(i as u32 + 1, 10).unwrap();
+            let picked = NAV.get(digit as usize - '1' as usize).map(|&(s, _)| s);
+            assert_eq!(picked, Some(screen));
+        }
+        assert!(NAV.len() <= 9, "digits only reach nine screens");
     }
 }
