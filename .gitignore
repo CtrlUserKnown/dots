@@ -28,5 +28,8 @@ CLAUDE.md
 site/install.sh
 site/CHANGELOG.md
 
+# universal macOS binary (build artifact)
+dots-universal
+
 # stray build output — site/ is published wholesale by deploy-site.yml
 site/target/

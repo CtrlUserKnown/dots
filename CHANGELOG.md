@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-07-27
+
 ### Added
 - Modular dashboard **zones** — the dashboard is now a set of user-defined regions, each holding an ordered list of widgets (built-in tiles or plugin panes). Zones live in `~/.dots/layout.toml`; with no file the default reproduces the previous fixed grid exactly
 - `dots layout show | init [--force] | path` — resolve the layout the way the TUI does (plugins included), scaffold a commented `layout.toml`, or print its path
@@ -21,7 +23,6 @@ All notable changes to this project will be documented in this file.
 - Top bar shows a cyan title with a muted subtitle and right-aligned hints; the bottom bar renders keys dimmed against lighter action text
 - The palette moved into named roles in `tui-core::theme` (borders, titles, keys, status), so a screen picks a role rather than a color. The original five style functions remain as aliases
 - The configs detail column no longer paints over the description bar's row
-
 - Version resolution hardened: `git describe` on an untagged checkout no longer becomes the version (it degraded to a bare commit hash, which compares as older than every release and pinned self-update to a permanent "update available")
 - `crate::version` is the single place the binary's own version is read from, replacing `env!("DOTS_VERSION")` scattered across the CLI, settings header, and updater
 - Release workflow gained a `verify-version` job that fails a tag disagreeing with `Cargo.toml` before any binary is built
