@@ -2,16 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>dots — cross-platform dotfiles manager</title>
-  <meta name="description" content="A fast, cross-platform dotfiles manager with an interactive TUI. Manage symlinks, install tools, and keep everything healthy — on macOS and Linux.">
+  <meta name="description" content="A fast, cross-platform dotfiles manager with an interactive TUI, written in Rust. Manage symlinks, install tools, and keep everything healthy on macOS and Linux.">
   <meta name="author" content="CtrlUserKnown">
 
   <link rel="icon" href="img/svg/dots_icon_color.svg" type="image/svg+xml">
   <link rel="alternate icon" href="img/svg/dots_favicons_color.svg">
   <link rel="apple-touch-icon" href="img/svg/dots_favicons_color.svg">
   <link rel="manifest" href="site.webmanifest">
-  <meta name="theme-color" content="#0c0c0c">
+  <meta name="theme-color" content="#1a1a1a">
+  <meta name="color-scheme" content="dark">
 
   <base href="/dots/">
 
@@ -33,192 +34,49 @@
 </head>
 <body>
 
-<div class="term">
-  <div class="term-bar">
-    <div class="term-dots">
-      <span class="term-dot term-dot--r"></span>
-      <span class="term-dot term-dot--y"></span>
-      <span class="term-dot term-dot--g"></span>
-    </div>
-    <span class="term-title">dots — index</span>
+<header class="topbar">
+  <span class="mark">✻</span>
+  <span class="path">dots</span>
+  <span class="dim hide-sm">— ~/.dots</span>
+  <span class="spacer"></span>
+  <a href="https://github.com/CtrlUserKnown/dots" target="_blank" rel="noopener noreferrer">github ↗</a>
+</header>
+
+<main class="stream" id="stream">
+  <noscript>
+    <h1>dots</h1>
+    <p><strong>dots</strong> is a fast, cross-platform dotfiles manager with an interactive TUI,
+    written in Rust. It installs your tools, wires up symlinks GNU Stow–style, applies premade app
+    configs, and keeps everything healthy — on macOS (Homebrew) and Linux (apt/dnf) alike.</p>
+    <p>Install:</p>
+    <pre>curl -fsSL https://raw.githubusercontent.com/CtrlUserKnown/dots/main/install.sh | sh</pre>
+    <p>This page is an interactive terminal and needs JavaScript. Everything it shows also lives in
+    the <a href="https://github.com/CtrlUserKnown/dots#readme">README</a> and the
+    <a href="https://github.com/CtrlUserKnown/dots/blob/main/CHANGELOG.md">changelog</a>.</p>
+  </noscript>
+</main>
+
+<footer class="composer">
+  <div class="popup" id="popup" hidden></div>
+  <div class="chips" id="chips"></div>
+
+  <div class="inputbox">
+    <span class="caret">&gt;</span>
+    <input id="input" type="text" autocomplete="off" autocapitalize="off"
+           autocorrect="off" spellcheck="false" enterkeyhint="go"
+           placeholder="Ask about dots, or type / for commands" aria-label="terminal input">
   </div>
 
-  <div class="term-screen">
-
-    <div class="prompt-line">
-      <span class="prompt-symbol">~ $</span>
-      <span class="prompt-cmd">ls pages/</span>
-    </div>
-    <div class="nav-files">
-      <a href="index.html" class="active">index.html</a>
-      <a href="about.html">about.html</a>
-      <a href="docs.html">docs.html</a>
-      <a href="changelog.html">changelog.html</a>
-    </div>
-
-    <div class="prompt-line">
-      <span class="prompt-symbol">~ $</span>
-      <span class="prompt-cmd">neofetch</span>
-    </div>
-    <div class="neofetch">
-      <div class="nf-ascii">
-        <pre>
-      ██████╗  ██████╗ ████████╗███████╗
-      ██╔══██╗██╔═══██╗╚══██╔══╝██╔════╝
-      ██║  ██║██║   ██║   ██║   ███████╗
-      ██║  ██║██║   ██║   ██║   ╚════██║
-      ██████╔╝╚██████╔╝   ██║   ███████║
-      ╚═════╝  ╚═════╝    ╚═╝   ╚══════╝
-        </pre>
-      </div>
-      <div class="nf-info">
-        <div class="nf-row"><span class="nf-label">OS</span><span class="nf-val">macOS / Linux</span></div>
-        <div class="nf-row"><span class="nf-label">Shell</span><span class="nf-val">bash / zsh / fish</span></div>
-        <div class="nf-row"><span class="nf-label">Version</span><span class="nf-val">v2.2.0</span></div>
-        <div class="nf-row"><span class="nf-label">Repo</span><span class="nf-val">CtrlUserKnown/dots</span></div>
-        <div class="nf-row"><span class="nf-label">License</span><span class="nf-val">MIT</span></div>
-        <div class="nf-row"><span class="nf-label">Language</span><span class="nf-val">Rust</span></div>
-        <div class="nf-row"><span class="nf-label">TUI</span><span class="nf-val">ratatui</span></div>
-      </div>
-    </div>
-
-    <div class="prompt-line">
-      <span class="prompt-symbol">~ $</span>
-      <span class="prompt-cmd">curl -fsSL https://raw.githubusercontent.com/CtrlUserKnown/dots/main/install.sh | sh</span>
-    </div>
-    <div class="install-block">
-      <span class="prompt-symbol">$</span>
-      <code id="install-cmd">curl -fsSL https://raw.githubusercontent.com/CtrlUserKnown/dots/main/install.sh | sh</code>
-      <button class="install-copy" id="copy-btn" onclick="copyInstall()">copy</button>
-    </div>
-
-    <div class="btn-line">
-      <a href="docs.html">docs/quickstart</a>
-      <a href="about.html">about/project</a>
-    </div>
-
-    <div class="prompt-line">
-      <span class="prompt-symbol">~ $</span>
-      <span class="prompt-cmd">dots --features</span>
-    </div>
-    <div class="divider-line">── features ──</div>
-    <div class="feature-list">
-      <div class="feature-item">
-        <span class="feature-bullet">◆</span>
-        <span class="feature-name">Interactive TUI</span>
-        <span class="feature-desc">ratatui dashboard with 6 panes: symlinks, tools, plugins, configs, updates, network</span>
-      </div>
-      <div class="feature-item">
-        <span class="feature-bullet">◆</span>
-        <span class="feature-name">Symlink management</span>
-        <span class="feature-desc">Declare links in <code>links.toml</code> or use GNU Stow folding. Idempotent with backups</span>
-      </div>
-      <div class="feature-item">
-        <span class="feature-bullet">◆</span>
-        <span class="feature-name">Cross-platform installs</span>
-        <span class="feature-desc">One dep list per platform via Homebrew, apt, dnf; required/optional/dev tiers</span>
-      </div>
-      <div class="feature-item">
-        <span class="feature-bullet">◆</span>
-        <span class="feature-name">Premade configs</span>
-        <span class="feature-desc">Ghostty, Neovim, opencode starter configs compiled into the binary</span>
-      </div>
-      <div class="feature-item">
-        <span class="feature-bullet">◆</span>
-        <span class="feature-name">Network monitor</span>
-        <span class="feature-desc">Live pane: connectivity, latency, DNS, VPN status via platform probes</span>
-      </div>
-      <div class="feature-item">
-        <span class="feature-bullet">◆</span>
-        <span class="feature-name">Portable profiles</span>
-        <span class="feature-desc">Export to <code>personal.json</code>, re-import on another machine or from GitHub</span>
-      </div>
-    </div>
-
-    <div class="prompt-line">
-      <span class="prompt-symbol">~ $</span>
-      <span class="prompt-cmd">dots --stack</span>
-    </div>
-    <div class="divider-line">── stack ──</div>
-    <div class="tool-list">
-      <div class="tool-row"><span class="tool-name">Rust</span><span class="tool-desc">Single static binary with pure-Rust TLS</span></div>
-      <div class="tool-row"><span class="tool-name">ratatui</span><span class="tool-desc">Terminal UI framework for the interactive dashboard</span></div>
-      <div class="tool-row"><span class="tool-name">git</span><span class="tool-desc">Version control and self-updating</span></div>
-      <div class="tool-row"><span class="tool-name">eza</span><span class="tool-desc">Modern ls replacement</span></div>
-      <div class="tool-row"><span class="tool-name">fzf</span><span class="tool-desc">Fuzzy finder</span></div>
-      <div class="tool-row"><span class="tool-name">bat</span><span class="tool-desc">Syntax-highlighted file previewer</span></div>
-      <div class="tool-row"><span class="tool-name">zoxide</span><span class="tool-desc">Smarter cd</span></div>
-      <div class="tool-row"><span class="tool-name">fastfetch</span><span class="tool-desc">System info on shell start</span></div>
-    </div>
-
-    <div class="prompt-line">
-      <span class="prompt-symbol">~ $</span>
-      <span class="prompt-cmd">dots --demo</span>
-    </div>
-    <div class="divider-line">── demo ──</div>
-    <div class="demo-term">
-      <div class="demo-bar">
-        <span class="term-dot term-dot--r"></span>
-        <span class="term-dot term-dot--y"></span>
-        <span class="term-dot term-dot--g"></span>
-        <span class="term-title">dots</span>
-      </div>
-      <div class="demo-body" id="demo-output"></div>
-    </div>
-
-    <div class="prompt-line">
-      <span class="prompt-symbol">~ $</span>
-      <span class="prompt-cmd">dots --help</span>
-    </div>
-    <div class="divider-line">── quick start ──</div>
-    <div class="cta-block">
-      <p>Run the install script and you'll have a working dotfiles setup in a few minutes.</p>
-      <div class="btn-line">
-        <a href="docs.html">docs/readme</a>
-        <a href="https://github.com/CtrlUserKnown/dots" target="_blank" rel="noopener noreferrer">github/repo</a>
-      </div>
-    </div>
-
-    <div class="prompt-line">
-      <span class="prompt-symbol">~ $</span>
-      <span class="prompt-cmd" style="animation: blink 1s step-end infinite;">_</span>
-    </div>
-
+  <div class="hints">
+    <span id="mode"></span>
+    <span class="hide-sm">? for shortcuts</span>
+    <span class="spacer"></span>
+    <span id="ctx"></span>
   </div>
+</footer>
 
-  <div class="statusbar">
-    <span>dots v2.0.0</span>
-    <a href="https://github.com/CtrlUserKnown/dots" target="_blank" rel="noopener noreferrer">github.com/CtrlUserKnown/dots</a>
-    <span>MIT License</span>
-  </div>
-</div>
-
-<script src="js/nav.js"></script>
-<script src="js/demo.js"></script>
-<script>
-  function copyInstall() {
-    var cmd = document.getElementById('install-cmd').textContent;
-    var btn = document.getElementById('copy-btn');
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(cmd).then(function () {
-        btn.textContent = 'copied!';
-        setTimeout(function () { btn.textContent = 'copy'; }, 2000);
-      });
-    } else {
-      var el = document.createElement('textarea');
-      el.value = cmd;
-      el.style.position = 'fixed';
-      el.style.opacity = '0';
-      document.body.appendChild(el);
-      el.focus();
-      el.select();
-      try { document.execCommand('copy'); } catch (e) {}
-      document.body.removeChild(el);
-      btn.textContent = 'copied!';
-      setTimeout(function () { btn.textContent = 'copy'; }, 2000);
-    }
-  }
-</script>
+<script src="js/content.js"></script>
+<script src="js/term.js"></script>
 
 </body>
 </html>

@@ -1,7 +1,7 @@
 {
   "name": "dots",
   "short_name": "dots",
-  "description": "A personal macOS development environment. Automated setup, custom shell config, and a TUI for managing it all.",
+  "description": "A fast, cross-platform dotfiles manager with an interactive TUI, written in Rust.",
   "start_url": "/dots/",
   "display": "standalone",
   "background_color": "#1a1a1a",
