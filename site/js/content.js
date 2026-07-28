@@ -156,9 +156,8 @@ window.DOTS = (function () {
     ].concat(
       columns(
         { title: 'Symlinks', rows: [
-          g('●') + ' ghostty   ' + dim('~/.config/ghostty'),
           g('●') + ' nvim      ' + dim('~/.config/nvim'),
-          g('●') + ' zsh       ' + dim('~/.zshrc'),
+          g('●') + ' git       ' + dim('~/.gitconfig'),
           '<span class="c-yellow">○</span> tmux      <span class="c-yellow">missing</span>',
           dim('4 links · 3 ok · 1 missing'),
         ] },
@@ -176,10 +175,10 @@ window.DOTS = (function () {
           '<span class="c-yellow">◐</span> git       <span class="c-yellow">[  partial  ]</span>',
           dim('○ bat       [    none   ]'),
         ] },
-        { title: 'Plugins', rows: [
-          g('●') + ' zsh-autosuggestions   ' + g('ok'),
-          g('●') + ' zsh-syntax-highlight  ' + g('ok'),
-          g('●') + ' fzf-tab               ' + g('ok'),
+        { title: 'Shell', rows: [
+          g('●') + ' bash        ' + g('ok'),
+          g('●') + ' fish        ' + g('ok'),
+          g('●') + ' zsh         ' + g('ok'),
         ] }
       ),
       pane('Network', [
@@ -306,7 +305,7 @@ window.DOTS = (function () {
     }).join('');
 
     return [
-      { text: 'This site — and this session — wear **noir-cat**, the Ghostty theme that ships with dots: catppuccin-ish accents over a near-black `#1a1a1a`.' },
+      { text: 'This site — and this session — wear **noir-cat**, a catppuccin-ish accent palette over a near-black `#1a1a1a`.' },
       { raw: '<div class="swatches">' + swatches + '</div>' },
       { rule: 'ghostty' },
       { screen: [
@@ -320,7 +319,7 @@ window.DOTS = (function () {
         'palette = <span class="c-yellow">3</span>=<span class="c-yellow">#f9e2af</span>   palette = <span class="c-yellow">6</span>=<span class="c-cyan">#89dceb</span>',
       ] },
       { text: 'Pick it — or any of 200+ built-in Ghostty themes — from the TUI\'s Theme screen (`3` on the dashboard).' },
-      { note: 'Also bundled: **knew-pines** for Ghostty, **KnewPines** / Moon / Dawn for `bat`, and the **charModel** zsh prompt.' },
+      { note: 'Also bundled: **knew-pines** for Ghostty, **KnewPines** / Moon / Dawn for `bat`.' },
     ];
   }
 
@@ -352,7 +351,7 @@ window.DOTS = (function () {
         '├── links.toml          <span class="dim">declared symlinks</span>',
         '└── <span class="c-blue">plugins/</span>            <span class="dim">your Lua panes</span>',
         '<span class="c-blue">~/.personal/</span>            <span class="dim">machine-local layer</span>',
-        '├── aliases.zsh         <span class="dim">sourced after built-in aliases</span>',
+        '├── aliases.sh           <span class="dim">sourced after built-in aliases</span>',
         '├── <span class="c-blue">apps/</span>',
         '└── config.toml         <span class="dim">overrides settings.toml</span>',
       ] },
@@ -413,7 +412,7 @@ window.DOTS = (function () {
     aliases: function () { return [
       { text: 'dots ships a set of shell aliases and manages yours alongside them.' },
       { code: 'dots aliases list\ndots aliases add gs "git status"\ndots aliases remove gs' },
-      { text: 'User aliases land in `~/.personal/aliases.zsh`, sourced after the built-ins so yours win. The Aliases screen (`1` on the dashboard) does the same interactively.' },
+      { text: 'User aliases land in `~/.personal/aliases.sh`, sourced after the built-ins so yours win. The Aliases screen (`1` on the dashboard) does the same interactively.' },
     ]; },
 
     updating: function () { return [
@@ -579,7 +578,7 @@ window.DOTS = (function () {
           '<div class="fetch-info">' +
             row('user', 'you@dots') +
             row('os', 'macOS / Linux') +
-            row('shell', 'zsh · bash · fish') +
+            row('shell', 'bash · fish') +
             row('wm', 'ratatui') +
             row('theme', 'noir-cat') +
             row('lang', 'Rust') +
@@ -602,15 +601,14 @@ window.DOTS = (function () {
     return [
       { screen: [
         '<span class="dim">checking symlinks…</span>',
-        '  <span class="c-green">✓</span> ghostty      <span class="dim">~/.config/ghostty/config</span>',
         '  <span class="c-green">✓</span> nvim         <span class="dim">~/.config/nvim</span>',
-        '  <span class="c-green">✓</span> zsh          <span class="dim">~/.zshrc</span>',
+        '  <span class="c-green">✓</span> git          <span class="dim">~/.gitconfig</span>',
         '  <span class="c-yellow">!</span> tmux         <span class="c-yellow">missing</span> <span class="dim">— run with --fix</span>',
         '<span class="dim">checking tools…</span>',
         '  <span class="c-green">✓</span> git eza bat fd fzf fastfetch',
         '  <span class="c-red">✗</span> zoxide       <span class="c-red">not installed</span>',
         '<span class="dim">checking plugins…</span>',
-        '  <span class="c-green">✓</span> 3 zsh plugins active',
+        '  <span class="c-green">✓</span> shell configs ok',
         '',
         '<span class="c-yellow">2 issues</span> <span class="dim">· `dots health --fix` repairs links and installs what\'s missing</span>',
       ] },
@@ -634,9 +632,9 @@ window.DOTS = (function () {
   }
 
   var LS = [
-    '<span class="c-blue">bat/</span>', '<span class="c-blue">ghostty/</span>',
+    '<span class="c-blue">bat/</span>',
     '<span class="c-blue">git/</span>', '<span class="c-blue">nvim/</span>',
-    '<span class="c-blue">opencode/</span>', '<span class="c-blue">zsh/</span>',
+    '<span class="c-blue">opencode/</span>',
     'links.toml', 'settings.toml', 'README.md',
   ];
 

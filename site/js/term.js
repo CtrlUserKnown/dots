@@ -289,7 +289,7 @@
     [/host|server|remote|ssh/i,                   'dots tracks remote hosts and services. View them in the hosts table.', ['/hosts']],
     [/window|wsl/i,                               'dots targets macOS and Linux. WSL works the way any Linux does; native Windows is not supported.', ['/docs requirements']],
     [/rust|cargo|build|source|binary/i,           'Rust, a two-crate Cargo workspace, shipped as one static binary.', ['/about', '/docs dev']],
-    [/config|nvim|ghostty|opencode|premade/i,     'Configs are discovered from your dotfiles repo; a few starters ship inside the binary.', ['/docs configs']],
+    [/config|nvim|opencode|premade/i,     'Configs are discovered from your dotfiles repo; a few starters ship inside the binary.', ['/docs configs']],
     [/profile|machine|migrat|new laptop|backup/i, 'Export your setup to `personal.json`, import it on the next machine.', ['/docs profiles']],
     [/licen|free|cost|price/i,                    'MIT licensed, free, and the source is right there.', ['/about', '/status']],
     [/who|author|made|built by/i,                 'Built by CtrlUserKnown — the repo has the full history.', ['/github', '/changelog']],
