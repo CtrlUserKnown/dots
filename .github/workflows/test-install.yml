@@ -1,0 +1,69 @@
+name: Test Install Script
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  test-install:
+    name: ${{ matrix.os }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            arch: x86_64
+            runner: ubuntu-latest
+          - os: darwin
+            arch: aarch64
+            runner: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve latest release tag
+        id: latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$(gh release view --json tagName --jq .tagName)
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Run install script and verify
+        run: |
+          set -euo pipefail
+
+          VERSION="${{ steps.latest.outputs.tag }}"
+          echo "Installing dots $VERSION on $(uname -s)/$(uname -m)…"
+
+          ISOLATED_HOME=$(mktemp -d)
+          export HOME="$ISOLATED_HOME"
+
+          curl -fsSL https://ctrluserknown.github.io/dots/install.sh \
+            | sh -s -- --version "$VERSION"
+
+          echo ""
+
+          # ── binary exists and runs ──
+          BIN="$HOME/.dots/bin/dots"
+          test -x "$BIN" || { echo "FAIL: $BIN not found"; exit 1; }
+
+          INSTALLED=$("$BIN" --version 2>&1)
+          echo "$INSTALLED" | grep -qF "$VERSION" \
+            || { echo "FAIL: version $VERSION not in '$INSTALLED'"; exit 1; }
+          echo "✓ binary OK — $INSTALLED"
+
+          # ── was downloaded, not built from source ──
+          if [ -f "$HOME/.dots/target/release/dots" ]; then
+            echo "FAIL: binary was built from source (target/release/dots exists)"
+            exit 1
+          fi
+          echo "✓ binary was downloaded (no cargo build artifacts)"
+
+          echo ""
+          echo "✓ install test passed for $(uname -s)-$(uname -m)"
