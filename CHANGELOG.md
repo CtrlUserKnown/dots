@@ -4,12 +4,6 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### Fixed
-- `install.sh` no longer aborts silently right after adding itself to `PATH`. The `bash` branch of `configure_path` guarded an optional step (appending to `.bash_profile` on macOS) with a bare `test && test && cmd` chain instead of an `if`; under `set -e`, that chain aborts the whole script the instant either test is false — which is every time on Linux (`$OS` isn't `darwin`) and on a fresh macOS `$HOME` with no `.bash_profile` yet. In both cases the installer downloaded the binary and added it to `PATH`, then died before creating symlinks or running `dots init`
-- `test-install.yml`'s version check compared the release tag (e.g. `v2.3.1`) against `dots --version`'s output, which never has the leading `v` (`build.rs` strips it) — now checks both forms
-
-## [2.3.1] - 2026-07-29
-
 ### Added
 - **Dashboard blocks editor** — Settings → **Dashboard blocks** opens an in-TUI editor over `layout.toml`: swap, add, remove, and reorder the widgets in each zone (built-ins and live plugin panes alike), applied to disk as you go. Zone geometry (columns/span/weight) still requires hand-editing `layout.toml`
 - `install.sh` now verifies a downloaded release tarball's SHA-256 checksum before unpacking it
@@ -22,6 +16,8 @@ All notable changes to this project will be documented in this file.
 - A Lua plugin's `dots.sh(cmd)` call is now killed and returns `""` if it runs past 5 seconds, instead of blocking the TUI thread indefinitely — a slow `gh`/`aws` call used to freeze the whole dashboard
 
 ### Fixed
+- `install.sh` no longer aborts silently right after adding itself to `PATH`. The `bash` branch of `configure_path` guarded an optional step (appending to `.bash_profile` on macOS) with a bare `test && test && cmd` chain instead of an `if`; under `set -e`, that chain aborts the whole script the instant either test is false — which is every time on Linux (`$OS` isn't `darwin`) and on a fresh macOS `$HOME` with no `.bash_profile` yet. In both cases the installer downloaded the binary and added it to `PATH`, then died before creating symlinks or running `dots init`
+- `test-install.yml`'s version check compared the release tag (e.g. `v2.3.1`) against `dots --version`'s output, which never has the leading `v` (`build.rs` strips it) — now checks both forms
 - Applying a premade config a second time (or running `dots premade apply` twice) no longer overwrites the backup of the user's real original with the premade content
 - `dots link add` now compares the expanded absolute path when checking for an existing `links.toml` entry, so `~/…` and absolute forms of the same target are recognized as the same link
 
