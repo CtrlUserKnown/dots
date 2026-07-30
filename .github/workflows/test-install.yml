@@ -53,8 +53,11 @@ jobs:
           BIN="$HOME/.dots/bin/dots"
           test -x "$BIN" || { echo "FAIL: $BIN not found"; exit 1; }
 
+          # build.rs strips a leading "v" from DOTS_VERSION before baking it
+          # in, so the binary reports "2.3.0" for tag "v2.3.0" — check for
+          # the tag as given first, then the "v"-stripped form.
           INSTALLED=$("$BIN" --version 2>&1)
-          echo "$INSTALLED" | grep -qF "$VERSION" \
+          echo "$INSTALLED" | grep -qF "$VERSION" || echo "$INSTALLED" | grep -qF "${VERSION#v}" \
             || { echo "FAIL: version $VERSION not in '$INSTALLED'"; exit 1; }
           echo "✓ binary OK — $INSTALLED"
 

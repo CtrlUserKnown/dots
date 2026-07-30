@@ -218,9 +218,14 @@ configure_path() {
         bash)
             SHELL_RC="$HOME/.bashrc"
             append_line "$SHELL_RC" "$export_line"
-            # macOS login shells read .bash_profile, not .bashrc
-            [ "$OS" = darwin ] && [ -f "$HOME/.bash_profile" ] &&
-                append_line "$HOME/.bash_profile" "$export_line" ;;
+            # macOS login shells read .bash_profile, not .bashrc. Guarded by
+            # an explicit `if` (not a bare `&&` chain) — under `set -e`, a
+            # bare chain as the last statement in a `case` branch aborts the
+            # whole script the moment either test is false, even though
+            # that's a routine "skip this" outcome, not a real error.
+            if [ "$OS" = darwin ] && [ -f "$HOME/.bash_profile" ]; then
+                append_line "$HOME/.bash_profile" "$export_line"
+            fi ;;
         fish)
             SHELL_RC="$HOME/.config/fish/config.fish"
             mkdir -p "$(dirname "$SHELL_RC")"

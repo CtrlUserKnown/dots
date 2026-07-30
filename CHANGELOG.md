@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- `install.sh` no longer aborts silently right after adding itself to `PATH`. The `bash` branch of `configure_path` guarded an optional step (appending to `.bash_profile` on macOS) with a bare `test && test && cmd` chain instead of an `if`; under `set -e`, that chain aborts the whole script the instant either test is false — which is every time on Linux (`$OS` isn't `darwin`) and on a fresh macOS `$HOME` with no `.bash_profile` yet. In both cases the installer downloaded the binary and added it to `PATH`, then died before creating symlinks or running `dots init`
+- `test-install.yml`'s version check compared the release tag (e.g. `v2.3.1`) against `dots --version`'s output, which never has the leading `v` (`build.rs` strips it) — now checks both forms
+
 ## [2.3.1] - 2026-07-29
 
 ### Added
