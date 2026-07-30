@@ -6,7 +6,7 @@ members = ["crates/tui-core", "crates/dots"]
 # The version under development — the release workflow refuses to build a tag
 # that disagrees with this, so the fallback baked into a no-git tarball build
 # can never drift behind the real releases again.
-version = "2.3.0"
+version = "2.3.1"
 edition = "2021"
 
 [workspace.dependencies]

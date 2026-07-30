@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.3.1] - 2026-07-29
+
 ### Added
 - **Dashboard blocks editor** — Settings → **Dashboard blocks** opens an in-TUI editor over `layout.toml`: swap, add, remove, and reorder the widgets in each zone (built-ins and live plugin panes alike), applied to disk as you go. Zone geometry (columns/span/weight) still requires hand-editing `layout.toml`
 - `install.sh` now verifies a downloaded release tarball's SHA-256 checksum before unpacking it
