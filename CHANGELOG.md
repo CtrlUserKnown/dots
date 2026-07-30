@@ -4,10 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Dashboard blocks editor** — Settings → **Dashboard blocks** opens an in-TUI editor over `layout.toml`: swap, add, remove, and reorder the widgets in each zone (built-ins and live plugin panes alike), applied to disk as you go. Zone geometry (columns/span/weight) still requires hand-editing `layout.toml`
+- `install.sh` now verifies a downloaded release tarball's SHA-256 checksum before unpacking it
+
 ### Changed
 - `install.sh` no longer clones this tool's own repo into `~/.dots` — it only ever downloads (or, as a last resort, source-builds in a scratch dir) the `dots` binary itself. The only git repo an install now needs is the user's own personal dotfiles repo. Upgraders with a pre-existing full-repo clone at `~/.dots` get it cleaned up automatically (tool-repo files only — `settings.toml`/`links.toml`/`plugins/`/`src/` are left untouched)
 - Version resolution in `install.sh` now queries the GitHub Releases API instead of `git describe`, and the from-source fallback pulls a tagged source tarball via HTTPS instead of `git clone` — `git` is no longer a dependency of the installer at all
 - The TUI now shows a brief boxed banner in the top-right corner when a newer release is found, instead of relying solely on the easily-overwritten one-line flash message
+- The Symlinks/Tools/Configs dashboard tiles now read from a cache refreshed on a background timer instead of re-reading the symlink manifest, spawning a `which` per dependency, and rescanning the configs directory on every single frame
+- A Lua plugin's `dots.sh(cmd)` call is now killed and returns `""` if it runs past 5 seconds, instead of blocking the TUI thread indefinitely — a slow `gh`/`aws` call used to freeze the whole dashboard
+
+### Fixed
+- Applying a premade config a second time (or running `dots premade apply` twice) no longer overwrites the backup of the user's real original with the premade content
+- `dots link add` now compares the expanded absolute path when checking for an existing `links.toml` entry, so `~/…` and absolute forms of the same target are recognized as the same link
 
 ## [2.3.0] - 2026-07-27
 

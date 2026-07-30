@@ -31,5 +31,8 @@ site/CHANGELOG.md
 # universal macOS binary (build artifact)
 dots-universal
 
+# local release helper — not for the repo
+/release.sh
+
 # stray build output — site/ is published wholesale by deploy-site.yml
 site/target/

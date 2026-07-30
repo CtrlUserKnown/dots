@@ -25,7 +25,7 @@ Release-by-release history lives in [`CHANGELOG.md`](CHANGELOG.md).
 curl -fsSL https://ctrluserknown.github.io/dots/install.sh | sh
 ```
 
-The installer downloads a prebuilt binary for your OS/arch straight from GitHub Releases (or builds from source in a scratch dir with `cargo` if no release matches — no `git` required either way), puts it in `~/.dots/bin` and on your `PATH`, and initializes config. It never clones this tool's own repo — the only git repo you need is your own personal dotfiles repo, which `dots` manages separately (see `dots get-config`). Upgrading from an install made before this changed: the installer detects a leftover full-repo clone at `~/.dots` and removes the stale tool-repo files (`.git`, `Cargo.toml`, `crates/`, …) on your next run, leaving your `settings.toml`/`links.toml`/`plugins/`/`src/` untouched.
+The installer downloads a prebuilt binary for your OS/arch straight from GitHub Releases (or builds from source in a scratch dir with `cargo` if no release matches — no `git` required either way), verifies it against the release's published SHA-256 checksum, puts it in `~/.dots/bin` and on your `PATH`, and initializes config. It never clones this tool's own repo — the only git repo you need is your own personal dotfiles repo, which `dots` manages separately (see `dots get-config`). Upgrading from an install made before this changed: the installer detects a leftover full-repo clone at `~/.dots` and removes the stale tool-repo files (`.git`, `Cargo.toml`, `crates/`, …) on your next run, leaving your `settings.toml`/`links.toml`/`plugins/`/`src/` untouched.
 
 ```
 install.sh [--version <tag>] [--dir <path>]
