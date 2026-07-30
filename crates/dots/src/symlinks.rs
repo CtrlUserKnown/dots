@@ -52,12 +52,10 @@ pub fn check(s: &Symlink) -> SymlinkStatus {
         } else {
             SymlinkStatus::Broken
         }
+    } else if s.target.exists() {
+        SymlinkStatus::WrongTarget
     } else {
-        if s.target.exists() {
-            SymlinkStatus::WrongTarget
-        } else {
-            SymlinkStatus::Broken
-        }
+        SymlinkStatus::Broken
     }
 }
 

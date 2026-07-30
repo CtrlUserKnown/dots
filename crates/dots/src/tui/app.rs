@@ -1,5 +1,5 @@
 use std::io::Stdout;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crossterm::event::{
     self, Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
@@ -16,16 +16,24 @@ use ratatui::{
 use crate::config::settings::Settings;
 use crate::plugins::{PluginHost, PluginPaneView};
 use crate::tui::theme::style_error;
-use crate::tui::{draw_desc, draw_key_bar, draw_top_bar, FlashKind};
+use crate::tui::{draw_banner, draw_desc, draw_key_bar, draw_top_bar, FlashKind};
 use crate::update::{self, InstallSource, UpdateInfo};
 use crate::zones::{self, Layout, PanePlacement, Resolved};
 
 use super::aliases::{handle_alias_key, render_aliases, AliasView};
+use super::blocks::{handle_blocks_key, render_blocks, BlocksView};
 use super::configs::ConfigsView;
 use super::health::{HealthView, Scope as HealthScope};
+use super::overview::DashCache;
 use super::profile::{handle_profile_key, render_profile, ProfileView};
 use super::settings::{handle_settings_key, render_settings, render_theme, handle_theme_key, SettingsView, ThemeView};
 use super::update::UpdateScreen;
+
+/// How often the background thread in [`run`] recomputes [`App::dash_cache`].
+const DASH_CACHE_INTERVAL: Duration = Duration::from_secs(2);
+
+/// How long [`App::update_banner`] stays on screen before clearing itself.
+const UPDATE_BANNER_LIFETIME: Duration = Duration::from_secs(5);
 
 // ── screen enum ───────────────────────────────────────────────────────────────
 
@@ -43,6 +51,11 @@ pub enum Screen {
     Theme,
     /// Also where the update check/apply flow lives, as a row in the popup.
     Settings,
+    /// Reassigns which widgets sit in which dashboard zone. Reached only
+    /// from the Settings popup — not a `NAV` member, so it stays modal (see
+    /// `is_modal`) rather than risking a stray digit press teleporting the
+    /// user out mid-edit.
+    Blocks,
 }
 
 // ── app state ─────────────────────────────────────────────────────────────────
@@ -55,6 +68,10 @@ pub struct App {
     /// The newest release, if a background check found one newer than us.
     pub update_info:    Option<UpdateInfo>,
     pub update_error:   Option<String>,
+    /// A transient "update available" notice and when it was shown — cleared a
+    /// few seconds after it appears (see [`UPDATE_BANNER_LIFETIME`]), separate
+    /// from `flash` so it isn't clobbered by the next keypress's flash message.
+    pub update_banner:  Option<(String, Instant)>,
     /// How this binary was installed — gates whether self-update is offered.
     pub install_source: InstallSource,
     pub network:        Option<crate::network::NetworkStatus>,
@@ -66,6 +83,10 @@ pub struct App {
     pub plugin_infos:   Vec<crate::plugins::PluginInfo>,
     /// The dashboard's zone layout, from `~/.dots/layout.toml` or the default.
     pub layout:         Layout,
+    /// Last snapshot of the Symlinks/Tools/Configs tiles' data — recomputed
+    /// on a background thread every [`DASH_CACHE_INTERVAL`] rather than on
+    /// every frame (see [`DashCache`]).
+    pub dash_cache:     DashCache,
     /// [`App::layout`] resolved against the current plugin panes — the concrete
     /// zone/widget arrangement the dashboard draws and navigates.
     pub dash:           Resolved,
@@ -82,12 +103,14 @@ impl App {
             dash_focus:     0,
             update_info:    None,
             update_error:   None,
+            update_banner:  None,
             install_source: update::install_source(),
             network:        None,
             settings,
             plugin_panes:   Vec::new(),
             plugin_infos:   Vec::new(),
             layout:         Layout::default(),
+            dash_cache:     DashCache::default(),
             dash:           Resolved::default(),
             pending_plugin_enter: None,
         }
@@ -109,6 +132,24 @@ impl App {
         let last = self.dash.len().saturating_sub(1);
         self.dash_focus = self.dash_focus.min(last);
     }
+}
+
+// ── screen views ──────────────────────────────────────────────────────────────
+
+/// Every sibling screen's own state, bundled so the dispatch functions below
+/// take one `&mut Views` instead of a growing list of `&mut FooView` — each
+/// new screen used to mean a new parameter threaded through `render`,
+/// `handle_key`, `handle_mouse`, `navigate_to`, and everything they call.
+#[derive(Default)]
+pub struct Views {
+    pub health:   HealthView,
+    pub configs:  ConfigsView,
+    pub aliases:  AliasView,
+    pub profile:  ProfileView,
+    pub update:   UpdateScreen,
+    pub settings: SettingsView,
+    pub theme:    ThemeView,
+    pub blocks:   BlocksView,
 }
 
 // ── navigation ────────────────────────────────────────────────────────────────
@@ -152,14 +193,8 @@ pub fn run(
     start:     Screen,
     settings:  &Settings,
 ) -> anyhow::Result<()> {
-    let mut app           = App::new(start, settings.clone());
-    let mut health_view   = HealthView::new();
-    let mut configs_view  = ConfigsView::new();
-    let mut alias_view    = AliasView::new();
-    let mut profile_view  = ProfileView::new();
-    let mut update_screen = UpdateScreen::new();
-    let mut settings_view = SettingsView::new();
-    let mut theme_view    = ThemeView::new();
+    let mut app   = App::new(start, settings.clone());
+    let mut views = Views::default();
 
     // Load Lua plugins and seed the dashboard with their panes and zones. The
     // host stays on this thread (its Lua state is not Send).
@@ -194,12 +229,13 @@ pub fn run(
         }
     }
     app.rebuild_dashboard();
+    app.dash_cache = DashCache::compute();
 
     if start == Screen::Settings {
-        settings_view.load_from(&app.settings);
-        update_screen.sync_from_app(&app);
+        views.settings.load_from(&app.settings);
+        views.update.sync_from_app(&app);
     }
-    if start == Screen::Theme { theme_view.load(); }
+    if start == Screen::Theme { views.theme.load(); }
 
     // Kick off the background release check, unless disabled or this binary is
     // managed by a package manager (then updating is the manager's job). The
@@ -218,9 +254,26 @@ pub fn run(
         std::thread::sleep(Duration::from_secs(5));
     });
 
+    // Same pattern for the Symlinks/Tools/Configs tiles: `DashCache::compute`
+    // reads the symlink manifest, spawns a `which` per dependency, and scans
+    // the configs directory, so it runs here rather than in the render path.
+    let (dash_tx, dash_rx) = std::sync::mpsc::channel::<DashCache>();
+    std::thread::spawn(move || loop {
+        std::thread::sleep(DASH_CACHE_INTERVAL);
+        if dash_tx.send(DashCache::compute()).is_err() {
+            break;
+        }
+    });
+
     loop {
-        update_screen.pump(&mut app);
-        health_view.try_complete_install();
+        views.update.pump(&mut app);
+        views.health.try_complete_install();
+
+        if let Some((_, shown_at)) = &app.update_banner {
+            if shown_at.elapsed() >= UPDATE_BANNER_LIFETIME {
+                app.update_banner = None;
+            }
+        }
 
         // Refresh any plugin panes whose interval has elapsed.
         if plugin_host.tick() {
@@ -231,6 +284,11 @@ pub fn run(
         // Drain the latest network snapshot (keep only the freshest).
         while let Ok(status) = net_rx.try_recv() {
             app.network = Some(status);
+        }
+
+        // Same for the dashboard data cache.
+        while let Ok(cache) = dash_rx.try_recv() {
+            app.dash_cache = cache;
         }
 
         // Fold in the initial release check the moment it lands.
@@ -244,6 +302,10 @@ pub fn run(
                                 FlashKind::Info,
                             ));
                         }
+                        app.update_banner = Some((
+                            format!("Update available: v{}", info.latest),
+                            Instant::now(),
+                        ));
                         app.update_info = Some(info);
                     }
                     Ok(None) => {}
@@ -252,35 +314,14 @@ pub fn run(
             }
         }
 
-        terminal.draw(|f| render(f, &app, &health_view, &configs_view, &alias_view, &profile_view, &update_screen, &settings_view, &theme_view))?;
+        terminal.draw(|f| render(f, &app, &views))?;
 
         if event::poll(Duration::from_millis(16))? {
             match event::read()? {
-                Event::Key(key) => handle_key(
-                    &mut app,
-                    &mut health_view,
-                    &mut configs_view,
-                    &mut alias_view,
-                    &mut profile_view,
-                    &mut update_screen,
-                    &mut settings_view,
-                    &mut theme_view,
-                    key,
-                ),
+                Event::Key(key) => handle_key(&mut app, &mut views, key),
                 Event::Mouse(me) => {
                     let area = terminal.size().map(|s| Rect::new(0, 0, s.width, s.height)).unwrap_or_default();
-                    handle_mouse(
-                        &mut app,
-                        &mut health_view,
-                        &mut configs_view,
-                        &mut alias_view,
-                        &mut profile_view,
-                        &mut update_screen,
-                        &mut settings_view,
-                        &mut theme_view,
-                        me,
-                        area,
-                    );
+                    handle_mouse(&mut app, &mut views, me, area);
                 }
                 Event::Resize(..) => {}
                 _ => {}
@@ -303,18 +344,7 @@ pub fn run(
 
 // ── rendering dispatch ────────────────────────────────────────────────────────
 
-#[allow(clippy::too_many_arguments)]
-fn render(
-    f:        &mut Frame,
-    app:      &App,
-    health:   &HealthView,
-    configs:  &ConfigsView,
-    aliases:  &AliasView,
-    profile:  &ProfileView,
-    update:   &UpdateScreen,
-    settings: &SettingsView,
-    theme:    &ThemeView,
-) {
+fn render(f: &mut Frame, app: &App, views: &Views) {
     let area = f.area();
     if area.width < 50 || area.height < 14 {
         render_too_small(f, area);
@@ -322,18 +352,23 @@ fn render(
     }
     match app.screen {
         Screen::Main     => render_main(f, area, app),
-        Screen::Symlinks | Screen::Tools => super::health::render(f, area, app, health),
-        Screen::Configs  => super::configs::render(f, area, app, configs),
-        Screen::Aliases  => render_aliases(f, area, app, aliases),
-        Screen::Profile  => render_profile(f, area, app, profile),
+        Screen::Symlinks | Screen::Tools => super::health::render(f, area, app, &views.health),
+        Screen::Configs  => super::configs::render(f, area, app, &views.configs),
+        Screen::Aliases  => render_aliases(f, area, app, &views.aliases),
+        Screen::Profile  => render_profile(f, area, app, &views.profile),
         // Settings (which folds in updates) is a popup: draw the dashboard
         // underneath, then overlay it, mirroring ssm's which-key popup over
         // its list screen.
         Screen::Settings => {
             render_main(f, area, app);
-            render_settings(f, area, app, settings, update);
+            render_settings(f, area, app, &views.settings, &views.update);
         }
-        Screen::Theme    => render_theme(f, area, app, theme),
+        Screen::Theme    => render_theme(f, area, app, &views.theme),
+        Screen::Blocks   => render_blocks(f, area, app, &views.blocks),
+    }
+
+    if let Some((msg, _)) = &app.update_banner {
+        draw_banner(f, area, msg, &FlashKind::Info);
     }
 }
 
@@ -385,18 +420,7 @@ fn render_too_small(f: &mut Frame, area: Rect) {
 
 // ── key dispatch ──────────────────────────────────────────────────────────────
 
-#[allow(clippy::too_many_arguments)]
-fn handle_key(
-    app:      &mut App,
-    health:   &mut HealthView,
-    configs:  &mut ConfigsView,
-    aliases:  &mut AliasView,
-    profile:  &mut ProfileView,
-    update:   &mut UpdateScreen,
-    settings: &mut SettingsView,
-    theme:    &mut ThemeView,
-    key:      KeyEvent,
-) {
+fn handle_key(app: &mut App, views: &mut Views, key: KeyEvent) {
     if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
         app.should_quit = true;
         return;
@@ -405,7 +429,7 @@ fn handle_key(
     // Cross-screen navigation, handled before the screen sees the key — but
     // only when the screen isn't holding a prompt open. A screen mid-edit owns
     // every keystroke, or typing "3" into a path would teleport you to configs.
-    if !is_modal(app, health, configs, aliases, profile) {
+    if !is_modal(app, views) {
         let target = match key.code {
             KeyCode::Char(']') | KeyCode::Tab      => Some(nav_step(app.screen, 1)),
             KeyCode::Char('[') | KeyCode::BackTab  => Some(nav_step(app.screen, -1)),
@@ -415,34 +439,24 @@ fn handle_key(
             _ => None,
         };
         if let Some(screen) = target {
-            navigate_to(app, health, configs, aliases, profile, update, settings, theme, screen);
+            navigate_to(app, views, screen);
             return;
         }
     }
 
     match app.screen {
-        Screen::Main     => handle_main_key(app, health, configs, aliases, profile, update, settings, theme, key),
-        Screen::Symlinks | Screen::Tools => super::health::handle_key(app, health, key),
-        Screen::Configs  => super::configs::handle_key(app, configs, key),
-        Screen::Aliases  => handle_alias_key(app, aliases, key),
-        Screen::Profile  => handle_profile_key(app, profile, key),
-        Screen::Settings => handle_settings_key(app, settings, theme, update, key),
-        Screen::Theme    => handle_theme_key(app, theme, key),
+        Screen::Main     => handle_main_key(app, views, key),
+        Screen::Symlinks | Screen::Tools => super::health::handle_key(app, &mut views.health, key),
+        Screen::Configs  => super::configs::handle_key(app, &mut views.configs, key),
+        Screen::Aliases  => handle_alias_key(app, &mut views.aliases, key),
+        Screen::Profile  => handle_profile_key(app, &mut views.profile, key),
+        Screen::Settings => handle_settings_key(app, &mut views.settings, &mut views.theme, &mut views.blocks, &mut views.update, key),
+        Screen::Theme    => handle_theme_key(app, &mut views.theme, key),
+        Screen::Blocks   => handle_blocks_key(app, &mut views.blocks, key),
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn handle_main_key(
-    app:      &mut App,
-    health:   &mut HealthView,
-    configs:  &mut ConfigsView,
-    aliases:  &mut AliasView,
-    profile:  &mut ProfileView,
-    update:   &mut UpdateScreen,
-    settings: &mut SettingsView,
-    theme:    &mut ThemeView,
-    key:      KeyEvent,
-) {
+fn handle_main_key(app: &mut App, views: &mut Views, key: KeyEvent) {
     use super::overview::{self, Dir};
 
     match key.code {
@@ -453,12 +467,8 @@ fn handle_main_key(
         KeyCode::Char('k') | KeyCode::Up    => app.dash_focus = overview::move_focus(app, app.dash_focus, Dir::Up),
         // Digits and `[`/`]` are handled globally in `handle_key`, so the
         // dashboard doesn't bind them itself — one table drives them everywhere.
-        KeyCode::Char(' ') => {
-            navigate_to(app, health, configs, aliases, profile, update, settings, theme, Screen::Settings);
-        }
-        KeyCode::Enter => {
-            activate_focus(app, health, configs, aliases, profile, update, settings, theme, app.dash_focus);
-        }
+        KeyCode::Char(' ') => navigate_to(app, views, Screen::Settings),
+        KeyCode::Enter => activate_focus(app, views, app.dash_focus),
         _ => {}
     }
 }
@@ -466,21 +476,19 @@ fn handle_main_key(
 /// True when the active screen owns every keystroke and global navigation must
 /// keep its hands off: a text prompt, a confirmation, an open pager, or the
 /// settings popup (which holds unsaved edits until `esc` writes them).
-fn is_modal(
-    app:      &App,
-    health:   &HealthView,
-    configs:  &ConfigsView,
-    aliases:  &AliasView,
-    profile:  &ProfileView,
-) -> bool {
-    if app.screen == Screen::Settings {
+fn is_modal(app: &App, views: &Views) -> bool {
+    // Blocks has no `NAV` slot of its own (unlike Theme), so — like Settings —
+    // it stays modal unconditionally: an un-modal Blocks screen would let a
+    // stray digit press silently teleport the user out via the leading
+    // digit-key check in `handle_key`, and there's no sane target for that.
+    if app.screen == Screen::Settings || app.screen == Screen::Blocks {
         return true;
     }
     match app.screen {
-        Screen::Symlinks | Screen::Tools => health.is_busy(),
-        Screen::Configs => configs.is_capturing(),
-        Screen::Aliases => aliases.is_capturing(),
-        Screen::Profile => profile.is_capturing(),
+        Screen::Symlinks | Screen::Tools => views.health.is_busy(),
+        Screen::Configs => views.configs.is_capturing(),
+        Screen::Aliases => views.aliases.is_capturing(),
+        Screen::Profile => views.profile.is_capturing(),
         _ => false,
     }
 }
@@ -488,42 +496,17 @@ fn is_modal(
 /// Open whatever dashboard widget sits at `focus`: drill into a built-in's
 /// screen, or hand a plugin pane off to the host in the event loop. Shared by
 /// the enter key and left-click so both do exactly the same thing.
-#[allow(clippy::too_many_arguments)]
-fn activate_focus(
-    app:      &mut App,
-    health:   &mut HealthView,
-    configs:  &mut ConfigsView,
-    aliases:  &mut AliasView,
-    profile:  &mut ProfileView,
-    update:   &mut UpdateScreen,
-    settings: &mut SettingsView,
-    theme:    &mut ThemeView,
-    focus:    usize,
-) {
+fn activate_focus(app: &mut App, views: &mut Views, focus: usize) {
     use super::overview::{focused, Focus};
 
     match focused(app, focus) {
-        Some(Focus::Builtin(pane)) => {
-            navigate_to(app, health, configs, aliases, profile, update, settings, theme, pane.target());
-        }
+        Some(Focus::Builtin(pane)) => navigate_to(app, views, pane.target()),
         Some(Focus::Plugin(i)) => app.pending_plugin_enter = Some(i),
         None => {}
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn handle_mouse(
-    app:      &mut App,
-    health:   &mut HealthView,
-    configs:  &mut ConfigsView,
-    aliases:  &mut AliasView,
-    profile:  &mut ProfileView,
-    update:   &mut UpdateScreen,
-    settings: &mut SettingsView,
-    theme:    &mut ThemeView,
-    me:       MouseEvent,
-    area:     Rect,
-) {
+fn handle_mouse(app: &mut App, views: &mut Views, me: MouseEvent, area: Rect) {
     use super::overview;
 
     match me.kind {
@@ -532,7 +515,7 @@ fn handle_mouse(
         MouseEventKind::ScrollDown | MouseEventKind::ScrollUp => {
             let code = if matches!(me.kind, MouseEventKind::ScrollDown) { KeyCode::Down } else { KeyCode::Up };
             let key = KeyEvent::new(code, KeyModifiers::NONE);
-            handle_key(app, health, configs, aliases, profile, update, settings, theme, key);
+            handle_key(app, views, key);
         }
         // Left-click on a dashboard pane focuses and opens it. The 50×14 guard
         // matches the threshold below which the dashboard isn't drawn at all.
@@ -542,60 +525,54 @@ fn handle_mouse(
             let grid = dashboard_grid(area);
             if let Some(i) = overview::pane_at(grid, app, me.column, me.row) {
                 app.dash_focus = i;
-                activate_focus(app, health, configs, aliases, profile, update, settings, theme, i);
+                activate_focus(app, views, i);
             }
         }
         _ => {}
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn navigate_to(
-    app:      &mut App,
-    health:   &mut HealthView,
-    configs:  &mut ConfigsView,
-    aliases:  &mut AliasView,
-    profile:  &mut ProfileView,
-    update:   &mut UpdateScreen,
-    settings: &mut SettingsView,
-    theme:    &mut ThemeView,
-    screen:   Screen,
-) {
+fn navigate_to(app: &mut App, views: &mut Views, screen: Screen) {
     match screen {
         Screen::Symlinks => {
-            health.show(HealthScope::Symlinks);
+            views.health.show(HealthScope::Symlinks);
             app.screen = Screen::Symlinks;
             app.flash  = None;
         }
         Screen::Tools => {
-            health.show(HealthScope::Tools);
+            views.health.show(HealthScope::Tools);
             app.screen = Screen::Tools;
             app.flash  = None;
         }
         Screen::Configs => {
-            configs.reload();
+            views.configs.reload();
             app.screen = Screen::Configs;
             app.flash  = None;
         }
         Screen::Aliases => {
-            aliases.reload();
+            views.aliases.reload();
             app.screen = Screen::Aliases;
             app.flash  = None;
         }
         Screen::Profile => {
-            profile.reset();
+            views.profile.reset();
             app.screen = Screen::Profile;
             app.flash  = None;
         }
         Screen::Settings => {
-            settings.load_from(&app.settings);
-            update.sync_from_app(app);
+            views.settings.load_from(&app.settings);
+            views.update.sync_from_app(app);
             app.screen = Screen::Settings;
             app.flash  = None;
         }
         Screen::Theme => {
-            theme.load();
+            views.theme.load();
             app.screen = Screen::Theme;
+            app.flash  = None;
+        }
+        Screen::Blocks => {
+            views.blocks.load();
+            app.screen = Screen::Blocks;
             app.flash  = None;
         }
         other => {
@@ -610,10 +587,6 @@ fn navigate_to(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn views() -> (HealthView, ConfigsView, AliasView, ProfileView) {
-        (HealthView::new(), ConfigsView::new(), AliasView::new(), ProfileView::new())
-    }
 
     /// The nav strip, the digit keys, and `[`/`]` all read the same table, so
     /// they can never disagree about which screen is which.
@@ -650,19 +623,23 @@ mod tests {
     #[test]
     fn a_prompt_is_modal_and_global_nav_stays_out() {
         let mut app = App::new(Screen::Aliases, crate::config::settings::Settings::default());
-        let (health, configs, mut aliases, profile) = views();
-        assert!(!is_modal(&app, &health, &configs, &aliases, &profile), "the list is not modal");
+        let mut views = Views::default();
+        assert!(!is_modal(&app, &views), "the list is not modal");
 
-        aliases.mode = super::super::aliases::AliasMode::Search { query: "3".into() };
-        assert!(
-            is_modal(&app, &health, &configs, &aliases, &profile),
-            "a search box must keep its keys",
-        );
+        views.aliases.mode = super::super::aliases::AliasMode::Search { query: "3".into() };
+        assert!(is_modal(&app, &views), "a search box must keep its keys");
 
         // The settings popup holds unsaved edits until esc writes them.
         app.screen = Screen::Settings;
-        let (health, configs, aliases, profile) = views();
-        assert!(is_modal(&app, &health, &configs, &aliases, &profile));
+        let views = Views::default();
+        assert!(is_modal(&app, &views));
+
+        // Blocks has no `NAV` slot, so it must stay modal too — otherwise a
+        // stray digit press would silently bounce the user to another screen
+        // mid-edit, with nowhere sane on the ring for Blocks itself to go back to.
+        app.screen = Screen::Blocks;
+        let views = Views::default();
+        assert!(is_modal(&app, &views));
     }
 
     #[test]

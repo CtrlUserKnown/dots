@@ -2,8 +2,11 @@
 # dots installer — portable, POSIX sh. Safe to run via:
 #   curl -fsSL https://raw.githubusercontent.com/CtrlUserKnown/dots/main/install.sh | sh
 #
-# Installs the dots repo to ~/.dots, puts the `dots` binary on your PATH
-# (regardless of which shell you use), and wires up your dotfiles.
+# Downloads a prebuilt `dots` binary for your OS/arch straight from GitHub
+# Releases, puts it on your PATH (regardless of which shell you use), and
+# wires up your dotfiles. Never clones this tool's own repo — the only git
+# repo you need is your own personal dotfiles repo, which `dots` manages
+# separately (see `dots get-config`).
 set -eu
 
 # ── configuration ─────────────────────────────────────────────────────────────
@@ -36,6 +39,17 @@ warn() { printf '  ⚠ %s\n' "$*" >&2; }
 die()  { printf '\n%sError:%s %s\n' "$B" "$R" "$*" >&2; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
+fetch() {  # fetch <url>  — prints body to stdout
+    url="$1"
+    if have curl; then
+        curl -fsSL "$url"
+    elif have wget; then
+        wget -qO- "$url"
+    else
+        return 1
+    fi
+}
+
 # ── platform detection ────────────────────────────────────────────────────────
 
 detect_platform() {
@@ -53,27 +67,71 @@ detect_platform() {
     esac
 }
 
-# ── step 1: clone or update the repo ──────────────────────────────────────────
+# ── step 1: clean up a legacy full-repo clone, if this dir has one ────────────
 
-setup_repo() {
-    have git || die "git is required. Install git and re-run."
-    if [ -d "$DOTS_DIR/.git" ]; then
-        info "Updating $DOTS_DIR…"
-        git -C "$DOTS_DIR" fetch --quiet origin || die "git fetch failed"
-        git -C "$DOTS_DIR" pull --ff-only --quiet ||
-            die "'git pull --ff-only' failed — you have local changes in $DOTS_DIR. Stash or commit them, then re-run."
-    else
-        info "Cloning $REPO…"
-        git clone --quiet "$REPO_URL" "$DOTS_DIR" || die "git clone failed"
+# Installs before this rework did `git clone` of this tool's own repo into
+# $DOTS_DIR, so upgraders may have Cargo.toml/crates/.git/etc. sitting next to
+# their real config (settings.toml, links.toml, ...). Remove exactly the
+# known tool-repo artifacts by allowlist; everything else is left alone.
+migrate_legacy_clone() {
+    [ -d "$DOTS_DIR/.git" ] || return 0
+    have git || return 0
+
+    origin=$(git -C "$DOTS_DIR" remote get-url origin 2>/dev/null || echo "")
+    # Exact match only — a substring match would also fire for a user's own
+    # fork of this repo (e.g. kept as their personal dotfiles remote), which
+    # would then have its .git/Cargo.toml/crates/ deleted as "legacy" files.
+    slug="${OWNER}/${REPO}"
+    case "$origin" in
+        "https://github.com/${slug}"|"https://github.com/${slug}.git"|"https://github.com/${slug}/") ;;
+        "git@github.com:${slug}"|"git@github.com:${slug}.git") ;;
+        *) return 0 ;;
+    esac
+
+    info "Found a legacy full-repo clone at $DOTS_DIR — cleaning up tool-repo files…"
+    removed=""
+    for item in .git Cargo.toml Cargo.lock crates .github site target \
+                README.md CHANGELOG.md man tests examples docs img test-env \
+                uninstall.sh install.sh BUILD_MACOS.md; do
+        path="$DOTS_DIR/$item"
+        if [ -e "$path" ]; then
+            rm -rf "$path"
+            removed="$removed $item"
+        fi
+    done
+    if [ -n "$removed" ]; then
+        ok "Removed:$removed"
     fi
-    ok "Repository ready"
+    ok "Your config (settings.toml, links.toml, plugins/, src/, ...) was left untouched"
 }
 
 # ── step 2: obtain the binary (download prebuilt, else build) ─────────────────
 
 resolve_version() {
     [ -n "$VERSION" ] && return 0
-    VERSION=$(git -C "$DOTS_DIR" describe --tags --abbrev=0 2>/dev/null || echo "")
+    info "Resolving latest release…"
+    json=$(fetch "https://api.github.com/repos/${OWNER}/${REPO}/releases/latest" 2>/dev/null || echo "")
+    VERSION=$(printf '%s\n' "$json" | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name" *: *"([^"]+)".*/\1/')
+}
+
+# verify_checksum <file> <asset-name> — fetches <asset-name>.sha256 (published
+# alongside every release asset by release.yml) and checks it against <file>.
+# Fails closed: no sha256/shasum tool, or no sidecar reachable, is a failure,
+# not a silent skip — otherwise blocking the sidecar fetch would defeat it.
+verify_checksum() {
+    file="$1"; asset="$2"
+    if have sha256sum; then hasher() { sha256sum "$1" | awk '{print $1}'; }
+    elif have shasum;  then hasher() { shasum -a 256 "$1" | awk '{print $1}'; }
+    else warn "no sha256sum/shasum found — cannot verify download integrity"; return 1
+    fi
+    sidecar=$(fetch "${REPO_URL}/releases/download/${VERSION}/${asset}.sha256" 2>/dev/null) || return 1
+    expected=$(printf '%s\n' "$sidecar" | awk '{print $1}')
+    [ -n "$expected" ] || return 1
+    actual=$(hasher "$file")
+    if [ "$expected" != "$actual" ]; then
+        warn "checksum mismatch for ${asset} (expected ${expected}, got ${actual})"
+        return 1
+    fi
 }
 
 download_binary() {
@@ -81,23 +139,40 @@ download_binary() {
     asset="dots-${VERSION}-${OS}-${ARCH}.tar.gz"
     url="${REPO_URL}/releases/download/${VERSION}/${asset}"
     mkdir -p "$BIN_DIR"
-    info "Downloading $asset…"
-    if have curl; then
-        curl -fsSL "$url" | tar -xz -C "$BIN_DIR" 2>/dev/null || return 1
-    elif have wget; then
-        wget -qO- "$url" | tar -xz -C "$BIN_DIR" 2>/dev/null || return 1
-    else
+    info "Downloading ${asset}…"
+    tmp_tar=$(mktemp) || return 1
+    fetch "$url" > "$tmp_tar" 2>/dev/null || { rm -f "$tmp_tar"; return 1; }
+    if ! verify_checksum "$tmp_tar" "$asset"; then
+        rm -f "$tmp_tar"
         return 1
     fi
+    tar -xzf "$tmp_tar" -C "$BIN_DIR" 2>/dev/null
+    rm -f "$tmp_tar"
     [ -x "$DOTS_BIN" ]
 }
 
+# Fallback for platforms/tags with no prebuilt asset: pull the tagged source
+# tarball straight from GitHub (no git needed) and build it in a scratch dir.
 build_binary() {
     have cargo || return 1
+    [ -n "$VERSION" ] || return 1
     info "Building from source ($VERSION)…"
-    cargo build --release --manifest-path "$DOTS_DIR/Cargo.toml" || return 1
+
+    tmp_src=$(mktemp -d) || return 1
+    src_url="https://github.com/${OWNER}/${REPO}/archive/refs/tags/${VERSION}.tar.gz"
+    if ! fetch "$src_url" 2>/dev/null | tar -xz -C "$tmp_src" --strip-components=1 2>/dev/null; then
+        rm -rf "$tmp_src"
+        return 1
+    fi
+
+    if ! ( cd "$tmp_src" && cargo build --release --manifest-path Cargo.toml ); then
+        rm -rf "$tmp_src"
+        return 1
+    fi
+
     mkdir -p "$BIN_DIR"
-    cp "$DOTS_DIR/target/release/dots" "$DOTS_BIN"
+    cp "$tmp_src/target/release/dots" "$DOTS_BIN" || { rm -rf "$tmp_src"; return 1; }
+    rm -rf "$tmp_src"
     [ -x "$DOTS_BIN" ]
 }
 
@@ -176,8 +251,9 @@ setup_dotfiles() {
 # ── run ───────────────────────────────────────────────────────────────────────
 
 printf '\n%sInstalling dots%s\n\n' "$B" "$R"
+have curl || have wget || die "curl or wget is required. Install one and re-run."
 detect_platform
-setup_repo
+migrate_legacy_clone
 setup_binary
 configure_path
 setup_dotfiles

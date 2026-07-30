@@ -10,6 +10,7 @@ use ratatui::{
 use std::path::Path;
 
 use crate::config::settings::{self, dots_dir, Settings};
+use crate::tui::blocks::BlocksView;
 use crate::tui::update::UpdateScreen;
 use crate::tui::{draw_desc, draw_key_bar, draw_screen_nav, FlashKind};
 use crate::tui::app::{App, Screen};
@@ -49,6 +50,7 @@ enum FieldKey {
     CheckInterval,
     Greeting,
     Theme,
+    Blocks,
 }
 
 fn field_label(k: FieldKey) -> &'static str {
@@ -58,6 +60,7 @@ fn field_label(k: FieldKey) -> &'static str {
         FieldKey::CheckInterval => "Check interval",
         FieldKey::Greeting      => "Shell greeting",
         FieldKey::Theme         => "Theme",
+        FieldKey::Blocks        => "Dashboard blocks",
     }
 }
 
@@ -70,6 +73,7 @@ fn field_desc(k: FieldKey, app: &App, update: &UpdateScreen) -> String {
         FieldKey::CheckInterval => "how often to check for updates".into(),
         FieldKey::Greeting      => "show fastfetch system info when opening a terminal".into(),
         FieldKey::Theme         => "pick a terminal color theme".into(),
+        FieldKey::Blocks        => "swap or rearrange the dashboard's widgets".into(),
     }
 }
 
@@ -106,6 +110,7 @@ impl SettingsView {
             FieldKey::CheckInterval,
             FieldKey::Greeting,
             FieldKey::Theme,
+            FieldKey::Blocks,
         ];
     }
 
@@ -118,6 +123,7 @@ impl SettingsView {
             FieldKey::CheckInterval => (freq_label(self.settings.dots.update_frequency).to_string(), true),
             FieldKey::Greeting      => bool_display(self.settings.dots.greeting),
             FieldKey::Theme         => (String::new(), true),
+            FieldKey::Blocks        => (String::new(), true),
         }
     }
 
@@ -131,12 +137,13 @@ impl SettingsView {
             }
             FieldKey::Update  => SettingsAction::ActivateUpdate,
             FieldKey::Theme   => SettingsAction::OpenTheme,
+            FieldKey::Blocks  => SettingsAction::OpenBlocks,
         }
     }
 }
 
 #[must_use]
-enum SettingsAction { None, ActivateUpdate, OpenTheme }
+enum SettingsAction { None, ActivateUpdate, OpenTheme, OpenBlocks }
 
 fn bool_display(v: bool) -> (String, bool) {
     (if v { "ON".to_string() } else { "OFF".to_string() }, v)
@@ -234,6 +241,7 @@ pub fn handle_settings_key(
     app:    &mut App,
     view:   &mut SettingsView,
     theme:  &mut ThemeView,
+    blocks: &mut BlocksView,
     update: &mut UpdateScreen,
     key:    KeyEvent,
 ) {
@@ -260,6 +268,10 @@ pub fn handle_settings_key(
                     SettingsAction::OpenTheme => {
                         theme.load();
                         app.screen = Screen::Theme;
+                    }
+                    SettingsAction::OpenBlocks => {
+                        blocks.load();
+                        app.screen = Screen::Blocks;
                     }
                 }
             }

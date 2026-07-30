@@ -21,10 +21,10 @@ use ratatui::{
 };
 use tui_core::{status_row, summary_line, Status};
 
-use crate::packages::{check_dep, check_plugin, Category, DEPS, PLUGINS};
+use crate::packages::{check_dep, check_plugin, Category, Dep, Plugin, DEPS, PLUGINS};
 use crate::plugins::layout::{self, Cell};
 use crate::plugins::PluginPaneView;
-use crate::symlinks::{self, SymlinkStatus};
+use crate::symlinks::{self, Symlink, SymlinkStatus};
 use crate::tui::app::{App, Screen};
 use crate::tui::theme::style_text;
 use crate::zones::{Resolved, ResolvedZone, Widget};
@@ -57,7 +57,7 @@ impl Pane {
         }
     }
 
-    fn title(self) -> &'static str {
+    pub(crate) fn title(self) -> &'static str {
         match self {
             Pane::Symlinks => " Symlinks ",
             Pane::Tools    => " Tools ",
@@ -160,6 +160,57 @@ pub fn move_focus(app: &App, focus: usize, dir: Dir) -> usize {
     layout::move_focus(&widget_rects(area, &app.dash, &app.plugin_panes), focus, dir)
 }
 
+// ── dashboard data cache ────────────────────────────────────────────────────
+
+/// A snapshot of everything the Symlinks/Tools/Configs tiles show, recomputed
+/// on a timer rather than every frame.
+///
+/// Each render used to re-read the symlink manifest and the configs
+/// directory from disk and re-spawn a `which` subprocess per dependency —
+/// unnoticeable once, ruinous at a 60Hz redraw. [`App::run`] refreshes this
+/// on a background thread instead (mirroring the network probe below it) and
+/// the render path only ever reads the last snapshot.
+pub struct DashCache {
+    symlinks:    Vec<(Symlink, SymlinkStatus)>,
+    tools:       Vec<(&'static Dep, bool)>,
+    zsh_plugins: Vec<(&'static Plugin, bool)>,
+    /// Each config alongside its precomputed `(ok, total)` link counts, so
+    /// [`crate::configs::Config::link_counts`] — itself a symlink stat per
+    /// link — also runs only once per refresh, not once per frame.
+    configs:     Vec<(crate::configs::Config, usize, usize)>,
+}
+
+impl DashCache {
+    /// Does the actual I/O: reads the symlink manifest, spawns a `which` per
+    /// dependency, and scans the configs directory. Call off the render
+    /// thread — see [`App::run`].
+    pub fn compute() -> Self {
+        let symlinks = symlinks::get_symlinks()
+            .into_iter()
+            .map(|s| { let status = symlinks::check(&s); (s, status) })
+            .collect();
+        let tools = DEPS.iter()
+            .filter(|d| d.category == Category::Required || d.category == Category::Optional)
+            .map(|d| (d, check_dep(d)))
+            .collect();
+        let zsh_plugins = PLUGINS.iter().map(|p| (p, check_plugin(p))).collect();
+        let configs = crate::configs::discover()
+            .into_iter()
+            .map(|c| { let (ok, total) = c.link_counts(); (c, ok, total) })
+            .collect();
+        Self { symlinks, tools, zsh_plugins, configs }
+    }
+}
+
+impl Default for DashCache {
+    /// Empty, not computed — so building an `App` in a test never touches
+    /// the filesystem or shells out. [`App::run`] fills it in for real before
+    /// the event loop starts.
+    fn default() -> Self {
+        Self { symlinks: Vec::new(), tools: Vec::new(), zsh_plugins: Vec::new(), configs: Vec::new() }
+    }
+}
+
 // ── summaries ───────────────────────────────────────────────────────────────
 
 struct Summary {
@@ -172,30 +223,25 @@ impl Summary {
     fn all_ok(&self) -> bool { self.total > 0 && self.ok == self.total }
 }
 
-fn symlink_summary() -> Summary {
-    let links = symlinks::get_symlinks();
-    let total = links.len();
-    let ok = links.iter().filter(|s| symlinks::check(s) == SymlinkStatus::Ok).count();
+fn symlink_summary(cache: &DashCache) -> Summary {
+    let total = cache.symlinks.len();
+    let ok = cache.symlinks.iter().filter(|(_, status)| *status == SymlinkStatus::Ok).count();
     Summary { ok, total }
 }
 
 /// Tools covers both installed CLI deps and zsh plugins — the dashboard tile
 /// and the Health screen's "tools" section (with zsh as a subheading) agree.
-fn tool_summary() -> Summary {
-    let tools: Vec<_> = DEPS.iter()
-        .filter(|d| d.category == Category::Required || d.category == Category::Optional)
-        .collect();
-    let total = tools.len() + PLUGINS.len();
-    let ok = tools.iter().filter(|d| check_dep(d)).count()
-        + PLUGINS.iter().filter(|p| check_plugin(p)).count();
+fn tool_summary(cache: &DashCache) -> Summary {
+    let total = cache.tools.len() + cache.zsh_plugins.len();
+    let ok = cache.tools.iter().filter(|(_, ok)| *ok).count()
+        + cache.zsh_plugins.iter().filter(|(_, ok)| *ok).count();
     Summary { ok, total }
 }
 
-fn config_summary() -> Summary {
-    let cfgs = crate::configs::discover();
-    let total = cfgs.len();
-    let ok = cfgs.iter()
-        .filter(|c| c.status == crate::configs::ConfigStatus::Installed)
+fn config_summary(cache: &DashCache) -> Summary {
+    let total = cache.configs.len();
+    let ok = cache.configs.iter()
+        .filter(|(c, ..)| c.status == crate::configs::ConfigStatus::Installed)
         .count();
     Summary { ok, total }
 }
@@ -213,17 +259,17 @@ fn plugin_summary(app: &App) -> Summary {
 pub fn pane_hint(pane: Pane, app: &App) -> String {
     match pane {
         Pane::Symlinks => {
-            let s = symlink_summary();
+            let s = symlink_summary(&app.dash_cache);
             if s.all_ok() { "all symlinks healthy — enter to view".into() }
             else { format!("{} broken symlink(s) — enter to repair", s.bad()) }
         }
         Pane::Tools => {
-            let s = tool_summary();
+            let s = tool_summary(&app.dash_cache);
             if s.all_ok() { "all tools installed — enter to view".into() }
             else { format!("{} tool(s) missing — enter to install", s.bad()) }
         }
         Pane::Configs => {
-            let s = config_summary();
+            let s = config_summary(&app.dash_cache);
             if s.total == 0 {
                 "no dotfiles configs found — enter for details".into()
             } else {
@@ -414,10 +460,10 @@ fn problems_first(mut rows: Vec<Row>) -> Vec<Row> {
 fn pane_rows(pane: Pane, app: &App) -> Vec<Row> {
     match pane {
         Pane::Symlinks => problems_first(
-            symlinks::get_symlinks()
+            app.dash_cache.symlinks
                 .iter()
-                .map(|s| {
-                    let (status, label) = match symlinks::check(s) {
+                .map(|(s, status)| {
+                    let (status, label) = match status {
                         SymlinkStatus::Ok          => (Status::Ok, "linked"),
                         SymlinkStatus::Missing     => (Status::Bad, "missing"),
                         SymlinkStatus::Broken      => (Status::Bad, "broken"),
@@ -429,36 +475,29 @@ fn pane_rows(pane: Pane, app: &App) -> Vec<Row> {
                 .collect(),
         ),
         Pane::Tools => problems_first(
-            DEPS.iter()
-                .filter(|d| d.category == Category::Required || d.category == Category::Optional)
-                .map(|d| {
-                    let ok = check_dep(d);
-                    Row::new(
-                        if ok { Status::Ok } else { Status::Bad },
-                        d.bin,
-                        if ok { "installed" } else { "missing" },
-                    )
-                })
-                .chain(PLUGINS.iter().map(|p| {
-                    let ok = check_plugin(p);
-                    Row::new(
-                        if ok { Status::Ok } else { Status::Bad },
-                        p.name,
-                        if ok { "zsh" } else { "missing" },
-                    )
-                }))
+            app.dash_cache.tools
+                .iter()
+                .map(|(d, ok)| Row::new(
+                    if *ok { Status::Ok } else { Status::Bad },
+                    d.bin,
+                    if *ok { "installed" } else { "missing" },
+                ))
+                .chain(app.dash_cache.zsh_plugins.iter().map(|(p, ok)| Row::new(
+                    if *ok { Status::Ok } else { Status::Bad },
+                    p.name,
+                    if *ok { "zsh" } else { "missing" },
+                )))
                 .collect(),
         ),
         Pane::Configs => problems_first(
-            crate::configs::discover()
+            app.dash_cache.configs
                 .iter()
-                .map(|c| {
-                    let (ok, total) = c.link_counts();
+                .map(|(c, ok, total)| {
                     // An unapplied config is pending, not broken — it is a
                     // choice the user has not made yet.
                     let status = match c.status {
                         crate::configs::ConfigStatus::Installed => Status::Ok,
-                        _ if ok > 0 => Status::Partial,
+                        _ if *ok > 0 => Status::Partial,
                         _ => Status::Pending,
                     };
                     Row::new(status, c.name.clone(), format!("{ok}/{total}"))
@@ -533,10 +572,10 @@ fn pane_summary(pane: Pane, app: &App) -> Vec<String> {
     }
 
     match pane {
-        Pane::Symlinks => counts(&symlink_summary(), "links", "missing"),
-        Pane::Tools    => counts(&tool_summary(), "tools", "missing"),
+        Pane::Symlinks => counts(&symlink_summary(&app.dash_cache), "links", "missing"),
+        Pane::Tools    => counts(&tool_summary(&app.dash_cache), "tools", "missing"),
         Pane::Configs  => {
-            let s = config_summary();
+            let s = config_summary(&app.dash_cache);
             let mut parts = vec![format!("{} configs", s.total)];
             if s.total > 0 {
                 parts.push(format!("{} installed", s.ok));

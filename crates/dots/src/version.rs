@@ -44,6 +44,10 @@ pub fn long() -> &'static str {
     static LONG: std::sync::OnceLock<String> = std::sync::OnceLock::new();
     LONG.get_or_init(|| {
         let mut s = VERSION.to_string();
+        // COMMIT is empty only when built outside a git checkout; clippy sees
+        // a fixed value baked in by this particular build and flags the check
+        // as dead, but it varies across build environments.
+        #[allow(clippy::const_is_empty)]
         if !COMMIT.is_empty() {
             s.push_str(&format!("\ncommit:   {COMMIT}"));
         }

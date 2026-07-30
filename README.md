@@ -14,7 +14,7 @@
 - **App configs** — every directory in your dotfiles repo (`nvim/`, `git/`, `bat/`, …) shows up in the TUI's **Configs** screen with an install-status badge (`[ installed ]` / `[ partial ]` / `[ not installed ]`); view a config's files, preview their contents, and install/remove it by (un)linking into `$HOME`.
 - **Premade configs** — bundled starter configs for Ghostty, Neovim, and opencode, applied on demand (existing files are backed up).
 - **Portable profiles** — export your setup to `personal.json` and re-import it on another machine, locally or straight from GitHub.
-- **Self-updating** — built-in update checker and one-command upgrade.
+- **Self-updating** — built-in update checker and one-command upgrade; a boxed banner in the corner of the TUI flags when a newer release is found.
 - **Single static binary** — no runtime dependencies (pure-Rust TLS, no OpenSSL/keychain), optimized for size.
 
 Release-by-release history lives in [`CHANGELOG.md`](CHANGELOG.md).
@@ -25,7 +25,7 @@ Release-by-release history lives in [`CHANGELOG.md`](CHANGELOG.md).
 curl -fsSL https://ctrluserknown.github.io/dots/install.sh | sh
 ```
 
-The installer clones the repo to `~/.dots`, downloads a prebuilt binary for your OS/arch (or builds from source with `cargo` if no release matches), puts `dots` on your `PATH`, and initializes config.
+The installer downloads a prebuilt binary for your OS/arch straight from GitHub Releases (or builds from source in a scratch dir with `cargo` if no release matches — no `git` required either way), puts it in `~/.dots/bin` and on your `PATH`, and initializes config. It never clones this tool's own repo — the only git repo you need is your own personal dotfiles repo, which `dots` manages separately (see `dots get-config`). Upgrading from an install made before this changed: the installer detects a leftover full-repo clone at `~/.dots` and removes the stale tool-repo files (`.git`, `Cargo.toml`, `crates/`, …) on your next run, leaving your `settings.toml`/`links.toml`/`plugins/`/`src/` untouched.
 
 ```
 install.sh [--version <tag>] [--dir <path>]
@@ -106,6 +106,8 @@ The dependency list is defined in [`crates/dots/src/packages.rs`](crates/dots/sr
 The dashboard is a set of **zones**, each holding an ordered list of **widgets**. A widget is either a built-in tile — `symlinks`, `tools`, `configs`, `plugins`, `network` — or a pane registered by a [Lua plugin](#plugins-lua). Zones are yours to arrange: `dots layout init` writes the current layout to `~/.dots/layout.toml`, and `dots layout show` prints where every widget ended up (plugins included) without opening the TUI.
 
 With no layout file you get the default — one untitled zone holding the five built-ins in two columns, exactly the dashboard dots has always drawn. Delete `layout.toml` to return to it.
+
+Prefer not to hand-edit TOML? Settings → **Dashboard blocks** opens an in-TUI editor over the same `layout.toml` — swap, add, remove, and reorder the widgets in each zone (built-ins and live plugin panes alike), applied to disk as you go.
 
 | Key | Scope | Meaning |
 |---|---|---|

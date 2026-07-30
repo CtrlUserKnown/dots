@@ -19,7 +19,7 @@
 
 window.DOTS = (function () {
 
-  var VERSION = '2.2.0';
+  var VERSION = '2.3.0';
   var REPO    = 'https://github.com/CtrlUserKnown/dots';
   var SITE    = 'https://ctrluserknown.github.io/dots/';
   var INSTALL = 'curl -fsSL ' + SITE + 'install.sh | sh';
@@ -68,21 +68,22 @@ window.DOTS = (function () {
       { rule: 'what the installer does' },
       { todo: [
         ['x', 'Detect your OS and architecture'],
-        ['x', 'Clone the repo to `~/.dots`'],
-        ['x', 'Download a prebuilt binary — or `cargo build` if no release matches'],
+        ['x', 'Download a prebuilt binary from GitHub Releases — or fetch a source tarball and `cargo build` in a scratch dir if no release matches'],
         ['x', 'Put `dots` on your `PATH` (`~/.dots/bin/dots`)'],
         ['x', 'Run `dots init` to write the default config'],
         [' ', 'Run `dots` to open the TUI'],
       ] },
+      { text: 'No `git` involved — the installer only ever needs `curl` or `wget`. It never clones this tool\'s own repo; the only git repo you need is your own personal dotfiles repo, which `dots` manages separately.' },
       { rule: 'flags' },
       { code: 'install.sh [--version <tag>] [--dir <path>]' },
       { kv: [
-        ['--version', 'pin a release tag, e.g. `--version v2.2.0`'],
+        ['--version', 'pin a release tag, e.g. `--version v2.3.0`'],
         ['--dir',     'install somewhere other than `~/.dots`'],
       ] },
       { rule: 'from source' },
       { code: 'git clone ' + REPO + ' && cargo build --release', copy: true },
       { note: 'Binary lands at `target/release/dots`. To remove everything: `uninstall.sh`.' },
+      { note: 'Upgrading from an older install that cloned the full repo into `~/.dots`? The next run of `install.sh` cleans up the leftover tool-repo files automatically — your `settings.toml`/`links.toml`/`plugins/` are left untouched.' },
       { cmds: [
         ['/tui',  'see the dashboard you get after installing'],
         ['/docs requirements', 'what you need first'],
@@ -106,7 +107,7 @@ window.DOTS = (function () {
       { rule: 'and' },
       { list: [
         '**Lua plugins** — [add your own dashboard panes](cmd:/plugins) with a few lines of Lua',
-        '**Self-updating** — built-in update check, one-command upgrade with SHA-256 verified release tarballs',
+        '**Self-updating** — built-in update check, one-command upgrade with SHA-256 verified release tarballs; a boxed banner in the TUI\'s corner flags a newer release the moment it\'s found',
         '**Network pane** — live connectivity, latency, DNS, and VPN status via platform probes',
       ] },
       { cmds: [
@@ -201,7 +202,8 @@ window.DOTS = (function () {
         ['Aliases',  'built-in and user aliases; add, edit, remove'],
         ['Profile',  'export and import your personal configuration'],
         ['Theme',    'pick from 200+ built-in Ghostty themes'],
-        ['Settings', 'update checks, greeting, developer mode — and the update popup'],
+        ['Settings', 'update checks, greeting, developer mode, and the dashboard blocks editor'],
+        ['Blocks',   'reassign which widgets sit in which dashboard zone, in place of hand-editing `layout.toml`'],
       ] },
       { rule: 'keys' },
       { kv: [
@@ -329,11 +331,11 @@ window.DOTS = (function () {
     requirements: function () { return [
       { text: 'dots runs on macOS and Linux as a single static binary — no runtime dependencies, no OpenSSL, no keychain.' },
       { kv: [
-        ['macOS', 'Homebrew for package installs'],
-        ['Linux', '`apt` (Debian/Ubuntu) or `dnf` (Fedora/RHEL)'],
-        ['git',   'used for the repo checkout and self-update'],
-        ['shell', 'zsh, bash, or fish'],
-        ['rust',  'only if you build from source (`cargo build --release`)'],
+        ['macOS',        'Homebrew for package installs'],
+        ['Linux',        '`apt` (Debian/Ubuntu) or `dnf` (Fedora/RHEL)'],
+        ['curl / wget',  'either one — used by the installer and self-updater; no `git` dependency'],
+        ['shell',        'zsh, bash, or fish'],
+        ['rust',         'only if you build from source (`cargo build --release`)'],
       ] },
     ]; },
 
@@ -416,7 +418,7 @@ window.DOTS = (function () {
     ]; },
 
     updating: function () { return [
-      { text: 'dots checks for new releases in the background (`update_check`, every `update_frequency` minutes) and surfaces them in the Settings popup.' },
+      { text: 'dots checks for new releases in the background (`update_check`, every `update_frequency` minutes). A newer release shows up two ways: a boxed banner in the TUI\'s top-right corner for a few seconds, and a row in the Settings popup for as long as it stays unapplied.' },
       { code: 'dots update', copy: true },
       { text: 'Updates download a release tarball from GitHub Releases and verify its SHA-256 before swapping the binary. If dots was installed through a package manager, it defers to that instead.' },
     ]; },
@@ -425,6 +427,7 @@ window.DOTS = (function () {
       { text: 'Working on dots itself:' },
       { code: 'cargo test --all\ncargo clippy --all -- -D warnings\ncargo fmt --all -- --check\nbash tests/integration/test_setup.sh' },
       { text: 'An isolated container environment lives in [`test-env/`](' + REPO + '/tree/main/test-env); the manual QA checklist is in [`docs/manual-test-checklist.md`](' + REPO + '/blob/main/docs/manual-test-checklist.md). CI runs on Linux and macOS.' },
+      { text: 'Releasing is just a tag push — bump `Cargo.toml`, `git tag vX.Y.Z && git push origin vX.Y.Z`, and CI builds and uploads all four platform binaries. See [`BUILD_MACOS.md`](' + REPO + '/blob/main/BUILD_MACOS.md#releasing).' },
     ]; },
   };
 
@@ -619,7 +622,7 @@ window.DOTS = (function () {
     return [
       { screen: [
         '<span class="dim">  ▸</span> detecting platform…            <span class="c-green">linux-x86_64</span>',
-        '<span class="dim">  ▸</span> cloning CtrlUserKnown/dots…    <span class="c-green">~/.dots</span>',
+        '<span class="dim">  ▸</span> resolving latest release…      <span class="c-green">v' + VERSION + '</span>',
         '<span class="dim">  ▸</span> fetching release v' + VERSION + '…       <span class="c-green">2.1 MB</span>',
         '<span class="dim">  ▸</span> verifying sha-256…             <span class="c-green">ok</span>',
         '<span class="dim">  ▸</span> linking ~/.dots/bin/dots…      <span class="c-green">on PATH</span>',
@@ -688,7 +691,7 @@ window.DOTS = (function () {
         return [{ text: 'dots drives your package manager for you — one dependency list, resolved per platform. See [/docs deps](cmd:/docs deps).' }];
       } },
     { re: /^git\s+clone/,            run: function () {
-        return [{ text: 'The installer clones it for you: [/install](cmd:/install).' }];
+        return [{ text: 'No clone needed — the installer downloads a prebuilt binary straight from GitHub Releases: [/install](cmd:/install).' }];
       } },
     { re: /^(vim|nvim|nano|emacs|vi)\b/, run: function () {
         return [{ text: 'No editor in here. dots does symlink `~/.config/nvim` for you, though — [/docs configs](cmd:/docs configs).' }];

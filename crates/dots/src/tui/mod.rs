@@ -1,5 +1,6 @@
 pub mod aliases;
 pub mod app;
+pub mod blocks;
 pub mod configs;
 pub mod health;
 pub mod overview;
@@ -11,8 +12,8 @@ pub mod update;
 // model now live in the `tui-core` crate, shared with `ssm`. Re-export them so
 // existing `crate::tui::…` paths across the dots screens keep resolving.
 pub use tui_core::{
-    block, draw_desc, draw_footer, draw_header, draw_header_right, draw_key_bar, draw_nav_bar,
-    draw_top_bar, plain_block, status_row, summary_line, theme, FlashKind, Status,
+    block, draw_banner, draw_desc, draw_footer, draw_header, draw_header_right, draw_key_bar,
+    draw_nav_bar, draw_top_bar, plain_block, status_row, summary_line, theme, FlashKind, Status,
 };
 
 /// The nav strip every sibling screen draws at the top. Screens call this

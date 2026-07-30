@@ -81,19 +81,19 @@ pub static PREMADE_CONFIGS: &[PremadeConfig] = &[
     PremadeConfig {
         app:         "ghostty",
         description: "Ghostty terminal — Catppuccin Mocha theme + sensible defaults",
-        dest:        || dirs::home_dir().unwrap_or_default().join(".config/ghostty/config"),
+        dest:        || dirs::home_dir().expect("home dir must exist").join(".config/ghostty/config"),
         content:     include_str!("../assets/premade/ghostty/config"),
     },
     PremadeConfig {
         app:         "neovim",
         description: "Minimal Neovim config (lazy.nvim bootstrap)",
-        dest:        || dirs::home_dir().unwrap_or_default().join(".config/nvim/init.lua"),
+        dest:        || dirs::home_dir().expect("home dir must exist").join(".config/nvim/init.lua"),
         content:     include_str!("../assets/premade/neovim/init.lua"),
     },
     PremadeConfig {
         app:         "opencode",
         description: "Opencode AI terminal config",
-        dest:        || dirs::home_dir().unwrap_or_default().join(".config/opencode/config.json"),
+        dest:        || dirs::home_dir().expect("home dir must exist").join(".config/opencode/config.json"),
         content:     include_str!("../assets/premade/opencode/config.json"),
     },
 ];
@@ -137,9 +137,20 @@ pub fn write_premade(content: &str, dest: &Path) -> Result<()> {
             .with_context(|| format!("creating {}", parent.display()))?;
     }
     if dest.exists() {
+        // Re-applying an already-applied premade (or hitting `apply` twice) must
+        // not clobber the user's original with premade content: bail out before
+        // touching the backup once `dest` already matches what we'd write.
+        if std::fs::read_to_string(dest).map(|c| c == content).unwrap_or(false) {
+            return Ok(());
+        }
+        // Keep only the *first* backup — it holds the user's real original.
+        // A later apply (e.g. onto a premade the user has since hand-edited)
+        // must not overwrite that with the in-between state.
         let bak = PathBuf::from(format!("{}.bak", dest.display()));
-        std::fs::copy(dest, &bak)
-            .with_context(|| format!("backing up {}", dest.display()))?;
+        if !bak.exists() {
+            std::fs::copy(dest, &bak)
+                .with_context(|| format!("backing up {}", dest.display()))?;
+        }
     }
     let tmp = PathBuf::from(format!("{}.tmp", dest.display()));
     std::fs::write(&tmp, content).context("writing premade config")?;
@@ -203,6 +214,24 @@ mod tests {
         assert!(bak.exists(), "backup not found");
         assert_eq!(fs::read_to_string(&bak).unwrap(), "original");
         assert_eq!(fs::read_to_string(&dest).unwrap(), "new content");
+    }
+
+    #[test]
+    fn premade_apply_twice_preserves_original_backup() {
+        let tmp  = tempdir().unwrap();
+        let dest = tmp.path().join("config");
+        fs::write(&dest, "the user's real config").unwrap();
+
+        write_premade("premade content", &dest).unwrap();
+        write_premade("premade content", &dest).unwrap(); // re-apply, e.g. run twice
+
+        let bak = PathBuf::from(format!("{}.bak", dest.display()));
+        assert_eq!(
+            fs::read_to_string(&bak).unwrap(),
+            "the user's real config",
+            "second apply must not overwrite the backup with premade content"
+        );
+        assert_eq!(fs::read_to_string(&dest).unwrap(), "premade content");
     }
 
     #[test]

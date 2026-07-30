@@ -239,10 +239,16 @@ fn upsert_manifest_link(source: &Path, target: &Path) -> Result<()> {
         .as_array_of_tables_mut()
         .ok_or_else(|| anyhow::anyhow!("'link' in links.toml is not an array of tables"))?;
 
-    if arr
-        .iter()
-        .any(|t| t.get("target").and_then(|v| v.as_str()) == Some(tgt_s.as_str()))
-    {
+    // Compare on the expanded, absolute path — not the raw manifest string —
+    // so this agrees with `remove_manifest_link`'s notion of "same target"
+    // regardless of whether an entry was written as `~/…` or an absolute path.
+    if arr.iter().any(|t| {
+        t.get("target")
+            .and_then(|v| v.as_str())
+            .map(expand_path)
+            .as_deref()
+            == Some(target)
+    }) {
         bail!("a link for target {} already exists in links.toml", tgt_s);
     }
 

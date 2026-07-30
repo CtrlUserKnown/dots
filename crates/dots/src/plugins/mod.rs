@@ -11,9 +11,10 @@
 //!   want their own region rather than a tile in the user's; `ui.layout{
 //!   columns = N }` sets the grid's column count.
 //! * **`dots`** — integration helpers. `dots.sh(cmd)` runs a shell command and
-//!   returns its trimmed stdout (this is what drives `gh`, `aws`, …);
-//!   `dots.env(name)` and `dots.dir()` expose the environment and the `~/.dots`
-//!   path.
+//!   returns its trimmed stdout (this is what drives `gh`, `aws`, …), killing
+//!   it and returning `""` if it runs past [`SH_TIMEOUT`] since it blocks the
+//!   TUI thread (see that constant's doc); `dots.env(name)` and `dots.dir()`
+//!   expose the environment and the `~/.dots` path.
 //!
 //! Plugins are trusted like any other dotfile — there is no sandbox. A plugin
 //! that fails to load is recorded as an error (surfaced by `dots plugins list`)
@@ -24,7 +25,9 @@
 pub mod layout;
 
 use std::cell::{Cell, RefCell};
+use std::io::Read;
 use std::path::PathBuf;
+use std::process::{Command, Stdio};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
@@ -35,9 +38,56 @@ use crate::config::settings::dots_dir;
 /// Default seconds between `render()` calls for a pane that doesn't set one.
 const DEFAULT_REFRESH: u64 = 30;
 
+/// Ceiling on how long `dots.sh()` may block the TUI thread. `render()` calls
+/// run synchronously on the main event loop (see module docs — the `Lua`
+/// state isn't `Send`, so there's nowhere else to run them), so a plugin
+/// shelling out to something slow/network-bound (`gh`, `aws`, …) would
+/// otherwise freeze the whole dashboard indefinitely. This bounds the freeze
+/// instead of eliminating it.
+const SH_TIMEOUT: Duration = Duration::from_secs(5);
+
 /// Where user plugins live: `~/.dots/plugins/`.
 pub fn plugins_dir() -> PathBuf {
     dots_dir().join("plugins")
+}
+
+/// Run `cmd` via `sh -c`, killing it and returning an empty string if it
+/// doesn't finish within `timeout`. Polls rather than blocking on `wait()` so
+/// the caller's thread is never held past `timeout`, no matter how long the
+/// child runs.
+fn run_shell(cmd: &str, timeout: Duration) -> String {
+    let mut child = match Command::new("sh")
+        .arg("-c")
+        .arg(cmd)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+    {
+        Ok(c) => c,
+        Err(_) => return String::new(),
+    };
+
+    let start = Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => {
+                let mut out = String::new();
+                if let Some(mut stdout) = child.stdout.take() {
+                    let _ = stdout.read_to_string(&mut out);
+                }
+                return out.trim().to_string();
+            }
+            Ok(None) => {
+                if start.elapsed() >= timeout {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return String::new();
+                }
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            Err(_) => return String::new(),
+        }
+    }
 }
 
 /// Runtime state for one registered pane. `render`/`on_enter` are Lua functions
@@ -340,13 +390,7 @@ fn install_api(
     // ── dots package ───────────────────────────────────────────────────────
     let dots = lua.create_table()?;
 
-    let sh = lua.create_function(|_, cmd: String| {
-        let out = std::process::Command::new("sh").arg("-c").arg(&cmd).output();
-        Ok(match out {
-            Ok(o) => String::from_utf8_lossy(&o.stdout).trim().to_string(),
-            Err(_) => String::new(),
-        })
-    })?;
+    let sh = lua.create_function(|_, cmd: String| Ok(run_shell(&cmd, SH_TIMEOUT)))?;
     dots.set("sh", sh)?;
 
     let env = lua.create_function(|_, name: String| Ok(std::env::var(name).unwrap_or_default()))?;

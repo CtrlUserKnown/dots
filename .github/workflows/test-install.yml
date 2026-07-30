@@ -65,5 +65,48 @@ jobs:
           fi
           echo "✓ binary was downloaded (no cargo build artifacts)"
 
+          # ── the tool repo itself was never cloned ──
+          if [ -d "$HOME/.dots/.git" ]; then
+            echo "FAIL: ~/.dots/.git exists — the tool repo got cloned"
+            exit 1
+          fi
+          echo "✓ no ~/.dots/.git (binary-only install)"
+
           echo ""
           echo "✓ install test passed for $(uname -s)-$(uname -m)"
+
+      - name: Legacy clone migration — seed a pre-rework ~/.dots and re-install
+        run: |
+          set -euo pipefail
+
+          VERSION="${{ steps.latest.outputs.tag }}"
+          ISOLATED_HOME=$(mktemp -d)
+          export HOME="$ISOLATED_HOME"
+
+          # Simulate what installs before this rework left behind: a full git
+          # clone of the tool repo sitting next to the user's real config.
+          mkdir -p "$HOME/.dots"
+          git init -q -b main "$HOME/.dots"
+          git -C "$HOME/.dots" remote add origin https://github.com/CtrlUserKnown/dots.git
+          mkdir -p "$HOME/.dots/crates" "$HOME/.dots/.github"
+          touch "$HOME/.dots/Cargo.toml" "$HOME/.dots/Cargo.lock" "$HOME/.dots/README.md"
+          printf '[dots]\nmarker = "keep-me"\n' > "$HOME/.dots/settings.toml"
+          git -C "$HOME/.dots" add -A
+          git -c user.email=t@t -c user.name=t -C "$HOME/.dots" commit -q -m seed
+
+          curl -fsSL https://ctrluserknown.github.io/dots/install.sh \
+            | sh -s -- --version "$VERSION"
+
+          echo ""
+
+          if [ -d "$HOME/.dots/.git" ] || [ -f "$HOME/.dots/Cargo.toml" ]; then
+            echo "FAIL: legacy tool-repo files were not cleaned up"
+            exit 1
+          fi
+          echo "✓ legacy .git/Cargo.toml removed"
+
+          if ! grep -qF "keep-me" "$HOME/.dots/settings.toml"; then
+            echo "FAIL: settings.toml marker was lost during migration"
+            exit 1
+          fi
+          echo "✓ settings.toml preserved across migration"

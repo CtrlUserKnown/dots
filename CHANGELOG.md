@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- `install.sh` no longer clones this tool's own repo into `~/.dots` — it only ever downloads (or, as a last resort, source-builds in a scratch dir) the `dots` binary itself. The only git repo an install now needs is the user's own personal dotfiles repo. Upgraders with a pre-existing full-repo clone at `~/.dots` get it cleaned up automatically (tool-repo files only — `settings.toml`/`links.toml`/`plugins/`/`src/` are left untouched)
+- Version resolution in `install.sh` now queries the GitHub Releases API instead of `git describe`, and the from-source fallback pulls a tagged source tarball via HTTPS instead of `git clone` — `git` is no longer a dependency of the installer at all
+- The TUI now shows a brief boxed banner in the top-right corner when a newer release is found, instead of relying solely on the easily-overwritten one-line flash message
+
 ## [2.3.0] - 2026-07-27
 
 ### Added

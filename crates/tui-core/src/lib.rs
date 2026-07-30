@@ -10,7 +10,7 @@ use ratatui::{
     layout::Rect,
     style::Modifier,
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Paragraph},
+    widgets::{Block, BorderType, Borders, Clear, Paragraph},
 };
 
 pub mod theme;
@@ -277,6 +277,41 @@ pub fn draw_desc(f: &mut Frame, area: Rect, text: &str, flash: Option<&(String, 
     f.render_widget(widget, desc_rect);
 }
 
+/// A short-lived, boxed notice floated in the top-right corner over whatever
+/// the screen currently shows — for announcements the user should notice
+/// immediately (e.g. "update available") without folding into a screen's own
+/// flash state, which the next keypress would silently overwrite. The caller
+/// owns the lifetime: keep rendering this only while the notice should be
+/// visible, then stop — there is no built-in dismiss/expiry here.
+pub fn draw_banner(f: &mut Frame, area: Rect, text: &str, kind: &FlashKind) {
+    if area.width < 24 || area.height < 5 {
+        return;
+    }
+
+    let style = match kind {
+        FlashKind::Success => style_select(),
+        FlashKind::Error   => style_error(),
+        FlashKind::Info    => style_title(),
+    };
+
+    let inner_w = text.chars().count() as u16 + 2;
+    let width   = (inner_w + 2).min(area.width.saturating_sub(2));
+    let x       = area.x + area.width.saturating_sub(width + 1);
+    let y       = area.y + 1;
+    let rect    = Rect { x, y, width, height: 3 };
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(style);
+
+    f.render_widget(Clear, rect);
+    f.render_widget(
+        Paragraph::new(Line::from(Span::styled(format!(" {text} "), style))).block(block),
+        rect,
+    );
+}
+
 // ── list rows ─────────────────────────────────────────────────────────────────
 
 /// The state a list row reports, which picks both its bullet and its color.
@@ -386,6 +421,40 @@ mod tests {
             draw_header(f, area, " dots ", "1.0.0");
             draw_footer(f, area, " q quit ");
         }).unwrap();
+    }
+
+    /// The banner must never panic, including on terminals too small to fit
+    /// it — [`draw_banner`] should just skip drawing rather than underflow the
+    /// `Rect` math.
+    #[test]
+    fn banner_no_panic_at_any_size() {
+        for (w, h) in [(80, 24), (24, 5), (23, 5), (24, 4), (10, 10), (0, 0)] {
+            let backend = TestBackend::new(w.max(1), h.max(1));
+            let mut terminal = Terminal::new(backend).unwrap();
+            terminal.draw(|f| {
+                let area = f.area();
+                draw_banner(f, area, "Update available: v9.9.9", &FlashKind::Info);
+            }).unwrap();
+        }
+    }
+
+    /// On a terminal with room for it, the banner's text must actually land in
+    /// the buffer — this is what a caller relies on to know the notice was seen.
+    #[test]
+    fn banner_renders_its_text() {
+        let width = 80;
+        let mut term = Terminal::new(TestBackend::new(width, 24)).unwrap();
+        term.draw(|f| {
+            draw_banner(f, f.area(), "Update available: v9.9.9", &FlashKind::Info);
+        })
+        .unwrap();
+
+        let b = term.backend().buffer().clone();
+        let row: String = (0..width).map(|x| b[(x, 2)].symbol().to_string()).collect();
+        assert!(
+            row.contains("Update available: v9.9.9"),
+            "banner text missing from row 2 — got {row:?}",
+        );
     }
 
     /// A row must always fit the width it was measured for, or the columns in a

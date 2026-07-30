@@ -1,8 +1,8 @@
 # Building dots on macOS
 
 Steps to build the `dots` CLI on a macOS machine. The Rust code lives in this
-`dots-rs/` Cargo workspace (crates `dots` + `tui-core`); the `dots` binary is
-the product. Works on both Apple Silicon (arm64) and Intel (x86_64).
+repo's Cargo workspace (crates `dots` + `tui-core`); the `dots` binary is the
+product. Works on both Apple Silicon (arm64) and Intel (x86_64).
 
 Unlike ssm (whose keychain backend links Apple's `Security.framework`), `dots`
 has no platform-locked dependencies — no keychain, no D-Bus, pure-Rust TLS — so
@@ -28,10 +28,9 @@ native requirement.
 
 ## 2. Build
 
-Run from the `dots-rs/` workspace directory:
+Run from the repo root (the workspace directory):
 
 ```bash
-cd dots-rs
 cargo build --release
 # binary: target/release/dots
 ```
@@ -85,6 +84,27 @@ Macs, so users don't hit a Gatekeeper "unidentified developer" warning.
 
   (Bare CLIs can't be stapled; wrap in a `.pkg`/`.dmg` to staple, or rely on
   Gatekeeper's online notarization check.)
+
+## Releasing
+
+Publishing a release doesn't require building anything but the tag — GitHub
+Actions builds every platform binary for you:
+
+1. Bump `[workspace.package].version` in `Cargo.toml` (and let `Cargo.lock`
+   pick it up), commit.
+2. Tag it and push the tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+3. `.github/workflows/release.yml` picks up the tag push, verifies it matches
+   `Cargo.toml`, and builds all four targets — `linux/x86_64`,
+   `linux/aarch64`, `darwin/x86_64`, `darwin/aarch64` — entirely on GitHub's
+   runners (the Linux builds don't need a Linux machine, and the Intel macOS
+   build doesn't need Intel hardware). Each gets packaged as
+   `dots-vX.Y.Z-<os>-<arch>.tar.gz` plus a `.sha256` sidecar and uploaded to
+   the GitHub Release.
+4. `install.sh` and `dots update` both pick the matching asset up
+   automatically — no manual step needed after the tag lands.
+
+A tag pushed from a MacBook is enough to publish a Linux build; nothing here
+needs to run on Linux.
 
 ## Notes
 
